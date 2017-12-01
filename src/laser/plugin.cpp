@@ -274,6 +274,7 @@ void LaserPlugin::initialize(ed::InitData& init)
     // Communication
     sub_scan_ = nh.subscribe<sensor_msgs::LaserScan>(laser_topic, 3, &LaserPlugin::scanCallback, this);
     door_pub_ = nh.advertise<ropod_demo_dec_2017::doorDetection>("door", 3);
+    circle_pub_ = nh.advertise<visualization_msgs::Marker>("circle", 3);
 
     tf_listener_ = new tf::TransformListener;
 
@@ -746,7 +747,7 @@ void LaserPlugin::update(const ed::WorldModel& world, const sensor_msgs::LaserSc
                     }
 
                     geo::Vec2 bb = seg_max - seg_min;
-                    if ((bb.x > min_cluster_size_ || bb.y > min_cluster_size_) && bb.x < max_cluster_size_ && bb.y < max_cluster_size_)
+                    if ((bb .x > min_cluster_size_ || bb.y > min_cluster_size_) && bb.x < max_cluster_size_ && bb.y < max_cluster_size_)
                         segments.push_back(current_segment);
                 }
 
@@ -809,6 +810,14 @@ void LaserPlugin::update(const ed::WorldModel& world, const sensor_msgs::LaserSc
 
         cluster.pose = geo::Pose3D::identity();
         ed::convex_hull::create(points, z_min, z_max, cluster.chull, cluster.pose);
+	
+	ed::convex_hull::Circle circle;
+	visualization_msgs::Marker marker;
+	ed::convex_hull::fitCircle(points, circle, z_min, z_max, cluster.chull, cluster.pose);
+	
+	circle.setMarker(marker);
+	circle_pub_.publish(marker);
+	//http://library.isr.ist.utl.pt/docs/roswiki/rviz(2f)DisplayTypes(2f)Marker.html
 
         // --------------------------
         // Temp for RoboCup 2016; todo: remove after

@@ -45,6 +45,8 @@ private:
     ros::Subscriber sub_scan_;
     
     ros::Publisher door_pub_;
+    
+    ros::Publisher circle_pub_;
 
     std::queue<sensor_msgs::LaserScan::ConstPtr> scan_buffer_;
 
