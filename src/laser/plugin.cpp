@@ -811,9 +811,9 @@ void LaserPlugin::update(const ed::WorldModel& world, const sensor_msgs::LaserSc
         cluster.pose = geo::Pose3D::identity();
         ed::convex_hull::create(points, z_min, z_max, cluster.chull, cluster.pose);
 	
-	ed::convex_hull::Circle circle;
+	ed::tracking::Circle circle;
 	visualization_msgs::Marker marker;
-	ed::convex_hull::fitCircle(points, circle, z_min, z_max, cluster.chull, cluster.pose);
+	ed::tracking::fitCircle(points, circle, z_min, z_max, cluster.pose);
 	
 	circle.setMarker(marker);
 	circle_pub_.publish(marker);
