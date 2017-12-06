@@ -809,7 +809,24 @@ void LaserPlugin::update(const ed::WorldModel& world, const sensor_msgs::LaserSc
         EntityUpdate& cluster = clusters.back();
 
         cluster.pose = geo::Pose3D::identity();
-
+	ed::convex_hull::create(points, z_min, z_max, cluster.chull, cluster.pose);
+	
+	
+	// Circle fitting
+	std::cout << "before" << std::endl;
+		
+	ed::tracking::Circle* pCircle;
+	visualization_msgs::Marker marker;
+	
+//	std::cout << "after" << std::endl;
+	
+ 	ed::tracking::fitCircle(points, pCircle, z_min, z_max, cluster.pose);
+	
+	pCircle->setMarker(marker);
+	circle_pub_.publish(marker);
+	//http://library.isr.ist.utl.pt/docs/roswiki/rviz(2f)DisplayTypes(2f)Marker.html
+	
+	
         // --------------------------
         // Temp for RoboCup 2016; todo: remove after
 
@@ -993,22 +1010,11 @@ void LaserPlugin::update(const ed::WorldModel& world, const sensor_msgs::LaserSc
             id = e->id();
         }
 
-   /*     
-                ed::convex_hull::create(points, z_min, z_max, cluster.chull, cluster.pose);
+       
+               
 	
-//	std::cout << "before" << std::endl;
-		
-	ed::tracking::Circle* pCircle;
-	visualization_msgs::Marker marker;
-	
-//	std::cout << "after" << std::endl;
-	
- 	ed::tracking::fitCircle(points, pCircle, z_min, z_max, cluster.pose);
-	
-	pCircle->setMarker(marker);
-	circle_pub_.publish(marker);
-	//http://library.isr.ist.utl.pt/docs/roswiki/rviz(2f)DisplayTypes(2f)Marker.html
-     */   
+//	
+       
         // Set convex hull and pose
         if (!new_chull.points.empty())
         {
