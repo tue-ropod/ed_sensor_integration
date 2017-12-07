@@ -811,14 +811,15 @@ void LaserPlugin::update(const ed::WorldModel& world, const sensor_msgs::LaserSc
 
         cluster.pose = geo::Pose3D::identity();
         ed::convex_hull::create ( points, z_min, z_max, cluster.chull, cluster.pose );
-/*
+
         bool circle_fitting = false;
 	bool rectangle_fitting = true;
 	
 	 std::cout << "bla" << std::endl;
         // Circle fitting
         if ( circle_fitting ) {
-            ed::tracking::Circle* pCircle;
+            ed::tracking::Circle circle;
+	    ed::tracking::Circle* pCircle = &circle;
             visualization_msgs::Marker marker;
 
             ed::tracking::fitCircle ( points, pCircle, cluster.pose );
@@ -829,15 +830,16 @@ void LaserPlugin::update(const ed::WorldModel& world, const sensor_msgs::LaserSc
         } 
         else if(rectangle_fitting){
 	  std::cout << "rectangle fitting" << std::endl;
-	  ed::tracking::Rectangle* pRectangle;
+	  ed::tracking::Rectangle rectangle;
+	  ed::tracking::Rectangle* pRectangle = &rectangle;
 	  visualization_msgs::Marker marker;
 	  
 	  std::cout << "Start fitRectangle" << std::endl;
 	  ed::tracking::fitRectangle ( points, pRectangle, cluster.pose );
-	 // pRectangle->setMarker ( marker , ++ID);
-	 // circle_pub_.publish ( marker ); // TODO: rename circle_pub_ as it is used for rectangles now as well
+	  pRectangle->setMarker ( marker , ++ID);
+	  circle_pub_.publish ( marker ); // TODO: rename circle_pub_ as it is used for rectangles now as well
 	}
-*/
+
 
         // --------------------------
         // Temp for RoboCup 2016; todo: remove after
