@@ -394,11 +394,11 @@ void LaserPlugin::update(const ed::WorldModel& world, const sensor_msgs::LaserSc
 
 	//std::cout << "BLA0 = " << e->hasType("hospital_test/door") << "type = " << e->type() << std::endl;
 
-	std::cout << "Localization plugin: id = " << e->id() << ". shape = " << e->shape() << std::endl;
+	//std::cout << "Localization plugin: id = " << e->id() << ". shape = " << e->shape() << std::endl;
 	
         if (e->shape() && e->has_pose() && !(e->hasType("left_door") || e->hasType("door_left") || e->hasType("right_door") || e->hasType("door_right" ) || e->hasFlag("non-localizable")))
         {
-	  std::cout << "Shape after = " << e->shape() << std::endl;
+	 // std::cout << "Shape after = " << e->shape() << std::endl;
             // Set render options
             geo::LaserRangeFinder::RenderOptions opt;
             opt.setMesh(e->shape()->getMesh(), sensor_pose_inv * e->pose());
@@ -769,8 +769,9 @@ void LaserPlugin::update(const ed::WorldModel& world, const sensor_msgs::LaserSc
 
     // - - - - - - - - - - - - - - - - - -
     // Convert the segments to convex hulls, and check for collisions with other convex hulls
-
+//std::cout << "bla heu" << std::endl;
     std::vector<EntityUpdate> clusters;
+    unsigned int ID = 0; // To Do: After tracking, the right ID's should be created. The ID's are used to have multiple markers.
 
     for(std::vector<ScanSegment>::const_iterator it = segments.begin(); it != segments.end(); ++it)
     {
@@ -805,36 +806,48 @@ void LaserPlugin::update(const ed::WorldModel& world, const sensor_msgs::LaserSc
             }
         }
 
-        clusters.push_back(EntityUpdate());
+        clusters.push_back ( EntityUpdate() );
         EntityUpdate& cluster = clusters.back();
 
         cluster.pose = geo::Pose3D::identity();
-	ed::convex_hull::create(points, z_min, z_max, cluster.chull, cluster.pose);
+        ed::convex_hull::create ( points, z_min, z_max, cluster.chull, cluster.pose );
+/*
+        bool circle_fitting = false;
+	bool rectangle_fitting = true;
 	
-	
-	// Circle fitting
-	std::cout << "before" << std::endl;
-		
-	ed::tracking::Circle* pCircle;
-	visualization_msgs::Marker marker;
-	
-//	std::cout << "after" << std::endl;
-	
- 	ed::tracking::fitCircle(points, pCircle, z_min, z_max, cluster.pose);
-	
-	pCircle->setMarker(marker);
-	circle_pub_.publish(marker);
-	//http://library.isr.ist.utl.pt/docs/roswiki/rviz(2f)DisplayTypes(2f)Marker.html
-	
-	
+	 std::cout << "bla" << std::endl;
+        // Circle fitting
+        if ( circle_fitting ) {
+            ed::tracking::Circle* pCircle;
+            visualization_msgs::Marker marker;
+
+            ed::tracking::fitCircle ( points, pCircle, cluster.pose );
+	   
+            pCircle->setMarker ( marker , ++ID);
+            circle_pub_.publish ( marker );
+            //http://library.isr.ist.utl.pt/docs/roswiki/rviz(2f)DisplayTypes(2f)Marker.html
+        } 
+        else if(rectangle_fitting){
+	  std::cout << "rectangle fitting" << std::endl;
+	  ed::tracking::Rectangle* pRectangle;
+	  visualization_msgs::Marker marker;
+	  
+	  std::cout << "Start fitRectangle" << std::endl;
+	  ed::tracking::fitRectangle ( points, pRectangle, cluster.pose );
+	 // pRectangle->setMarker ( marker , ++ID);
+	 // circle_pub_.publish ( marker ); // TODO: rename circle_pub_ as it is used for rectangles now as well
+	}
+*/
+
         // --------------------------
         // Temp for RoboCup 2016; todo: remove after
 
         // Determine the cluster size
         geo::Vec2f diff = points.back() - points.front();
         float size_sq = diff.length2();
-        if (size_sq > 0.35 * 0.35 && size_sq < 0.8 * 0.8)
+        if ( size_sq > 0.35 * 0.35 && size_sq < 0.8 * 0.8 ) {
             cluster.flag = "possible_human";
+        }
 
         // --------------------------
     }
