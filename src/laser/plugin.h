@@ -21,6 +21,11 @@
 #include "ed/convex_hull.h"
 
 
+#define MIN_ANGLE_CIRCLE M_PI_2
+#define MAX_ANGLE_CIRCLE M_PI_2+M_PI_4
+#define MAX_DEV_CIRCLE 8.6*M_PI/180
+#define MAX_MARGIN_LINE 5.0*M_PI/180
+
 // ----------------------------------------------------------------------------------------------------
 
 class LaserPlugin : public ed::Plugin

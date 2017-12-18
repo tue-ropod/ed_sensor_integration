@@ -812,34 +812,54 @@ void LaserPlugin::update(const ed::WorldModel& world, const sensor_msgs::LaserSc
         cluster.pose = geo::Pose3D::identity();
         ed::convex_hull::create ( points, z_min, z_max, cluster.chull, cluster.pose );
 
-        bool circle_fitting = false;
-	bool rectangle_fitting = true;
 	
+	
+	// Fit circles and lines to the segmented objects
+        bool circle_fitting = false;
+	bool rectangle_fitting = false;
+	
+	// first, determine the inscribed radius of all points
+	float mean_iav, std_dev_iav;
+	unsigned int min_counter;
+	
+	std::vector<float> iav = ed::tracking::inscribedRadius ( points, &mean_iav, &std_dev_iav, &min_counter );
+	
+	/*if(mean_iav >= MIN_ANGLE_CIRCLE && mean_iav <= MAX_ANGLE_CIRCLE && std_dev_iav < MAX_DEV_CIRCLE){
+	  circle_fitting = true;
+	} else{*/
+	  rectangle_fitting = true;
+	//}
+	  
 	 std::cout << "bla" << std::endl;
         // Circle fitting
         if ( circle_fitting ) {
             ed::tracking::Circle circle;
-	    ed::tracking::Circle* pCircle = &circle;
             visualization_msgs::Marker marker;
 
-            ed::tracking::fitCircle ( points, pCircle, cluster.pose );
+            ed::tracking::fitCircle ( points, &circle, cluster.pose );
 	   
-            pCircle->setMarker ( marker , ++ID);
+            circle.setMarker ( marker , ++ID);
             circle_pub_.publish ( marker );
             //http://library.isr.ist.utl.pt/docs/roswiki/rviz(2f)DisplayTypes(2f)Marker.html
         } 
         else if(rectangle_fitting){
-	  std::cout << "rectangle fitting" << std::endl;
+	  //std::cout << "rectangle fitting" << std::endl;
 	  ed::tracking::Rectangle rectangle;
-	  ed::tracking::Rectangle* pRectangle = &rectangle;
 	  visualization_msgs::Marker marker;
 	  
-	  std::cout << "Start fitRectangle" << std::endl;
-	  ed::tracking::fitRectangle ( points, pRectangle, cluster.pose );
-	  pRectangle->setMarker ( marker , ++ID);
-	  circle_pub_.publish ( marker ); // TODO: rename circle_pub_ as it is used for rectangles now as well
+	 // std::cout << "Start fitRectangle-function" << std::endl;
+	  if(ed::tracking::fitRectangle ( points, &rectangle, cluster.pose) )
+	  {
+	    std::cout << "Marker "<< ID << "set" << std::endl;
+	      rectangle.setMarker ( marker , ++ID);
+	      rectangle.printValues();
+	      circle_pub_.publish ( marker ); // TODO: rename circle_pub_ as it is used for rectangles now as well
+	  } else {
+	    std::cout << "WARNING: PROBLEMS "<< std::endl;
+	  }
+	  
 	}
-
+	std::cout << "bla finished. Points size = " << points.size() << std::endl;
 
         // --------------------------
         // Temp for RoboCup 2016; todo: remove after
