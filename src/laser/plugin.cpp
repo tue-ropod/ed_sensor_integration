@@ -812,25 +812,23 @@ void LaserPlugin::update(const ed::WorldModel& world, const sensor_msgs::LaserSc
         cluster.pose = geo::Pose3D::identity();
         ed::convex_hull::create ( points, z_min, z_max, cluster.chull, cluster.pose );
 
+	 std::cout << "bla" << std::endl;	
+	unsigned int cornerIndex;
+	ed::tracking::Circle circle;
+	ed::tracking::Rectangle rectangle;
+	visualization_msgs::Marker marker;
 	
-	
-	// Fit circles and lines to the segmented objects
-        bool circle_fitting = false;
-	bool rectangle_fitting = false;
-	
-	// first, determine the inscribed radius of all points
-	float mean_iav, std_dev_iav;
-	unsigned int min_counter;
-	
-	std::vector<float> iav = ed::tracking::inscribedRadius ( points, &mean_iav, &std_dev_iav, &min_counter );
-	
-	/*if(mean_iav >= MIN_ANGLE_CIRCLE && mean_iav <= MAX_ANGLE_CIRCLE && std_dev_iav < MAX_DEV_CIRCLE){
-	  circle_fitting = true;
-	} else{*/
-	  rectangle_fitting = true;
-	//}
+	ed::tracking::FITTINGMETHOD method = ed::tracking::determineCase ( points, &cornerIndex);
+	if( !ed::tracking::fitObject ( points, cluster.pose, method,  &cornerIndex, &rectangle, &circle, &ID, marker) )
+	{
+	   std::cout << "WARNING: PROBLEMS "<< std::endl;
+	} else {
+	    circle_pub_.publish ( marker );	  
+	}
 	  
-	 std::cout << "bla" << std::endl;
+	std::cout << "bla finished. Points size = " << points.size() << std::endl;
+
+	/*
         // Circle fitting
         if ( circle_fitting ) {
             ed::tracking::Circle circle;
@@ -859,8 +857,8 @@ void LaserPlugin::update(const ed::WorldModel& world, const sensor_msgs::LaserSc
 	  }
 	  
 	}
-	std::cout << "bla finished. Points size = " << points.size() << std::endl;
-
+	
+*/
         // --------------------------
         // Temp for RoboCup 2016; todo: remove after
 
