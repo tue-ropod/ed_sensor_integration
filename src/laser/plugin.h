@@ -20,6 +20,8 @@
 // Properties
 #include "ed/convex_hull.h"
 
+#define MAX_CORRIDOR_WIDTH 4 // [m]
+
 // ----------------------------------------------------------------------------------------------------
 
 class LaserPlugin : public ed::Plugin
