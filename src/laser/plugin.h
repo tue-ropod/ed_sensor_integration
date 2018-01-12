@@ -20,7 +20,7 @@
 // Properties
 #include "ed/convex_hull.h"
 
-#define MAX_CORRIDOR_WIDTH 4 // [m]
+#define MAX_CORRIDOR_WIDTH 3 // [m]
 
 // ----------------------------------------------------------------------------------------------------
 
@@ -47,7 +47,7 @@ private:
     
     ros::Publisher door_pub_;
     
-    ros::Publisher circle_pub_;
+    ros::Publisher ObjectMarkers_pub_;
 
     std::queue<sensor_msgs::LaserScan::ConstPtr> scan_buffer_;
 

@@ -267,7 +267,7 @@ void LaserPlugin::initialize ( ed::InitData& init )
     // Communication
     sub_scan_ = nh.subscribe<sensor_msgs::LaserScan> ( laser_topic, 3, &LaserPlugin::scanCallback, this );
     door_pub_ = nh.advertise<ropod_demo_dec_2017::doorDetection> ( "door", 3 );
-    circle_pub_ = nh.advertise<visualization_msgs::Marker> ( "circle", 3 );
+    ObjectMarkers_pub_ = nh.advertise<visualization_msgs::Marker> ( "ObjectMarkers", 3 );
 
     tf_listener_ = new tf::TransformListener;
 
@@ -769,82 +769,28 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
         cluster.pose = geo::Pose3D::identity();
         ed::convex_hull::create ( points, z_min, z_max, cluster.chull, cluster.pose );
 
-        std::cout << "bla" << std::endl;
         unsigned int cornerIndex;
         ed::tracking::Circle circle;
         ed::tracking::Rectangle rectangle;
         visualization_msgs::Marker marker_circle, marker_rectangle;
-	std::vector<geo::Vec2f>::iterator it_low, it_high;
+        std::vector<geo::Vec2f>::iterator it_low, it_high;
 
-std::cout << "\n\n\n\n\n\n\n";
-std::cout << "Points = " << std::endl;
-for(int ii = 0; ii < points.size(); ++ii)
-{
-  std::cout << points[ii].x << ", " << points[ii].y << ";" << std::endl;
-}
-
-std::cout << "nPoints = " << points.size() << std::endl;
-
-       /* ed::tracking::FITTINGMETHOD method = ed::tracking::determineCase ( points, &cornerIndex, &it_low, &it_high );
-	
-	float error_rectangle = ed::tracking::fitObject ( points, cluster.pose, method,  &cornerIndex, &rectangle, &circle, &ID, &marker_rectangle, &it_low, &it_high );
-	
-	rectangle.setMarker ( marker_rectangle , ++ID );
-	    rectangle.printValues();
-            circle_pub_.publish ( marker_rectangle );
-	*/
-        //std::cout << "Case = " << method << std::endl;
         ed::tracking::FITTINGMETHOD method = ed::tracking::CIRCLE;
-        float error_circle = ed::tracking::fitObject ( points, cluster.pose, method,  &cornerIndex, &rectangle, &circle, &ID, &marker_circle, &it_low, &it_high  );
+        float error_circle = ed::tracking::fitObject ( points, cluster.pose, method,  &cornerIndex, &rectangle, &circle, &ID, &marker_circle, &it_low, &it_high );
 
-        method = ed::tracking::determineCase ( points, &cornerIndex, &it_low, &it_high ); // fit line or rectangle depending on the number of points present
+        method = ed::tracking::determineCase ( points, &cornerIndex, &it_low, &it_high ); // chose to fit a single line or a rectangle (2 lines)
         float error_rectangle = ed::tracking::fitObject ( points, cluster.pose, method,  &cornerIndex, &rectangle, &circle, &ID, &marker_rectangle, &it_low, &it_high );
 
-	std::cout << "Circle error = " << error_circle << " Rectangle error = " << error_rectangle << std::endl;
-	
         if ( error_circle < error_rectangle && circle.get_R() < 0.5*MAX_CORRIDOR_WIDTH ) {
-	    circle.setMarker ( marker_circle , ++ID );
-	    circle.printValues();
-            circle_pub_.publish ( marker_circle );  // TODO: rename circle_pub_ as it is used for rectangles now as well
+            circle.setMarker ( marker_circle , ++ID );
+            //circle.printValues();
+            ObjectMarkers_pub_.publish ( marker_circle );
         } else {
-	    rectangle.setMarker ( marker_rectangle , ++ID );
-	    rectangle.printValues();
-            circle_pub_.publish ( marker_rectangle );
+            rectangle.setMarker ( marker_rectangle , ++ID );
+           // rectangle.printValues();
+            ObjectMarkers_pub_.publish ( marker_rectangle );
         }
 
-        std::cout << "bla finished. Points size = " << points.size() << std::endl;
-
-        /*
-            // Circle fitting
-            if ( circle_fitting ) {
-                ed::tracking::Circle circle;
-                visualization_msgs::Marker marker;
-
-                ed::tracking::fitCircle ( points, &circle, cluster.pose );
-
-                circle.setMarker ( marker , ++ID);
-                circle_pub_.publish ( marker );
-                //http://library.isr.ist.utl.pt/docs/roswiki/rviz(2f)DisplayTypes(2f)Marker.html
-            }
-            else if(rectangle_fitting){
-          //std::cout << "rectangle fitting" << std::endl;
-          ed::tracking::Rectangle rectangle;
-          visualization_msgs::Marker marker;
-
-         // std::cout << "Start fitRectangle-function" << std::endl;
-          if(ed::tracking::fitRectangle ( points, &rectangle, cluster.pose) )
-          {
-            std::cout << "Marker "<< ID << "set" << std::endl;
-              rectangle.setMarker ( marker , ++ID);
-              rectangle.printValues();
-              circle_pub_.publish ( marker );
-          } else {
-            std::cout << "WARNING: PROBLEMS "<< std::endl;
-          }
-
-        }
-
-        */
         // --------------------------
         // Temp for RoboCup 2016; todo: remove after
 
