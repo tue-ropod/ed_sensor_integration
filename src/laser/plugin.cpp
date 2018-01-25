@@ -731,7 +731,6 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
 
     // - - - - - - - - - - - - - - - - - -
     // Convert the segments to convex hulls, and check for collisions with other convex hulls
-//std::cout << "bla heu" << std::endl;
     std::vector<EntityUpdate> clusters;
     unsigned int ID = 0; // To Do: After tracking, the right ID's should be created. The ID's are used to have multiple markers.
 
@@ -768,7 +767,6 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
 
         cluster.pose = geo::Pose3D::identity();
         ed::convex_hull::create ( points, z_min, z_max, cluster.chull, cluster.pose );
-
         unsigned int cornerIndex;
         ed::tracking::Circle circle;
         ed::tracking::Rectangle rectangle;
@@ -778,6 +776,7 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
         ed::tracking::FITTINGMETHOD method = ed::tracking::CIRCLE;
         float error_circle = ed::tracking::fitObject ( points, cluster.pose, method,  &cornerIndex, &rectangle, &circle, &ID, &marker_circle, &it_low, &it_high );
 
+	
         method = ed::tracking::determineCase ( points, &cornerIndex, &it_low, &it_high ); // chose to fit a single line or a rectangle (2 lines)
         float error_rectangle = ed::tracking::fitObject ( points, cluster.pose, method,  &cornerIndex, &rectangle, &circle, &ID, &marker_rectangle, &it_low, &it_high );
 
