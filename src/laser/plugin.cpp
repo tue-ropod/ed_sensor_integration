@@ -659,7 +659,8 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
             sensor_ranges[i] = 0;
         }
     }
-
+    
+  
     // - - - - - - - - - - - - - - - - - -
     // Segment the remaining points into clusters
 
@@ -668,7 +669,7 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
     // Find first valid value
     ScanSegment current_segment;
     for ( unsigned int i = 0; i < num_beams; ++i ) {
-        if ( sensor_ranges[i] > 0 ) {
+        if ( sensor_ranges[i] > 0 ) {  
             current_segment.push_back ( i );
             break;
         }
@@ -684,11 +685,11 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
     for ( unsigned int i = current_segment.front(); i < num_beams; ++i ) {
         float rs = sensor_ranges[i];
 
-        if ( rs == 0 || std::abs ( rs - sensor_ranges[current_segment.back()] ) > segment_depth_threshold_ ) {
-            // Found a gap
+        if ( rs == 0 || std::abs ( rs - sensor_ranges[current_segment.back()] ) > segment_depth_threshold_ || i == num_beams - 1) {
+            // Found a gap or at final reading
             ++gap_size;
 
-            if ( gap_size >= max_gap_size_ ) {
+            if ( gap_size >= max_gap_size_ || i == num_beams - 1) {
                 i = current_segment.back() + 1;
 
                 if ( current_segment.size() >= min_segment_size_pixels_ ) {
@@ -720,7 +721,7 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
                 while ( sensor_ranges[i] == 0 && i < num_beams ) {
                     ++i;
                 }
-
+                
                 current_segment.push_back ( i );
             }
         } else {
