@@ -25,6 +25,12 @@
 #include <cmath>
 #include <iterator>
 
+#include "problib/conversions.h"
+#include "problib/datatypes.h"
+
+#define ARMA_DONT_USE_WRAPPER
+#include <armadillo>
+
 namespace
 {
 

@@ -8,6 +8,7 @@ find_package(catkin REQUIRED COMPONENTS
   kdl_parser
   message_generation
   visualization_msgs
+  problib
 )
 
 # ------------------------------------------------------------------------------------------------
@@ -38,9 +39,9 @@ generate_messages(
 
 catkin_package(
   INCLUDE_DIRS include
-  LIBRARIES ed_kinect
+  LIBRARIES ed_kinect 
   # DEPENDS
-  CATKIN_DEPENDS geometry_msgs message_runtime ropod_demo_dec_2017
+  CATKIN_DEPENDS geometry_msgs message_runtime ropod_demo_dec_2017 message_runtime
 )
 
 # ------------------------------------------------------------------------------------------------
@@ -80,6 +81,7 @@ add_library(ed_kinect
     src/kinect/renderer.cpp
     include/ed/kinect/renderer.h
 )
+        
 target_link_libraries(ed_kinect ed_association ${catkin_LIBRARIES})
 add_dependencies(ed_kinect ${PROJECT_NAME}_gencpp ${${PROJECT_NAME}_EXPORTED_TARGETS})
 
