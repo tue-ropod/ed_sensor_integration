@@ -28,9 +28,6 @@
 #include "problib/conversions.h"
 #include "problib/datatypes.h"
 
-#define ARMA_DONT_USE_WRAPPER
-#include <armadillo>
-
 namespace
 {
 
@@ -781,22 +778,48 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
         std::vector<geo::Vec2f>::iterator it_low, it_high;
 
         ed::tracking::FITTINGMETHOD method = ed::tracking::CIRCLE;
-        float error_circle = ed::tracking::fitObject ( points, cluster.pose, method,  &cornerIndex, &rectangle, &circle, &ID, &marker_circle, &it_low, &it_high );
+        float error_circle2 = ed::tracking::fitObject ( points, cluster.pose, method,  &cornerIndex, &rectangle, &circle, &ID, &marker_circle, &it_low, &it_high );
+    
+    
+        method = ed::tracking::determineCase ( points, &cornerIndex, &it_low, &it_high ); // chose to fit a single line or a rectangle (2 lines)
+        float error_rectangle2 = ed::tracking::fitObject ( points, cluster.pose, method,  &cornerIndex, &rectangle, &circle, &ID, &marker_rectangle, &it_low, &it_high );
 
 	
-        method = ed::tracking::determineCase ( points, &cornerIndex, &it_low, &it_high ); // chose to fit a single line or a rectangle (2 lines)
-        float error_rectangle = ed::tracking::fitObject ( points, cluster.pose, method,  &cornerIndex, &rectangle, &circle, &ID, &marker_rectangle, &it_low, &it_high );
 
-        if ( error_circle < error_rectangle && circle.get_R() < 0.5*MAX_CORRIDOR_WIDTH ) {
-            circle.setMarker ( marker_circle , ++ID );
+
+	ed::tracking::probabilitySet pSet = ed::tracking::determineFeatureProbabilities(error_rectangle2, error_circle2, 2*circle.get_R(), MAX_CORRIDOR_WIDTH );
+	
+	std::cout << "Probabilities [Rectangle, Circle] = [" << pSet.pRectangle << ", " << pSet.pCircle << "]" << std::endl;
+//MAX_CORRIDOR_WIDTH
+
+	
+    /*    if ( error_circle2 < error_rectangle2 && circle.get_R() < 0.5*MAX_CORRIDOR_WIDTH ) {
+            circle.setMarker ( marker_circle , ++ID, sensor_pose);
             //circle.printValues();
             ObjectMarkers_pub_.publish ( marker_circle );
         } else {
-            rectangle.setMarker ( marker_rectangle , ++ID );
+            rectangle.setMarker ( marker_rectangle , ++ID,  sensor_pose );
+           // rectangle.printValues();
+            ObjectMarkers_pub_.publish ( marker_rectangle );
+        }
+*/
+    
+        if ( pSet.pCircle > pSet.pRectangle ) {
+	  std::cout << "Cirlce published" << std::endl;
+            circle.setMarker ( marker_circle , ++ID, sensor_pose);
+            //circle.printValues();
+            ObjectMarkers_pub_.publish ( marker_circle );
+        } else {
+	  std::cout << "Rectangle published" << std::endl;
+            rectangle.setMarker ( marker_rectangle , ++ID,  sensor_pose );
            // rectangle.printValues();
             ObjectMarkers_pub_.publish ( marker_rectangle );
         }
 
+        
+        std::cout << "\n\n\n\n\n" ;
+    
+    
         // --------------------------
         // Temp for RoboCup 2016; todo: remove after
 

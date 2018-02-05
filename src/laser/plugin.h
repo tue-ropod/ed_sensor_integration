@@ -21,6 +21,7 @@
 #include "ed/convex_hull.h"
 
 #define MAX_CORRIDOR_WIDTH 3 // [m]
+//#define MAX_CORRIDOR_WIDTH2 pow(MAX_CORRIDOR_WIDTH, 2.0)
 
 // ----------------------------------------------------------------------------------------------------
 
