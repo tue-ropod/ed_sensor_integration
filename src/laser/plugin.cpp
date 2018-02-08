@@ -802,10 +802,12 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
            // rectangle.printValues();
             ObjectMarkers_pub_.publish ( marker_rectangle );
         }
-*/
+*/       
+    // TODO: determine probability of features in Bayesian way. Now, the feature with the highest probability is taken
+    // TODO: cleanup: remove objects which are fitted and clearly interfere with the walls -> more robustness on segmentation
     
         if ( pSet.pCircle > pSet.pRectangle ) {
-	  std::cout << "Cirlce published" << std::endl;
+	  std::cout << "Circle published" << std::endl;
             circle.setMarker ( marker_circle , ++ID, sensor_pose);
             //circle.printValues();
             ObjectMarkers_pub_.publish ( marker_circle );
@@ -816,6 +818,8 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
             ObjectMarkers_pub_.publish ( marker_rectangle );
         }
 
+
+        
         
         std::cout << "\n\n\n\n\n" ;
     
