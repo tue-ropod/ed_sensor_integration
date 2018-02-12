@@ -19,6 +19,7 @@
 
 // Properties
 #include "ed/convex_hull.h"
+#include "ed/convex_hull_calc.h"
 
 #define MAX_CORRIDOR_WIDTH 3 // [m]
 //#define MAX_CORRIDOR_WIDTH2 pow(MAX_CORRIDOR_WIDTH, 2.0)
@@ -75,6 +76,9 @@ private:
 
     int max_gap_size_;
     std::map<ed::UUID,geo::Pose3D> pose_cache;
+    
+    // 'Feature' property key
+    ed::PropertyKey<ed::tracking::FeatureProperties> featureProperties_;
 
 };
 
