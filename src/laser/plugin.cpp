@@ -224,19 +224,17 @@ bool pointIsPresent ( const geo::Vector3& p_sensor, const geo::LaserRangeFinder&
 }
 
 // ----------------------------------------------------------------------------------------------------
-void publishFeatures(ed::tracking::FeatureProperties featureProp, int ID, ros::Publisher pub)
-{
-  
-  // TODO: being able to read the properties of the features
-  // TODO: determine when and how to update the feature probabilities
+void publishFeatures(ed::tracking::FeatureProperties& featureProp, int ID, ros::Publisher& pub)
+{ 
   visualization_msgs::Marker marker;
+  
         if ( featureProp.getFeatureProbabilities().get_pCircle() > featureProp.getFeatureProbabilities().get_pRectangle() ) 
-	{ // publish circle
+	{  
 	  ed::tracking::Circle circle = featureProp.getCircle();
             circle.setMarker ( marker , ID);
         } 
         else
-	{ // publish rectangle
+	{
 	  ed::tracking::Rectangle rectangle = featureProp.getRectangle();
             rectangle.setMarker ( marker , ID );
         }
@@ -998,17 +996,13 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
                 new_chull = cluster.chull;
                 new_pose = cluster.pose;
 		
-		ed::tracking::FeatureProperties featureProperty( e->property(featureProperties_) );
 		ed::tracking::FeatureProperties propertiesMeasured = measuredProperties[i_cluster];
-		
-		featureProperty.updateProbabilities(propertiesMeasured.getFeatureProbabilities());// TODO: update properties of the features
-		
-		const ed::tracking::FeatureProperties* test = e->property(featureProperties_);
-		std::cout << "ID = " << e->id() << std::endl;
-		std::cout << "P before Circle = " << test->getFeatureProbabilities().get_pCircle() << "P before Rectangle = " <<  test->getFeatureProbabilities().get_pRectangle() << std::endl;
-		std::cout << "P after Circle = " << featureProperty.getFeatureProbabilities().get_pCircle() << "P after Rectangle = " <<  featureProperty.getFeatureProbabilities().get_pRectangle() << std::endl;
+		featureProperty = e->property(featureProperties_);
+		featureProperty.updateProbabilities( propertiesMeasured.getFeatureProbabilities() );// TODO: update properties of the features
+		featureProperty.setCircle( propertiesMeasured.getCircle() ); // TODO determine a proper method to update the circle and rectangle properties
+		featureProperty.setRectangle( propertiesMeasured.getRectangle() );// Now, the properties of the latest measurements are used
             }
-
+            
             // Update existence probability
             double p_exist = e->existenceProbability();
             req.setExistenceProbability ( e->id(), std::min ( 1.0, p_exist + 0.1 ) ); // TODO: very ugly prob update
