@@ -796,12 +796,19 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
         ed::tracking::Rectangle rectangle;
        // visualization_msgs::Marker marker_circle, marker_rectangle;
         std::vector<geo::Vec2f>::iterator it_low, it_high;
+	
+	int chull_size = points.size();
+	for(unsigned int i_print = 0; i_print < chull_size ; i_print++)
+	{
+	  std::cout << points[i_print].x << ", " << points[i_print].y << ";" << std::endl;
+	}
+	std::cout << std::endl;
 
         ed::tracking::FITTINGMETHOD method = ed::tracking::CIRCLE;
-        float error_circle2 = ed::tracking::fitObject ( points, cluster.pose, method,  &cornerIndex, &rectangle, &circle, &it_low, &it_high );
+        float error_circle2 = ed::tracking::fitObject ( points, cluster.pose, method,  &cornerIndex, &rectangle, &circle, &it_low, &it_high, sensor_pose );
     
-        method = ed::tracking::determineCase ( points, &cornerIndex, &it_low, &it_high ); // chose to fit a single line or a rectangle (2 lines)
-        float error_rectangle2 = ed::tracking::fitObject ( points, cluster.pose, method,  &cornerIndex, &rectangle, &circle, &it_low, &it_high );
+        method = ed::tracking::determineCase ( points, &cornerIndex, &it_low, &it_high, sensor_pose ); // chose to fit a single line or a rectangle (2 lines)
+        float error_rectangle2 = ed::tracking::fitObject ( points, cluster.pose, method,  &cornerIndex, &rectangle, &circle, &it_low, &it_high,  sensor_pose);
 
 	ed::tracking::FeatureProbabilities prob;
 	prob.setMeasurementProbabilities(error_rectangle2, error_circle2, 2*circle.get_R(), MAX_CORRIDOR_WIDTH );
@@ -934,7 +941,7 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
     std::vector<int> entities_associated ( entities.size(), -1 );
 
     unsigned int marker_ID = 0; // To Do: After tracking, the right ID's should be created. The ID's are used to have multiple markers.
-    std::cout << "\n\n New loop:" << std::endl;
+    
     for ( unsigned int i_cluster = 0; i_cluster < clusters.size(); ++i_cluster ) {
         const EntityUpdate& cluster = clusters[i_cluster];
 
@@ -1001,6 +1008,10 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
 		featureProperty.updateProbabilities( propertiesMeasured.getFeatureProbabilities() );// TODO: update properties of the features
 		featureProperty.setCircle( propertiesMeasured.getCircle() ); // TODO determine a proper method to update the circle and rectangle properties
 		featureProperty.setRectangle( propertiesMeasured.getRectangle() );// Now, the properties of the latest measurements are used
+		
+		std::cout << "ID = " << e->id() << std::endl;
+		propertiesMeasured.getRectangle().printValues();
+		 
             }
             
             // Update existence probability
