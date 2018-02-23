@@ -791,7 +791,8 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
 
         cluster.pose = geo::Pose3D::identity();
         ed::convex_hull::create ( points, z_min, z_max, cluster.chull, cluster.pose );
-        unsigned int cornerIndex;
+	
+        std::vector<unsigned int> cornerIndex;
         ed::tracking::Circle circle;
         ed::tracking::Rectangle rectangle;
        // visualization_msgs::Marker marker_circle, marker_rectangle;
@@ -803,12 +804,27 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
 	  std::cout << points[i_print].x << ", " << points[i_print].y << ";" << std::endl;
 	}
 	std::cout << std::endl;
+	
+	// check here for possible corners and splitting
+	std::vector<unsigned int> cornerIndices;
+	if(ed::tracking::findPossibleCorners(points, &cornerIndices))
+	{
+	    // criterion to split data. Add to segments.
+	  
+	  std::cout << "Corners at ID's = " << std::endl;
+	  for ( std::vector<unsigned int>::const_iterator it2 = cornerIndices.begin(); it2 != cornerIndices.end(); ++it2 ) {
+	    unsigned int index = *it2;
+	    std::cout << index << std::endl;
+ 	  }
+ 	}
+	
+
 
         ed::tracking::FITTINGMETHOD method = ed::tracking::CIRCLE;
-        float error_circle2 = ed::tracking::fitObject ( points, cluster.pose, method,  &cornerIndex, &rectangle, &circle, &it_low, &it_high, sensor_pose );
+        float error_circle2 = ed::tracking::fitObject ( points, cluster.pose, method,  &cornerIndex.back(), &rectangle, &circle, &it_low, &it_high, sensor_pose);
     
         method = ed::tracking::determineCase ( points, &cornerIndex, &it_low, &it_high, sensor_pose ); // chose to fit a single line or a rectangle (2 lines)
-        float error_rectangle2 = ed::tracking::fitObject ( points, cluster.pose, method,  &cornerIndex, &rectangle, &circle, &it_low, &it_high,  sensor_pose);
+        float error_rectangle2 = ed::tracking::fitObject ( points, cluster.pose, method,  &cornerIndex.back(), &rectangle, &circle, &it_low, &it_high,  sensor_pose);
 
 	ed::tracking::FeatureProbabilities prob;
 	prob.setMeasurementProbabilities(error_rectangle2, error_circle2, 2*circle.get_R(), MAX_CORRIDOR_WIDTH );
