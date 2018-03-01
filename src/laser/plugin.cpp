@@ -28,6 +28,9 @@
 
 #include "ed_sensor_integration/properties/feature_info.h"
 
+#define TRACKING
+
+
 namespace
 {
 
@@ -224,7 +227,7 @@ bool pointIsPresent ( const geo::Vector3& p_sensor, const geo::LaserRangeFinder&
 }
 
 // ----------------------------------------------------------------------------------------------------
-void publishFeatures(ed::tracking::FeatureProperties& featureProp, int ID, ros::Publisher& pub)
+void publishFeatures(ed::tracking::FeatureProperties& featureProp, int ID, ros::Publisher& pub) // TODO move to ed_rviz_plugins
 { 
   visualization_msgs::Marker marker;
   
@@ -756,7 +759,9 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
     // - - - - - - - - - - - - - - - - - -
     // Convert the segments to convex hulls, and check for collisions with other convex hulls
     std::vector<EntityUpdate> clusters;
+#ifdef TRACKING
     std::vector<ed::tracking::FeatureProperties> measuredProperties;
+#endif
 
     for ( std::vector<ScanSegment>::const_iterator it = segments.begin(); it != segments.end(); ++it ) {
         const ScanSegment& segment = *it;
@@ -791,57 +796,59 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
 
         cluster.pose = geo::Pose3D::identity();
         ed::convex_hull::create ( points, z_min, z_max, cluster.chull, cluster.pose );
-	
-        std::vector<unsigned int> cornerIndex;
+
+#ifdef TRACKING
+
+
         ed::tracking::Circle circle;
         ed::tracking::Rectangle rectangle;
-       // visualization_msgs::Marker marker_circle, marker_rectangle;
+        // visualization_msgs::Marker marker_circle, marker_rectangle;
         std::vector<geo::Vec2f>::iterator it_low, it_high;
-	
-	int chull_size = points.size();
-	for(unsigned int i_print = 0; i_print < chull_size ; i_print++)
-	{
-	  std::cout << points[i_print].x << ", " << points[i_print].y << ";" << std::endl;
-	}
-	std::cout << std::endl;
-	
-	// check here for possible corners and splitting
-	std::vector<unsigned int> cornerIndices;
-	if(ed::tracking::findPossibleCorners(points, &cornerIndices))
-	{
-	    // criterion to split data. Add to segments.
-	  
-	  std::cout << "Corners at ID's = " << std::endl;
-	  for ( std::vector<unsigned int>::const_iterator it2 = cornerIndices.begin(); it2 != cornerIndices.end(); ++it2 ) {
-	    unsigned int index = *it2;
-	    std::cout << index << std::endl;
- 	  }
- 	}
+
+        int chull_size = points.size();
+        std::cout << " \n Points = " << std::endl;
+        for ( unsigned int i_print = 0; i_print < chull_size ; i_print++ ) {
+            std::cout << points[i_print] << ";" << std::endl;
+        }
+        std::cout << std::endl;
 	
 
+        // check here for possible corners and splitting
+        std::vector<unsigned int> cornerIndices;
+        if ( ed::tracking::findPossibleCorners ( points, &cornerIndices ) ) {
+            // criterion to split data. Add to segments.
+
+            std::cout << "Corners at ID's = " << std::endl;
+            for ( std::vector<unsigned int>::const_iterator it2 = cornerIndices.begin(); it2 != cornerIndices.end(); ++it2 ) {
+                unsigned int index = *it2;
+                std::cout << index << std::endl;
+            }
+        }
+
+        std::vector<unsigned int> cornerIndex_test;
+        //cornerIndex_test.push_back(std::numeric_limits<unsigned int>::quiet_NaN() );
 
         ed::tracking::FITTINGMETHOD method = ed::tracking::CIRCLE;
-        float error_circle2 = ed::tracking::fitObject ( points, cluster.pose, method,  &cornerIndex.back(), &rectangle, &circle, &it_low, &it_high, sensor_pose);
-    
-        method = ed::tracking::determineCase ( points, &cornerIndex, &it_low, &it_high, sensor_pose ); // chose to fit a single line or a rectangle (2 lines)
-        float error_rectangle2 = ed::tracking::fitObject ( points, cluster.pose, method,  &cornerIndex.back(), &rectangle, &circle, &it_low, &it_high,  sensor_pose);
+        float error_circle2 = ed::tracking::fitObject ( points, cluster.pose, method,  &cornerIndex_test, &rectangle, &circle, &it_low, &it_high, sensor_pose );
 
-	ed::tracking::FeatureProbabilities prob;
-	prob.setMeasurementProbabilities(error_rectangle2, error_circle2, 2*circle.get_R(), MAX_CORRIDOR_WIDTH );
+        method = ed::tracking::determineCase ( points, &cornerIndex_test, &it_low, &it_high, sensor_pose ); // chose to fit a single line or a rectangle (2 lines)
+        float error_rectangle2 = ed::tracking::fitObject ( points, cluster.pose, method,  &cornerIndex_test, &rectangle, &circle, &it_low, &it_high,  sensor_pose );
 	
-	ed::tracking::FeatureProperties properties;
-	properties.setFeatureProbabilities(prob);
-	properties.setCircle(circle);
-	properties.setRectangle(rectangle);
+        ed::tracking::FeatureProbabilities prob;
+        prob.setMeasurementProbabilities ( error_rectangle2, error_circle2, 2*circle.get_R(), MAX_CORRIDOR_WIDTH );
 
-	measuredProperties.push_back(properties);
-	
-	//std::cout << "Probabilities [Rectangle, Circle] = [" << properties.getFeatureProbabilities().get_pRectangle() << ", " << properties.getFeatureProbabilities().get_pCircle() << "]" << std::endl;
-      
-    // TODO: cleanup: remove objects which are fitted and clearly interfere with the walls -> more robustness on segmentation. Where to check?
-        
-    
-    
+        ed::tracking::FeatureProperties properties;
+        properties.setFeatureProbabilities ( prob );
+        properties.setCircle ( circle );
+        properties.setRectangle ( rectangle );
+
+        measuredProperties.push_back ( properties );
+
+        //std::cout << "Probabilities [Rectangle, Circle] = [" << properties.getFeatureProbabilities().get_pRectangle() << ", " << properties.getFeatureProbabilities().get_pCircle() << "]" << std::endl;
+
+        // TODO: cleanup: remove objects which are fitted and clearly interfere with the walls -> more robustness on segmentation. Where to check?
+
+#endif
         // --------------------------
         // Temp for RoboCup 2016; todo: remove after
 
@@ -967,7 +974,9 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
         ed::UUID id;
         ed::ConvexHull new_chull;
         geo::Pose3D new_pose;
-	ed::tracking::FeatureProperties featureProperty;
+#ifdef TRACKING
+        ed::tracking::FeatureProperties featureProperty;
+#endif
 
         if ( i_entity == -1 ) {
             // No assignment, so add as new cluster
@@ -979,8 +988,10 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
 
             // Update existence probability
             req.setExistenceProbability ( id, 1.0 ); // TODO magic number
-	    featureProperty = measuredProperties[i_cluster];
-	    
+
+#ifdef TRACKING
+            featureProperty = measuredProperties[i_cluster];
+#endif
         } else {
             // Mark the entity as being associated
             entities_associated[i_entity] = i_cluster;
@@ -1018,16 +1029,16 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
             if ( !e->hasFlag ( "locked" ) ) {
                 new_chull = cluster.chull;
                 new_pose = cluster.pose;
-		
-		ed::tracking::FeatureProperties propertiesMeasured = measuredProperties[i_cluster];
-		featureProperty = e->property(featureProperties_);
-		featureProperty.updateProbabilities( propertiesMeasured.getFeatureProbabilities() );// TODO: update properties of the features
-		featureProperty.setCircle( propertiesMeasured.getCircle() ); // TODO determine a proper method to update the circle and rectangle properties
-		featureProperty.setRectangle( propertiesMeasured.getRectangle() );// Now, the properties of the latest measurements are used
-		
-		std::cout << "ID = " << e->id() << std::endl;
-		propertiesMeasured.getRectangle().printValues();
-		 
+#ifdef TRACKING
+                ed::tracking::FeatureProperties propertiesMeasured = measuredProperties[i_cluster];
+                featureProperty = e->property ( featureProperties_ );
+                featureProperty.updateProbabilities ( propertiesMeasured.getFeatureProbabilities() ); // TODO: update properties of the features
+                featureProperty.setCircle ( propertiesMeasured.getCircle() ); // TODO determine a proper method to update the circle and rectangle properties
+                featureProperty.setRectangle ( propertiesMeasured.getRectangle() ); // Now, the properties of the latest measurements are used
+
+                std::cout << "ID = " << e->id() << std::endl;
+                propertiesMeasured.getRectangle().printValues();
+#endif 
             }
             
             // Update existence probability
@@ -1055,8 +1066,10 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
         }
         
         // Set feature properties en publish geometries
-	 req.setProperty(id, featureProperties_, featureProperty );
-	 publishFeatures( featureProperty, marker_ID++, ObjectMarkers_pub_);
+#ifdef TRACKING
+        req.setProperty ( id, featureProperties_, featureProperty );
+        publishFeatures ( featureProperty, marker_ID++, ObjectMarkers_pub_ );
+#endif
 
         // Set timestamp
         req.setLastUpdateTimestamp ( id, scan->header.stamp.toSec() );
