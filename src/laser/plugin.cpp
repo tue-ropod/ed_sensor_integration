@@ -227,22 +227,19 @@ bool pointIsPresent ( const geo::Vector3& p_sensor, const geo::LaserRangeFinder&
 }
 
 // ----------------------------------------------------------------------------------------------------
-void publishFeatures(ed::tracking::FeatureProperties& featureProp, int ID, ros::Publisher& pub) // TODO move to ed_rviz_plugins
-{ 
-  visualization_msgs::Marker marker;
-  
-        if ( featureProp.getFeatureProbabilities().get_pCircle() > featureProp.getFeatureProbabilities().get_pRectangle() ) 
-	{  
-	  ed::tracking::Circle circle = featureProp.getCircle();
-            circle.setMarker ( marker , ID);
-        } 
-        else
-	{
-	  ed::tracking::Rectangle rectangle = featureProp.getRectangle();
-            rectangle.setMarker ( marker , ID );
-        }
-        
-        pub.publish ( marker );
+void publishFeatures ( ed::tracking::FeatureProperties& featureProp, int ID, ros::Publisher& pub ) // TODO move to ed_rviz_plugins
+{
+    visualization_msgs::Marker marker;
+
+    if ( featureProp.getFeatureProbabilities().get_pCircle() > featureProp.getFeatureProbabilities().get_pRectangle() ) {
+        ed::tracking::Circle circle = featureProp.getCircle();
+        circle.setMarker ( marker , ID );
+    } else {
+        ed::tracking::Rectangle rectangle = featureProp.getRectangle();
+        rectangle.setMarker ( marker , ID );
+    }
+
+    pub.publish ( marker );
 }
 
 LaserPlugin::LaserPlugin() : tf_listener_ ( 0 )
@@ -295,9 +292,9 @@ void LaserPlugin::initialize ( ed::InitData& init )
     tf_listener_ = new tf::TransformListener;
 
     //pose_cache.clear();
-    
-    init.properties.registerProperty("Feature", featureProperties_, new FeatureInfo); // example given in ED/ed/examples/custom_properties. Update the probabilities using an update-request
-    
+
+    init.properties.registerProperty ( "Feature", featureProperties_, new FeatureInfo ); // example given in ED/ed/examples/custom_properties. Update the probabilities using an update-request
+
 }
 
 // ----------------------------------------------------------------------------------------------------
@@ -685,8 +682,8 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
             sensor_ranges[i] = 0;
         }
     }
-    
-  
+
+
     // - - - - - - - - - - - - - - - - - -
     // Segment the remaining points into clusters
 
@@ -694,8 +691,10 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
 
     // Find first valid value
     ScanSegment current_segment;
+
+    // std::cout << "nbeams = " << num_beams << std::endl;
     for ( unsigned int i = 0; i < num_beams; ++i ) {
-        if ( sensor_ranges[i] > 0 ) {  
+        if ( sensor_ranges[i] > 0 ) {
             current_segment.push_back ( i );
             break;
         }
@@ -711,11 +710,11 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
     for ( unsigned int i = current_segment.front(); i < num_beams; ++i ) {
         float rs = sensor_ranges[i];
 
-        if ( rs == 0 || std::abs ( rs - sensor_ranges[current_segment.back()] ) > segment_depth_threshold_ || i == num_beams - 1) {
+        if ( rs == 0 || std::abs ( rs - sensor_ranges[current_segment.back()] ) > segment_depth_threshold_ || i == num_beams - 1 ) {
             // Found a gap or at final reading
             ++gap_size;
 
-            if ( gap_size >= max_gap_size_ || i == num_beams - 1) {
+            if ( gap_size >= max_gap_size_ || i == num_beams - 1 ) {
                 i = current_segment.back() + 1;
 
                 if ( current_segment.size() >= min_segment_size_pixels_ ) {
@@ -747,7 +746,7 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
                 while ( sensor_ranges[i] == 0 && i < num_beams ) {
                     ++i;
                 }
-                
+
                 current_segment.push_back ( i );
             }
         } else {
@@ -761,19 +760,28 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
     std::vector<EntityUpdate> clusters;
 #ifdef TRACKING
     std::vector<ed::tracking::FeatureProperties> measuredProperties;
-#endif
 
-    for ( std::vector<ScanSegment>::const_iterator it = segments.begin(); it != segments.end(); ++it ) {
-        const ScanSegment& segment = *it;
+
+#endif
+    std::vector<ScanSegment>::iterator it_end_initial = segments.end();
+    int counter = 0;
+    int initialSize = segments.size();
+
+    for ( unsigned int iSegment = 0; iSegment < segments.size(); ++iSegment ) {
+        bool splitSegmentsFlag = false;
+
+        counter++;
+        std::vector<ScanSegment>::iterator it_test = segments.begin();
+        ScanSegment& segment = segments[iSegment];
         unsigned int segment_size = segment.size();
 
         std::vector<geo::Vec2f> points ( segment_size );
 
         float z_min, z_max;
+
         for ( unsigned int i = 0; i < segment_size; ++i ) {
             unsigned int j = segment[i];
 
-            // Calculate the cartesian coordinate of the point in the segment (in sensor frame)
             geo::Vector3 p_sensor = lrf_model_.rayDirections() [j] * sensor_ranges[j];
 
             // Transform to world frame
@@ -791,83 +799,169 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
             }
         }
 
-        clusters.push_back ( EntityUpdate() );
-        EntityUpdate& cluster = clusters.back();
+//#ifdef TRACKING
 
-        cluster.pose = geo::Pose3D::identity();
-        ed::convex_hull::create ( points, z_min, z_max, cluster.chull, cluster.pose );
-
-#ifdef TRACKING
-
-
-        ed::tracking::Circle circle;
-        ed::tracking::Rectangle rectangle;
-        // visualization_msgs::Marker marker_circle, marker_rectangle;
-        std::vector<geo::Vec2f>::iterator it_low, it_high;
-
-        int chull_size = points.size();
-        std::cout << " \n Points = " << std::endl;
-        for ( unsigned int i_print = 0; i_print < chull_size ; i_print++ ) {
-            std::cout << points[i_print] << ";" << std::endl;
-        }
-        std::cout << std::endl;
-	
+        /*    int chull_size = points.size();
+            std::cout << " \n Points = " << std::endl;
+            for ( unsigned int i_print = 0; i_print < chull_size ; i_print++ ) {
+                std::cout << points[i_print] << ";" << std::endl;
+            }
+            std::cout << std::endl;
+          */
 
         // check here for possible corners and splitting
         std::vector<unsigned int> cornerIndices;
+        std::vector<ScanSegment> segmentsSplitted;
+        std::vector< std::vector<geo::Vec2f> > pointsList;
         if ( ed::tracking::findPossibleCorners ( points, &cornerIndices ) ) {
             // criterion to split data. Add to segments.
 
-            std::cout << "Corners at ID's = " << std::endl;
-            for ( std::vector<unsigned int>::const_iterator it2 = cornerIndices.begin(); it2 != cornerIndices.end(); ++it2 ) {
-                unsigned int index = *it2;
-                std::cout << index << std::endl;
+            cornerIndices.insert ( cornerIndices.begin(), 0 ); // add index of first point of "points"
+            cornerIndices.push_back ( points.size() - 1 );// add index of last point of "points"
+
+            std::vector<geo::Vec2f> pointsToCheck;
+            for ( unsigned int iIndex = 0; iIndex < cornerIndices.size(); ++iIndex ) {
+                pointsToCheck.push_back ( points[cornerIndices[iIndex]] );
+            }
+
+
+            unsigned int lowerIndex = cornerIndices[0];
+            unsigned int scanIndex = segment[0];
+
+            for ( unsigned int ii_pointsToCheck = 0; ii_pointsToCheck < pointsToCheck.size() - 2; ++ii_pointsToCheck ) {
+                geo::Vec2f startPoint = pointsToCheck[ii_pointsToCheck];
+                geo::Vec2f midPoint = pointsToCheck[ii_pointsToCheck + 1];
+                geo::Vec2f endPoint = pointsToCheck[ii_pointsToCheck + 2];
+
+                geo::Vec2f centerPoint = 0.5* ( startPoint + endPoint );
+
+                float distMidPoint2 = pow ( midPoint.x-sensor_pose.getOrigin().getX(), 2.0 ) + pow ( midPoint.y-sensor_pose.getOrigin().getY(), 2.0 );
+                float distcenterPoint2 = pow ( centerPoint.x-sensor_pose.getOrigin().getX(), 2.0 ) + pow ( centerPoint.y-sensor_pose.getOrigin().getY(), 2.0 );
+
+                if ( distcenterPoint2 <  distMidPoint2 ) { // split data at midpoint, because otherwise we will describe a square at a region which is not occupied
+
+                    splitSegmentsFlag = true;
+                    //	    std::vector<geo::Vec2f> pointsSplitted;
+                    for ( unsigned int ii_regions = 0; ii_regions < 2; ++ii_regions ) { // do for both the lower and the upper part
+//pointsSplitted.clear();
+                        current_segment.clear();
+                        unsigned int ID_low, ID_high;
+                        if ( ii_regions == 0 ) {
+                            ID_low = lowerIndex;
+                            ID_high = cornerIndices[ii_pointsToCheck + 1];
+                        } else {
+                            ID_low = cornerIndices[ii_pointsToCheck + 1];
+                            ID_high = cornerIndices.back();
+                            lowerIndex = ID_low;
+                        }
+
+                        for ( unsigned int i_corner = ID_low; i_corner < ID_high; ++i_corner ) {
+                            current_segment.push_back ( i_corner + scanIndex );    // current segment contains the indices from points, not from the original scan. segment[0] should be added for that.
+                            //     pointsSplitted.push_back(i_corner);
+                        }
+
+                        // if ( current_segment.size() >= min_segment_size_pixels_ ) {
+                        if ( ID_high - ID_low >= min_segment_size_pixels_ ) {
+                            geo::Vec2 seg_min, seg_max;
+                            for ( unsigned int i_seg = ID_low; i_seg <= ID_high; ++i_seg ) {
+                                geo::Vector3 p ( points[i_seg].x,  points[i_seg].y, sensor_pose.getOrigin().getZ() ) ; // TODO Right z-coordinate? Not used at the moment!
+
+                                if ( i_seg == ID_low ) {
+                                    seg_min = geo::Vec2 ( p.x, p.y );
+                                    seg_max = geo::Vec2 ( p.x, p.y );
+                                } else {
+                                    seg_min.x = std::min ( p.x, seg_min.x );
+                                    seg_min.y = std::min ( p.y, seg_min.y );
+                                    seg_max.x = std::max ( p.x, seg_max.x );
+                                    seg_max.y = std::max ( p.y, seg_max.y );
+                                }
+                            }
+
+                            geo::Vec2 bb = seg_max - seg_min;
+
+                            if ( ( bb .x > min_cluster_size_ || bb.y > min_cluster_size_ ) && bb.x < max_cluster_size_ && bb.y < max_cluster_size_ ) {
+                                if ( ii_regions == 0 ) {
+                                    segments.push_back ( current_segment );
+                                    //  pointsList.push_back(pointsSplitted);
+                                } else {
+                                    segments.push_back ( current_segment );
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 
-        std::vector<unsigned int> cornerIndex_test;
-        //cornerIndex_test.push_back(std::numeric_limits<unsigned int>::quiet_NaN() );
+        //   points
+        //   corners
 
-        ed::tracking::FITTINGMETHOD method = ed::tracking::CIRCLE;
-        float error_circle2 = ed::tracking::fitObject ( points, cluster.pose, method,  &cornerIndex_test, &rectangle, &circle, &it_low, &it_high, sensor_pose );
 
-        method = ed::tracking::determineCase ( points, &cornerIndex_test, &it_low, &it_high, sensor_pose ); // chose to fit a single line or a rectangle (2 lines)
-        float error_rectangle2 = ed::tracking::fitObject ( points, cluster.pose, method,  &cornerIndex_test, &rectangle, &circle, &it_low, &it_high,  sensor_pose );
-	
-        ed::tracking::FeatureProbabilities prob;
-        prob.setMeasurementProbabilities ( error_rectangle2, error_circle2, 2*circle.get_R(), MAX_CORRIDOR_WIDTH );
+        //TODO now: after splitting segments, both are added to the segments list, while we have information available about both segments which is recomputed!
+        //TODO now, both in splitting the segments and the feature-extraction-part, the corners are determined. Information is available!
 
-        ed::tracking::FeatureProperties properties;
-        properties.setFeatureProbabilities ( prob );
-        properties.setCircle ( circle );
-        properties.setRectangle ( rectangle );
+        //   if ( !splitSegmentsFlag )
+        //  pointsList.push_back(points);
 
-        measuredProperties.push_back ( properties );
+        if ( !splitSegmentsFlag ) {
 
-        //std::cout << "Probabilities [Rectangle, Circle] = [" << properties.getFeatureProbabilities().get_pRectangle() << ", " << properties.getFeatureProbabilities().get_pCircle() << "]" << std::endl;
 
-        // TODO: cleanup: remove objects which are fitted and clearly interfere with the walls -> more robustness on segmentation. Where to check?
+            //  for(unsigned int iPointsList = 0; iPointsList < pointsList.size(); ++iPointsList){
+//	points = pointsList[iPointsList];
+            clusters.push_back ( EntityUpdate() );
+            EntityUpdate& cluster = clusters.back();
 
-#endif
-        // --------------------------
-        // Temp for RoboCup 2016; todo: remove after
+            cluster.pose = geo::Pose3D::identity();
+            ed::convex_hull::create ( points, z_min, z_max, cluster.chull, cluster.pose );
 
-        // Determine the cluster size
-        geo::Vec2f diff = points.back() - points.front();
-        float size_sq = diff.length2();
-        if ( size_sq > 0.35 * 0.35 && size_sq < 0.8 * 0.8 ) {
-            cluster.flag = "possible_human";
+            ed::tracking::Circle circle;
+            ed::tracking::Rectangle rectangle;
+            std::vector<geo::Vec2f>::iterator it_low, it_high;
+
+            std::vector<unsigned int> cornerIndex_test;
+            //cornerIndex_test.push_back(std::numeric_limits<unsigned int>::quiet_NaN() );
+
+            ed::tracking::FITTINGMETHOD method = ed::tracking::CIRCLE;
+            float error_circle2 = ed::tracking::fitObject ( points, cluster.pose, method,  &cornerIndex_test, &rectangle, &circle, &it_low, &it_high, sensor_pose );
+
+            method = ed::tracking::determineCase ( points, &cornerIndex_test, &it_low, &it_high, sensor_pose ); // chose to fit a single line or a rectangle (2 lines)
+            float error_rectangle2 = ed::tracking::fitObject ( points, cluster.pose, method,  &cornerIndex_test, &rectangle, &circle, &it_low, &it_high,  sensor_pose );
+
+            ed::tracking::FeatureProbabilities prob;
+            prob.setMeasurementProbabilities ( error_rectangle2, error_circle2, 2*circle.get_R(), MAX_CORRIDOR_WIDTH );
+
+            ed::tracking::FeatureProperties properties;
+            properties.setFeatureProbabilities ( prob );
+            properties.setCircle ( circle );
+            properties.setRectangle ( rectangle );
+
+            measuredProperties.push_back ( properties );
+
+            //std::cout << "Probabilities [Rectangle, Circle] = [" << properties.getFeatureProbabilities().get_pRectangle() << ", " << properties.getFeatureProbabilities().get_pCircle() << "]" << std::endl;
+
+            // TODO: cleanup: remove objects which are fitted and clearly interfere with the walls -> more robustness on segmentation. Where to check?
+
+//#endif
+
+            // --------------------------
+            // Temp for RoboCup 2016; todo: remove after
+
+            // Determine the cluster size
+            geo::Vec2f diff = points.back() - points.front();
+            float size_sq = diff.length2();
+            if ( size_sq > 0.35 * 0.35 && size_sq < 0.8 * 0.8 ) {
+                cluster.flag = "possible_human";
+            }
         }
 
         // --------------------------
     }
 
-    // Create selection of world model entities that could associate
+// Create selection of world model entities that could associate
 
     float max_dist = 0.3;
 
     std::vector<ed::EntityConstPtr> entities;
-
     if ( !clusters.empty() ) {
         geo::Vec2 area_min ( clusters[0].pose.t.x, clusters[0].pose.t.y );
         geo::Vec2 area_max ( clusters[0].pose.t.x, clusters[0].pose.t.y );
@@ -912,7 +1006,7 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
         }
     }
 
-    // Create association matrix
+// Create association matrix
     ed_sensor_integration::AssociationMatrix assoc_matrix ( clusters.size() );
     for ( unsigned int i_cluster = 0; i_cluster < clusters.size(); ++i_cluster ) {
         const EntityUpdate& cluster = clusters[i_cluster];
@@ -959,12 +1053,12 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
         return;
     }
 
-    //std::cout << "Test detected " << std::endl;
+//std::cout << "Test detected " << std::endl;
 
     std::vector<int> entities_associated ( entities.size(), -1 );
 
     unsigned int marker_ID = 0; // To Do: After tracking, the right ID's should be created. The ID's are used to have multiple markers.
-    
+
     for ( unsigned int i_cluster = 0; i_cluster < clusters.size(); ++i_cluster ) {
         const EntityUpdate& cluster = clusters[i_cluster];
 
@@ -1036,17 +1130,17 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
                 featureProperty.setCircle ( propertiesMeasured.getCircle() ); // TODO determine a proper method to update the circle and rectangle properties
                 featureProperty.setRectangle ( propertiesMeasured.getRectangle() ); // Now, the properties of the latest measurements are used
 
-                std::cout << "ID = " << e->id() << std::endl;
-                propertiesMeasured.getRectangle().printValues();
-#endif 
+                //std::cout << "ID = " << e->id() << std::endl;
+                //propertiesMeasured.getRectangle().printValues();
+#endif
             }
-            
+
             // Update existence probability
             double p_exist = e->existenceProbability();
             req.setExistenceProbability ( e->id(), std::min ( 1.0, p_exist + 0.1 ) ); // TODO: very ugly prob update
-	    
-	    // update feature probabilities here
-	    //req.setProperty<>(e->id());
+
+            // update feature probabilities here
+            //req.setProperty<>(e->id());
 
             id = e->id();
         }
@@ -1064,7 +1158,7 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
 
             // --------------------------
         }
-        
+
         // Set feature properties en publish geometries
 #ifdef TRACKING
         req.setProperty ( id, featureProperties_, featureProperty );
@@ -1075,35 +1169,35 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
         req.setLastUpdateTimestamp ( id, scan->header.stamp.toSec() );
     }
 
-    // - - - - - - - - - - - - - - - - - -
-    // Clear unassociated entities in view
+// - - - - - - - - - - - - - - - - - -
+// Clear unassociated entities in view
 
-    //    for(unsigned int i = 0; i < entities_associated.size(); ++i)
-    //    {
-    //        const ed::EntityConstPtr& e = entities[i];
+//    for(unsigned int i = 0; i < entities_associated.size(); ++i)
+//    {
+//        const ed::EntityConstPtr& e = entities[i];
 
-    //        // If the entity is associated, skip it
-    //        if (entities_associated[i] >= 0)
-    //            continue;
+//        // If the entity is associated, skip it
+//        if (entities_associated[i] >= 0)
+//            continue;
 
-    //        const geo::Pose3D& pose = e->pose();
+//        const geo::Pose3D& pose = e->pose();
 
-    //        // Transform to sensor frame
-    //        geo::Vector3 p = sensor_pose.inverse() * pose.t;
+//        // Transform to sensor frame
+//        geo::Vector3 p = sensor_pose.inverse() * pose.t;
 
-    //        if (!pointIsPresent(p, lrf_model_, sensor_ranges))
-    //        {
-    //            double p_exist = e->existenceProbability();
-    //            if (p_exist < 0.3) // TODO: magic number
-    //                req.removeEntity(e->id());
-    //            else
-    //            {
-    //                req.setExistenceProbability(e->id(), std::max(0.0, p_exist - 0.1));  // TODO: very ugly prob update
-    //            }
-    //        }
-    //    }
+//        if (!pointIsPresent(p, lrf_model_, sensor_ranges))
+//        {
+//            double p_exist = e->existenceProbability();
+//            if (p_exist < 0.3) // TODO: magic number
+//                req.removeEntity(e->id());
+//            else
+//            {
+//                req.setExistenceProbability(e->id(), std::max(0.0, p_exist - 0.1));  // TODO: very ugly prob update
+//            }
+//        }
+//    }
 
-    // std::cout << "Total took " << t_total.getElapsedTimeInMilliSec() << " ms." << std::endl;
+// std::cout << "Total took " << t_total.getElapsedTimeInMilliSec() << " ms." << std::endl;
 }
 
 // ----------------------------------------------------------------------------------------------------
