@@ -28,8 +28,6 @@
 
 #include "ed_sensor_integration/properties/feature_info.h"
 
-#define TRACKING
-
 
 namespace
 {
@@ -758,17 +756,14 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
     // - - - - - - - - - - - - - - - - - -
     // Convert the segments to convex hulls, and check for collisions with other convex hulls
     std::vector<EntityUpdate> clusters;
-#ifdef TRACKING
     std::vector<ed::tracking::FeatureProperties> measuredProperties;
 
-
-#endif
     std::vector<ScanSegment>::iterator it_end_initial = segments.end();
     int counter = 0;
     int initialSize = segments.size();
 
     for ( unsigned int iSegment = 0; iSegment < segments.size(); ++iSegment ) {
-        bool splitSegmentsFlag = false;
+      //  bool splitSegmentsFlag = false;
 
         counter++;
         std::vector<ScanSegment>::iterator it_test = segments.begin();
@@ -799,137 +794,152 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
             }
         }
 
-//#ifdef TRACKING
-
-        /*    int chull_size = points.size();
+            int chull_size = points.size();
             std::cout << " \n Points = " << std::endl;
             for ( unsigned int i_print = 0; i_print < chull_size ; i_print++ ) {
                 std::cout << points[i_print] << ";" << std::endl;
             }
             std::cout << std::endl;
-          */
+          
 
         // check here for possible corners and splitting
         std::vector<unsigned int> cornerIndices;
         std::vector<ScanSegment> segmentsSplitted;
         std::vector< std::vector<geo::Vec2f> > pointsList;
-        if ( ed::tracking::findPossibleCorners ( points, &cornerIndices ) ) {
-            // criterion to split data. Add to segments.
+        std::vector<unsigned int> cornersAfterSplitting;
+	unsigned int cornerIndicesID;
+	
+	std::cout << "cornersAfterSplitting initialized, size = " << cornersAfterSplitting.size() << std::endl;
+
+        if ( !ed::tracking::findPossibleCorners ( points, &cornerIndices ) ) { // if no corners detected, add the points to the points-vector
+            pointsList.push_back ( points );
+            cornersAfterSplitting.push_back ( std::numeric_limits<unsigned int>::quiet_NaN() );
+	    
+	    std::cout << "No corners detected, cornersAfterSplitting = " << cornersAfterSplitting[0] << std::endl;
+	    
+        } else { // if corners detected, check if a valid region is described. If not, split these data
 
             cornerIndices.insert ( cornerIndices.begin(), 0 ); // add index of first point of "points"
             cornerIndices.push_back ( points.size() - 1 );// add index of last point of "points"
 
             std::vector<geo::Vec2f> pointsToCheck;
+	    std::cout << "CornerIndices = \t ";
             for ( unsigned int iIndex = 0; iIndex < cornerIndices.size(); ++iIndex ) {
                 pointsToCheck.push_back ( points[cornerIndices[iIndex]] );
+		std::cout << cornerIndices[iIndex] << "\t" << std::endl;
             }
+            std::cout << "\n";
+
+            while ( pointsToCheck.size() >= 2 ) {
+                unsigned int ID_low = cornerIndices[0], ID_high;
+
+                unsigned int cornerAfterSplitting;
+                if ( pointsToCheck.size() == 2 ) {
+		    cornerIndicesID = 1;
+                    ID_high = cornerIndices[cornerIndicesID];
+                    cornerAfterSplitting = std::numeric_limits<unsigned int>::quiet_NaN();
+		    
+		    std::cout << "kla0 cornerAfterSplitting = " << cornerAfterSplitting << std::endl;
+                } else {
+                    geo::Vec2f startPoint = pointsToCheck[0];
+                    geo::Vec2f midPoint = pointsToCheck[1];
+                    geo::Vec2f endPoint = pointsToCheck[2];
+
+                    geo::Vec2f centerPoint = 0.5* ( startPoint + endPoint );
+
+                    float distMidPoint2 = pow ( midPoint.x-sensor_pose.getOrigin().getX(), 2.0 ) + pow ( midPoint.y-sensor_pose.getOrigin().getY(), 2.0 );
+                    float distcenterPoint2 = pow ( centerPoint.x-sensor_pose.getOrigin().getX(), 2.0 ) + pow ( centerPoint.y-sensor_pose.getOrigin().getY(), 2.0 );
 
 
-            unsigned int lowerIndex = cornerIndices[0];
-            unsigned int scanIndex = segment[0];
+                    if ( distcenterPoint2 <  distMidPoint2 ) { // split data at midpoint, because otherwise we will describe a square at a region which is not necessarily occupied
+		      cornerIndicesID = 1;
+                        ID_high = cornerIndices[cornerIndicesID];
+                        cornerAfterSplitting = std::numeric_limits<unsigned int>::quiet_NaN();
+			std::cout << "kla1 cornerAfterSplitting = " << cornerAfterSplitting << std::endl;
+                    } else {
+		      cornerIndicesID = 2;
+                        ID_high = cornerIndices[cornerIndicesID];
+                        cornerAfterSplitting = cornerIndices[1] - ID_low;
+			std::cout << "kla2 cornerAfterSplitting = " << cornerAfterSplitting << std::endl;
+                    }
+                }
 
-            for ( unsigned int ii_pointsToCheck = 0; ii_pointsToCheck < pointsToCheck.size() - 2; ++ii_pointsToCheck ) {
-                geo::Vec2f startPoint = pointsToCheck[ii_pointsToCheck];
-                geo::Vec2f midPoint = pointsToCheck[ii_pointsToCheck + 1];
-                geo::Vec2f endPoint = pointsToCheck[ii_pointsToCheck + 2];
+                if ( ID_high - ID_low >= min_segment_size_pixels_ ) {
+                    geo::Vec2f seg_min, seg_max;
+                    std::vector<geo::Vec2f> pointsLow;
+                    for ( unsigned int i_seg = ID_low; i_seg <= ID_high; ++i_seg ) {
+                        geo::Vec2f p ( points[i_seg].x,  points[i_seg].y ) ; // TODO Right z-coordinate? Not used at the moment!
+                        pointsLow.push_back ( p );
 
-                geo::Vec2f centerPoint = 0.5* ( startPoint + endPoint );
-
-                float distMidPoint2 = pow ( midPoint.x-sensor_pose.getOrigin().getX(), 2.0 ) + pow ( midPoint.y-sensor_pose.getOrigin().getY(), 2.0 );
-                float distcenterPoint2 = pow ( centerPoint.x-sensor_pose.getOrigin().getX(), 2.0 ) + pow ( centerPoint.y-sensor_pose.getOrigin().getY(), 2.0 );
-
-                if ( distcenterPoint2 <  distMidPoint2 ) { // split data at midpoint, because otherwise we will describe a square at a region which is not occupied
-
-                    splitSegmentsFlag = true;
-                    //	    std::vector<geo::Vec2f> pointsSplitted;
-                    for ( unsigned int ii_regions = 0; ii_regions < 2; ++ii_regions ) { // do for both the lower and the upper part
-//pointsSplitted.clear();
-                        current_segment.clear();
-                        unsigned int ID_low, ID_high;
-                        if ( ii_regions == 0 ) {
-                            ID_low = lowerIndex;
-                            ID_high = cornerIndices[ii_pointsToCheck + 1];
+                        if ( i_seg == ID_low ) {
+                            seg_min = p;
+                            seg_max = p;
                         } else {
-                            ID_low = cornerIndices[ii_pointsToCheck + 1];
-                            ID_high = cornerIndices.back();
-                            lowerIndex = ID_low;
+                            seg_min.x = std::min ( p.x, seg_min.x );
+                            seg_min.y = std::min ( p.y, seg_min.y );
+                            seg_max.x = std::max ( p.x, seg_max.x );
+                            seg_max.y = std::max ( p.y, seg_max.y );
                         }
+                    }
 
-                        for ( unsigned int i_corner = ID_low; i_corner < ID_high; ++i_corner ) {
-                            current_segment.push_back ( i_corner + scanIndex );    // current segment contains the indices from points, not from the original scan. segment[0] should be added for that.
-                            //     pointsSplitted.push_back(i_corner);
-                        }
+                    geo::Vec2f bb = seg_max - seg_min;
 
-                        // if ( current_segment.size() >= min_segment_size_pixels_ ) {
-                        if ( ID_high - ID_low >= min_segment_size_pixels_ ) {
-                            geo::Vec2 seg_min, seg_max;
-                            for ( unsigned int i_seg = ID_low; i_seg <= ID_high; ++i_seg ) {
-                                geo::Vector3 p ( points[i_seg].x,  points[i_seg].y, sensor_pose.getOrigin().getZ() ) ; // TODO Right z-coordinate? Not used at the moment!
-
-                                if ( i_seg == ID_low ) {
-                                    seg_min = geo::Vec2 ( p.x, p.y );
-                                    seg_max = geo::Vec2 ( p.x, p.y );
-                                } else {
-                                    seg_min.x = std::min ( p.x, seg_min.x );
-                                    seg_min.y = std::min ( p.y, seg_min.y );
-                                    seg_max.x = std::max ( p.x, seg_max.x );
-                                    seg_max.y = std::max ( p.y, seg_max.y );
-                                }
-                            }
-
-                            geo::Vec2 bb = seg_max - seg_min;
-
-                            if ( ( bb .x > min_cluster_size_ || bb.y > min_cluster_size_ ) && bb.x < max_cluster_size_ && bb.y < max_cluster_size_ ) {
-                                if ( ii_regions == 0 ) {
-                                    segments.push_back ( current_segment );
-                                    //  pointsList.push_back(pointsSplitted);
-                                } else {
-                                    segments.push_back ( current_segment );
-                                }
-                            }
-                        }
+                    if ( ( bb .x > min_cluster_size_ || bb.y > min_cluster_size_ ) && bb.x < max_cluster_size_ && bb.y < max_cluster_size_ ) {
+                        pointsList.push_back ( pointsLow );
+                        pointsToCheck.erase ( pointsToCheck.begin(), pointsToCheck.begin() + cornerIndicesID );
+                        cornerIndices.erase ( cornerIndices.begin(), cornerIndices.begin() + cornerIndicesID );
+                        cornersAfterSplitting.push_back ( cornerAfterSplitting );
+			std::cout << "cornersAfterSplitting size = " << cornersAfterSplitting.size() << "Last element = " << cornersAfterSplitting.back() << std::endl;
                     }
                 }
             }
         }
 
-        //   points
-        //   corners
-
-
-        //TODO now: after splitting segments, both are added to the segments list, while we have information available about both segments which is recomputed!
         //TODO now, both in splitting the segments and the feature-extraction-part, the corners are determined. Information is available!
 
-        //   if ( !splitSegmentsFlag )
-        //  pointsList.push_back(points);
-
-        if ( !splitSegmentsFlag ) {
 
 
-            //  for(unsigned int iPointsList = 0; iPointsList < pointsList.size(); ++iPointsList){
-//	points = pointsList[iPointsList];
+std::cout << "bla1, cornersAfterSplitting size = " << cornersAfterSplitting.size() << "Pointslist.size = " << pointsList.size() << std::endl;
+for ( unsigned int iPointsList = 0; iPointsList < pointsList.size(); ++iPointsList ) {
+   std::cout << cornersAfterSplitting[iPointsList] << std::endl;
+}
+        for ( unsigned int iPointsList = 0; iPointsList < pointsList.size(); ++iPointsList ) {
+            points = pointsList[iPointsList];
+	    unsigned int cornerIndex = cornersAfterSplitting[iPointsList];
+	    
+	    std::cout << "After splitting: points.size = " << points.size() << "cornerIndex = " << cornerIndex << std::endl;
+	    
+	    std::cout << "bla2" << std::endl;
+	    
             clusters.push_back ( EntityUpdate() );
             EntityUpdate& cluster = clusters.back();
 
+	    std::cout << "bla3" << std::endl;
             cluster.pose = geo::Pose3D::identity();
             ed::convex_hull::create ( points, z_min, z_max, cluster.chull, cluster.pose );
 
+	    std::cout << "bla4" << std::endl;
             ed::tracking::Circle circle;
             ed::tracking::Rectangle rectangle;
             std::vector<geo::Vec2f>::iterator it_low, it_high;
 
-            std::vector<unsigned int> cornerIndex_test;
+	    std::cout << "bla5" << std::endl;
+           // std::vector<unsigned int> cornerIndex_test;
             //cornerIndex_test.push_back(std::numeric_limits<unsigned int>::quiet_NaN() );
 
+	    std::cout << "bla6" << std::endl;
             ed::tracking::FITTINGMETHOD method = ed::tracking::CIRCLE;
-            float error_circle2 = ed::tracking::fitObject ( points, cluster.pose, method,  &cornerIndex_test, &rectangle, &circle, &it_low, &it_high, sensor_pose );
+            float error_circle2 = ed::tracking::fitObject ( points, cluster.pose, method, &cornerIndex, &rectangle, &circle, &it_low, &it_high, sensor_pose );
 
-            method = ed::tracking::determineCase ( points, &cornerIndex_test, &it_low, &it_high, sensor_pose ); // chose to fit a single line or a rectangle (2 lines)
-            float error_rectangle2 = ed::tracking::fitObject ( points, cluster.pose, method,  &cornerIndex_test, &rectangle, &circle, &it_low, &it_high,  sensor_pose );
+	    std::cout << "bla7" << std::endl;
+            method = ed::tracking::determineCase ( points, &cornerIndex, &it_low, &it_high, sensor_pose ); // chose to fit a single line or a rectangle (2 lines)
+            float error_rectangle2 = ed::tracking::fitObject ( points, cluster.pose, method,  &cornerIndex, &rectangle, &circle, &it_low, &it_high,  sensor_pose );
 
+	    std::cout << "bla8" << std::endl;
             ed::tracking::FeatureProbabilities prob;
             prob.setMeasurementProbabilities ( error_rectangle2, error_circle2, 2*circle.get_R(), MAX_CORRIDOR_WIDTH );
 
+	    std::cout << "bla9" << std::endl;
             ed::tracking::FeatureProperties properties;
             properties.setFeatureProbabilities ( prob );
             properties.setCircle ( circle );
@@ -940,8 +950,6 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
             //std::cout << "Probabilities [Rectangle, Circle] = [" << properties.getFeatureProbabilities().get_pRectangle() << ", " << properties.getFeatureProbabilities().get_pCircle() << "]" << std::endl;
 
             // TODO: cleanup: remove objects which are fitted and clearly interfere with the walls -> more robustness on segmentation. Where to check?
-
-//#endif
 
             // --------------------------
             // Temp for RoboCup 2016; todo: remove after
