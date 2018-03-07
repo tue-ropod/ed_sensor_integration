@@ -794,13 +794,13 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
             }
         }
 
-            int chull_size = points.size();
+       /*     int chull_size = points.size();
             std::cout << " \n Points = " << std::endl;
             for ( unsigned int i_print = 0; i_print < chull_size ; i_print++ ) {
                 std::cout << points[i_print] << ";" << std::endl;
             }
             std::cout << std::endl;
-          
+         */ 
 
         // check here for possible corners and splitting
         std::vector<unsigned int> cornerIndices;
@@ -808,27 +808,19 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
         std::vector< std::vector<geo::Vec2f> > pointsList;
         std::vector<unsigned int> cornersAfterSplitting;
 	unsigned int cornerIndicesID;
-	
-	std::cout << "cornersAfterSplitting initialized, size = " << cornersAfterSplitting.size() << std::endl;
 
         if ( !ed::tracking::findPossibleCorners ( points, &cornerIndices ) ) { // if no corners detected, add the points to the points-vector
             pointsList.push_back ( points );
-            cornersAfterSplitting.push_back ( std::numeric_limits<unsigned int>::quiet_NaN() );
-	    
-	    std::cout << "No corners detected, cornersAfterSplitting = " << cornersAfterSplitting[0] << std::endl;
-	    
+            cornersAfterSplitting.push_back ( std::numeric_limits<unsigned int>::quiet_NaN() );  
         } else { // if corners detected, check if a valid region is described. If not, split these data
 
             cornerIndices.insert ( cornerIndices.begin(), 0 ); // add index of first point of "points"
             cornerIndices.push_back ( points.size() - 1 );// add index of last point of "points"
 
             std::vector<geo::Vec2f> pointsToCheck;
-	    std::cout << "CornerIndices = \t ";
             for ( unsigned int iIndex = 0; iIndex < cornerIndices.size(); ++iIndex ) {
                 pointsToCheck.push_back ( points[cornerIndices[iIndex]] );
-		std::cout << cornerIndices[iIndex] << "\t" << std::endl;
             }
-            std::cout << "\n";
 
             while ( pointsToCheck.size() >= 2 ) {
                 unsigned int ID_low = cornerIndices[0], ID_high;
@@ -838,8 +830,6 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
 		    cornerIndicesID = 1;
                     ID_high = cornerIndices[cornerIndicesID];
                     cornerAfterSplitting = std::numeric_limits<unsigned int>::quiet_NaN();
-		    
-		    std::cout << "kla0 cornerAfterSplitting = " << cornerAfterSplitting << std::endl;
                 } else {
                     geo::Vec2f startPoint = pointsToCheck[0];
                     geo::Vec2f midPoint = pointsToCheck[1];
@@ -855,12 +845,10 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
 		      cornerIndicesID = 1;
                         ID_high = cornerIndices[cornerIndicesID];
                         cornerAfterSplitting = std::numeric_limits<unsigned int>::quiet_NaN();
-			std::cout << "kla1 cornerAfterSplitting = " << cornerAfterSplitting << std::endl;
                     } else {
 		      cornerIndicesID = 2;
                         ID_high = cornerIndices[cornerIndicesID];
                         cornerAfterSplitting = cornerIndices[1] - ID_low;
-			std::cout << "kla2 cornerAfterSplitting = " << cornerAfterSplitting << std::endl;
                     }
                 }
 
@@ -886,68 +874,44 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
 
                     if ( ( bb .x > min_cluster_size_ || bb.y > min_cluster_size_ ) && bb.x < max_cluster_size_ && bb.y < max_cluster_size_ ) {
                         pointsList.push_back ( pointsLow );
-                        pointsToCheck.erase ( pointsToCheck.begin(), pointsToCheck.begin() + cornerIndicesID );
-                        cornerIndices.erase ( cornerIndices.begin(), cornerIndices.begin() + cornerIndicesID );
-                        cornersAfterSplitting.push_back ( cornerAfterSplitting );
-			std::cout << "cornersAfterSplitting size = " << cornersAfterSplitting.size() << "Last element = " << cornersAfterSplitting.back() << std::endl;
-                    }
+		    }
                 }
+                
+                    pointsToCheck.erase ( pointsToCheck.begin(), pointsToCheck.begin() + cornerIndicesID );
+                    cornerIndices.erase ( cornerIndices.begin(), cornerIndices.begin() + cornerIndicesID );
+                    cornersAfterSplitting.push_back ( cornerAfterSplitting );    
             }
         }
 
-        //TODO now, both in splitting the segments and the feature-extraction-part, the corners are determined. Information is available!
-
-
-
-std::cout << "bla1, cornersAfterSplitting size = " << cornersAfterSplitting.size() << "Pointslist.size = " << pointsList.size() << std::endl;
-for ( unsigned int iPointsList = 0; iPointsList < pointsList.size(); ++iPointsList ) {
-   std::cout << cornersAfterSplitting[iPointsList] << std::endl;
-}
         for ( unsigned int iPointsList = 0; iPointsList < pointsList.size(); ++iPointsList ) {
             points = pointsList[iPointsList];
 	    unsigned int cornerIndex = cornersAfterSplitting[iPointsList];
 	    
-	    std::cout << "After splitting: points.size = " << points.size() << "cornerIndex = " << cornerIndex << std::endl;
-	    
-	    std::cout << "bla2" << std::endl;
-	    
             clusters.push_back ( EntityUpdate() );
             EntityUpdate& cluster = clusters.back();
 
-	    std::cout << "bla3" << std::endl;
             cluster.pose = geo::Pose3D::identity();
             ed::convex_hull::create ( points, z_min, z_max, cluster.chull, cluster.pose );
 
-	    std::cout << "bla4" << std::endl;
             ed::tracking::Circle circle;
             ed::tracking::Rectangle rectangle;
             std::vector<geo::Vec2f>::iterator it_low, it_high;
 
-	    std::cout << "bla5" << std::endl;
-           // std::vector<unsigned int> cornerIndex_test;
-            //cornerIndex_test.push_back(std::numeric_limits<unsigned int>::quiet_NaN() );
-
-	    std::cout << "bla6" << std::endl;
             ed::tracking::FITTINGMETHOD method = ed::tracking::CIRCLE;
             float error_circle2 = ed::tracking::fitObject ( points, cluster.pose, method, &cornerIndex, &rectangle, &circle, &it_low, &it_high, sensor_pose );
 
-	    std::cout << "bla7" << std::endl;
             method = ed::tracking::determineCase ( points, &cornerIndex, &it_low, &it_high, sensor_pose ); // chose to fit a single line or a rectangle (2 lines)
             float error_rectangle2 = ed::tracking::fitObject ( points, cluster.pose, method,  &cornerIndex, &rectangle, &circle, &it_low, &it_high,  sensor_pose );
 
-	    std::cout << "bla8" << std::endl;
             ed::tracking::FeatureProbabilities prob;
             prob.setMeasurementProbabilities ( error_rectangle2, error_circle2, 2*circle.get_R(), MAX_CORRIDOR_WIDTH );
 
-	    std::cout << "bla9" << std::endl;
             ed::tracking::FeatureProperties properties;
             properties.setFeatureProbabilities ( prob );
             properties.setCircle ( circle );
             properties.setRectangle ( rectangle );
 
             measuredProperties.push_back ( properties );
-
-            //std::cout << "Probabilities [Rectangle, Circle] = [" << properties.getFeatureProbabilities().get_pRectangle() << ", " << properties.getFeatureProbabilities().get_pCircle() << "]" << std::endl;
 
             // TODO: cleanup: remove objects which are fitted and clearly interfere with the walls -> more robustness on segmentation. Where to check?
 
@@ -965,6 +929,7 @@ for ( unsigned int iPointsList = 0; iPointsList < pointsList.size(); ++iPointsLi
         // --------------------------
     }
 
+    
 // Create selection of world model entities that could associate
 
     float max_dist = 0.3;
@@ -1061,8 +1026,6 @@ for ( unsigned int iPointsList = 0; iPointsList < pointsList.size(); ++iPointsLi
         return;
     }
 
-//std::cout << "Test detected " << std::endl;
-
     std::vector<int> entities_associated ( entities.size(), -1 );
 
     unsigned int marker_ID = 0; // To Do: After tracking, the right ID's should be created. The ID's are used to have multiple markers.
@@ -1076,9 +1039,8 @@ for ( unsigned int iPointsList = 0; iPointsList < pointsList.size(); ++iPointsLi
         ed::UUID id;
         ed::ConvexHull new_chull;
         geo::Pose3D new_pose;
-#ifdef TRACKING
+
         ed::tracking::FeatureProperties featureProperty;
-#endif
 
         if ( i_entity == -1 ) {
             // No assignment, so add as new cluster
@@ -1091,9 +1053,7 @@ for ( unsigned int iPointsList = 0; iPointsList < pointsList.size(); ++iPointsLi
             // Update existence probability
             req.setExistenceProbability ( id, 1.0 ); // TODO magic number
 
-#ifdef TRACKING
             featureProperty = measuredProperties[i_cluster];
-#endif
         } else {
             // Mark the entity as being associated
             entities_associated[i_entity] = i_cluster;
@@ -1131,16 +1091,12 @@ for ( unsigned int iPointsList = 0; iPointsList < pointsList.size(); ++iPointsLi
             if ( !e->hasFlag ( "locked" ) ) {
                 new_chull = cluster.chull;
                 new_pose = cluster.pose;
-#ifdef TRACKING
+
                 ed::tracking::FeatureProperties propertiesMeasured = measuredProperties[i_cluster];
                 featureProperty = e->property ( featureProperties_ );
                 featureProperty.updateProbabilities ( propertiesMeasured.getFeatureProbabilities() ); // TODO: update properties of the features
                 featureProperty.setCircle ( propertiesMeasured.getCircle() ); // TODO determine a proper method to update the circle and rectangle properties
                 featureProperty.setRectangle ( propertiesMeasured.getRectangle() ); // Now, the properties of the latest measurements are used
-
-                //std::cout << "ID = " << e->id() << std::endl;
-                //propertiesMeasured.getRectangle().printValues();
-#endif
             }
 
             // Update existence probability
@@ -1168,10 +1124,8 @@ for ( unsigned int iPointsList = 0; iPointsList < pointsList.size(); ++iPointsLi
         }
 
         // Set feature properties en publish geometries
-#ifdef TRACKING
         req.setProperty ( id, featureProperties_, featureProperty );
         publishFeatures ( featureProperty, marker_ID++, ObjectMarkers_pub_ );
-#endif
 
         // Set timestamp
         req.setLastUpdateTimestamp ( id, scan->header.stamp.toSec() );
