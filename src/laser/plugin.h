@@ -22,6 +22,8 @@
 #include "ed/convex_hull_calc.h"
 
 #define MAX_CORRIDOR_WIDTH 3 // [m]
+#define ADD_ASSOCIATION_DISTANCE 0.5 // [m]
+#define MIN_ASSOCIATION_DISTANCE 0.1 // [m]
 //#define MAX_CORRIDOR_WIDTH2 pow(MAX_CORRIDOR_WIDTH, 2.0)
 
 // ----------------------------------------------------------------------------------------------------
