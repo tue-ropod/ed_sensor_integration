@@ -211,11 +211,17 @@ geo::Pose3D fitEntity ( const ed::Entity& e, const geo::Pose3D& sensor_pose, con
 
 bool pointIsPresent ( double x_sensor, double y_sensor, const geo::LaserRangeFinder& lrf, const std::vector<float>& sensor_ranges )
 {
+  
+  std::cout << "sensor_ranges.size = " << sensor_ranges.size() << std::endl;
+  std::cout << "point is present test 0 " << x_sensor << ", " << y_sensor << std::endl;
     int i_beam = lrf.getAngleUpperIndex ( x_sensor, y_sensor );
+    std::cout << "point is present test 1" << std::endl;
     if ( i_beam < 0 || i_beam >= sensor_ranges.size() ) {
+      std::cout << "point is present test 2" << std::endl;
         return true;    // or actually, we don't know
     }
 
+    std::cout << "point is present test " << std::endl;
     float rs = sensor_ranges[i_beam];
     return rs == 0 || geo::Vec2 ( x_sensor, y_sensor ).length() > rs - 0.1;
 }
@@ -224,6 +230,7 @@ bool pointIsPresent ( double x_sensor, double y_sensor, const geo::LaserRangeFin
 
 bool pointIsPresent ( const geo::Vector3& p_sensor, const geo::LaserRangeFinder& lrf, const std::vector<float>& sensor_ranges )
 {
+  std::cout << "In point is present function" << std::endl;
     return pointIsPresent ( p_sensor.x, p_sensor.y, lrf, sensor_ranges );
 }
 
@@ -896,20 +903,37 @@ std::cout << "After render" << std::endl;
     std::vector<ed::WorldModel::const_iterator> it_laserEntities;
     // Try to associate sensor remaining laser point to specific entities
     std::vector< EntityProperty > EntityProperties;
+    unsigned int counter = 0;
+     
     for ( ed::WorldModel::const_iterator e_it = world.begin(); e_it != world.end(); ++e_it ) {
         const ed::EntityConstPtr& e = *e_it;
 	
 	std::cout << "Test1" << std::endl;
 	//	std::cout << "Id = " << e->id().str() << " length = " <<  e->id().str().length() << std::endl;
 	
+
+	
 	std::string laserID = "-laser";
 	if( e->id().str().length() < laserID.length() )
 	  continue;
-
+std::cout << "Test1.1" << std::endl;
         if ( e->id().str().substr ( e->id().str().length() - 6 ) == laserID ) { // entity described by laser before
+	  std::cout << "Test1.2" << std::endl;
             it_laserEntities.push_back ( e_it );
-	    std::cout << "Test2" << std::endl;
+	    std::cout << "Test1.3" << std::endl;
+	    std::cout << "Test2, counter = " << counter << std::endl;
+	   
+	   // std::cout << "nEntities" << std::distance<ed::WorldModel::const_iterator>(world.begin(), world.end() ) << std::endl;
+	    counter++;
+	    std::cout << "ID =  " << e->id() << std::endl;
 	    ed::tracking::FeatureProperties featureProperties = e->property ( featureProperties_ );
+	    
+	    std::cout << "CircleValues : "; featureProperties.getCircle().printValues(); std::cout << "Prob = " << featureProperties.getFeatureProbabilities().get_pCircle();
+	    std::cout << "Rectangular Values : "; featureProperties.getRectangle().printValues();std::cout << "Prob = " << featureProperties.getFeatureProbabilities().get_pRectangle();
+	    //if(!featureProperties)
+	   //   std::cout << "NO FEATUREPROPERTIES!!" << std::endl;
+	    	    std::cout << "Test2.1" << std::endl;
+	 //   std::cout << "Test2.1, featureProperty = " << !featureProperties << std::endl;
             float dist;
 	    EntityProperty currentProperty;
 	    std::cout << "Test3" << std::endl;
@@ -920,11 +944,14 @@ std::cout << "After render" << std::endl;
                 currentProperty.entity_min.x = circle.get_x() - ( 0.5*ADD_ASSOCIATION_DISTANCE + circle.get_R() );
                 currentProperty.entity_max.x = circle.get_x() + ( 0.5*ADD_ASSOCIATION_DISTANCE + circle.get_R() );
                 currentProperty.entity_min.y = circle.get_y() - ( 0.5*ADD_ASSOCIATION_DISTANCE + circle.get_R() );
-                currentProperty.entity_max.y = circle.get_y() - ( 0.5*ADD_ASSOCIATION_DISTANCE + circle.get_R() );
+                currentProperty.entity_max.y = circle.get_y() + ( 0.5*ADD_ASSOCIATION_DISTANCE + circle.get_R() );
+		
+		std::cout << "Min-max values 1 = " << currentProperty.entity_min << ", " << currentProperty.entity_max << std::endl;
 
             } else {
 std::cout << "Test5" << std::endl;
                 ed::tracking::Rectangle rectangle = featureProperties.getRectangle();
+		rectangle.printValues();
 
 		std::vector<geo::Vec2f> corners = rectangle.determineCorners(ADD_ASSOCIATION_DISTANCE);
              /*   float x = rectangle.get_x();
@@ -961,7 +988,7 @@ std::cout << "Test5" << std::endl;
 		    std::cout << "Test8" << std::endl;
                 }
             }
-
+std::cout << "Min-max values 2 = " << currentProperty.entity_min << ", " << currentProperty.entity_max << std::endl;
             EntityProperties.push_back(currentProperty);
 	    std::cout << "Test9" << std::endl;
         }
@@ -1010,6 +1037,7 @@ std::cout << "Test5" << std::endl;
             }
         }
         //}
+        std::cout << "Min-max values 3 = " << seg_min << ", " << seg_max << std::endl;
 
         std::vector< int > possibleClusterEntityAssociations;
         for ( unsigned int jj = 0; jj < it_laserEntities.size(); ++jj ) {
@@ -1024,6 +1052,7 @@ std::cout << "Test5" << std::endl;
             if ( check1 || check2 || check3 || check4 ) {
                 possibleClusterEntityAssociations.push_back ( jj );
             }
+        std::cout << "Min-max values 4 = " << seg_min << ", " << seg_max << std::endl;
 
 
         }
@@ -1150,7 +1179,7 @@ std::cout << "Test5" << std::endl;
     std::vector<EntityUpdate> clusters;
     std::vector<ed::tracking::FeatureProperties> measuredProperties; // The first sequence in this vector (with the length of laser entitities) are the properties corresponding to existing entities
     
-    std::cout << "Bla1" << std::endl;
+    //std::cout << "Bla1" << std::endl;
  //   int counter = 0;
     int initialSize = segments.size();
 
@@ -1158,7 +1187,7 @@ std::cout << "Test5" << std::endl;
     //for ( unsigned int iSegment = 0; iSegment < segments.size(); ++iSegment ) {
     for(unsigned int iList = 0; iList < pointsAssociatedList.size(); iList++){ 
         //  bool splitSegmentsFlag = false;
-std::cout << "Bla2" << std::endl;
+//std::cout << "Bla2" << std::endl;
    //     counter++;
         //std::vector<ScanSegment>::iterator it_test = segments.begin();
        // ScanSegment& segment = segments[iSegment];
@@ -1170,12 +1199,12 @@ std::cout << "Bla2" << std::endl;
 	
 	std::cout << "points.size() initially = " << points.size() << " minclusterSize = " << min_segment_size_pixels_ << " Bool = " << (points.size() < min_segment_size_pixels_ )<< std::endl;
 	if(points.size() < min_segment_size_pixels_) // Add an element to measured properties such that the element in the measuredProperties-vector still corresponds with the laser-entity-vector
-	{  std::cout << "Bla2.1" << std::endl;
+	{ // std::cout << "Bla2.1" << std::endl;
             ed::tracking::FeatureProperties properties; // values initialized with nan now
             measuredProperties.push_back ( properties );
 	    continue;
 	}
-	std::cout << "Bla3" << std::endl;
+	//std::cout << "Bla3" << std::endl;
 	
        /* float z_min, z_max;
 
@@ -1213,7 +1242,7 @@ std::cout << "Bla2" << std::endl;
         std::vector< std::vector<geo::Vec2f> > pointsList;
         std::vector<unsigned int> cornersAfterSplitting;
         unsigned int cornerIndicesID;
-std::cout << "Bla3.1" << std::endl;
+//std::cout << "Bla3.1" << std::endl;
 std::cout << "poinst size = " << points.size() << std::endl;
 
 bool test = ed::tracking::findPossibleCorners ( points, &cornerIndices );
@@ -1225,18 +1254,18 @@ std::cout << "poinst size = " << points.size() << "ncornerIdices = " << cornerIn
             cornersAfterSplitting.push_back ( std::numeric_limits<unsigned int>::quiet_NaN() );
 
         } else { // if corners detected, check if a valid region is described. If not, split these data
-std::cout << "Bla5" << std::endl;
+//std::cout << "Bla5" << std::endl;
             cornerIndices.insert ( cornerIndices.begin(), 0 ); // add index of first point of "points"
             cornerIndices.push_back ( points.size() - 1 );// add index of last point of "points"
 
             std::vector<geo::Vec2f> pointsToCheck;
             for ( unsigned int iIndex = 0; iIndex < cornerIndices.size(); ++iIndex ) {
                 pointsToCheck.push_back ( points[cornerIndices[iIndex]] );
-		std::cout << "Bla6" << std::endl;
+	//	std::cout << "Bla6" << std::endl;
             }
 
             while ( pointsToCheck.size() >= 2 ) {
-	      std::cout << "Bla7" << std::endl;
+	 //     std::cout << "Bla7" << std::endl;
                 unsigned int ID_low = cornerIndices[0], ID_high;
 
                 unsigned int cornerAfterSplitting;
@@ -1245,7 +1274,7 @@ std::cout << "Bla5" << std::endl;
                     ID_high = cornerIndices[cornerIndicesID];
                     cornerAfterSplitting = std::numeric_limits<unsigned int>::quiet_NaN();
                 } else {
-		  std::cout << "Bla8" << std::endl;
+		//  std::cout << "Bla8" << std::endl;
                     geo::Vec2f startPoint = pointsToCheck[0];
                     geo::Vec2f midPoint = pointsToCheck[1];
                     geo::Vec2f endPoint = pointsToCheck[2];
@@ -1266,7 +1295,7 @@ std::cout << "Bla5" << std::endl;
                         cornerAfterSplitting = cornerIndices[1] - ID_low;
                     }
                 }
-std::cout << "Bla9" << std::endl;
+//std::cout << "Bla9" << std::endl;
                 if ( ID_high - ID_low >= min_segment_size_pixels_ ) {
                     geo::Vec2f seg_min, seg_max;
                     std::vector<geo::Vec2f> pointsLow;
@@ -1292,13 +1321,13 @@ std::cout << "Bla9" << std::endl;
                     }
                 }
 
-                std::cout << "Bla10" << std::endl;
+           //     std::cout << "Bla10" << std::endl;
                 pointsToCheck.erase ( pointsToCheck.begin(), pointsToCheck.begin() + cornerIndicesID );
                 cornerIndices.erase ( cornerIndices.begin(), cornerIndices.begin() + cornerIndicesID );
                 cornersAfterSplitting.push_back ( cornerAfterSplitting );
             }
         }
-std::cout << "Bla11" << std::endl;
+//std::cout << "Bla11" << std::endl;
         for ( unsigned int iPointsList = 0; iPointsList < pointsList.size(); ++iPointsList ) {
             points = pointsList[iPointsList];
             unsigned int cornerIndex = cornersAfterSplitting[iPointsList];
@@ -1329,7 +1358,7 @@ std::cout << "Bla11" << std::endl;
 
             measuredProperties.push_back ( properties );
 
-	    std::cout << "Bla12" << std::endl;
+	//    std::cout << "Bla12" << std::endl;
             // TODO: cleanup: remove objects which are fitted and clearly interfere with the walls -> more robustness on segmentation. Where to check?
 
             // --------------------------
@@ -1470,33 +1499,39 @@ std::cout << "Bla11" << std::endl;
     
     for ( unsigned int i_properties = 0; i_properties < measuredProperties.size(); i_properties++ ) {
         measuredProperty = measuredProperties[i_properties];
-
-	std::cout << "i_properties = " << i_properties << std::endl;
+	
+	
 	
         if ( i_properties < it_laserEntities.size() ) {
 	  const ed::EntityConstPtr& e = * ( it_laserEntities[i_properties] );
-
-	  std::cout << "Hatseflats" << std::endl;
+std::cout << "measuredProperties size = " << measuredProperties.size() << "i_properties = " << i_properties << " Check existence of e: !e = " <<  !e << ", ID = " << e->id() << std::endl; 
+	  //std::cout << "Hatseflats" << std::endl;
             // check if new properties are measured.
             bool check1 = measuredProperty.getCircle().get_R() != measuredProperty.getCircle().get_R();
             bool check2 = measuredProperty.getRectangle().get_w() != measuredProperty.getRectangle().get_w();
             bool check3 = measuredProperty.getRectangle().get_d() != measuredProperty.getRectangle().get_d();
 std::cout << "Hatseflats 2" << std::endl;
+	    
             if ( check1 || ( check2 && check3 ) ) {
                 //Clear unassociated entities in view
 std::cout << "Hatseflat3" << std::endl;
                 const geo::Pose3D& pose = e->pose();
-
+std::cout << "Hatseflat3.1" << pose << std::endl;
                 // Transform to sensor frame
+std::cout << "Sensor pose inverse " << sensor_pose.inverse() << std::endl;
                 geo::Vector3 p = sensor_pose.inverse() * pose.t;
-
+std::cout << "Hatseflat3.2" << p << std::endl;
                 if ( !pointIsPresent ( p, lrf_model_, sensor_ranges ) ) {
+		  std::cout << "Hatseflat3.3" << std::endl;
                     double p_exist = e->existenceProbability();
+		    std::cout << "Hatseflat3.4" << std::endl;
                     if ( p_exist < 0.3 ) { // TODO: magic number
                         req.removeEntity ( e->id() );
+			std::cout << "Hatseflat3.5" << std::endl;
 			
 			std::cout << "Entity removed " << std::endl;
                     } else {
+		        std::cout << "Hatseflat3.6" << std::endl;
                         req.setExistenceProbability ( e->id(), std::max ( 0.0, p_exist - 0.1 ) ); // TODO: very ugly prob update
                     }
                 }
@@ -1506,6 +1541,7 @@ std::cout << "Hatseflats4. We are going to continue!" << std::endl;
 
             // check if new information is available and update properties
 std::cout << "Hatseflat5" << std::endl;
+std::cout <<" Entity locked = " << e->hasFlag ( "locked" ) << std::endl;
             if ( !e->hasFlag ( "locked" ) ) {
                 ed::tracking::FeatureProperties propertiesMeasured = measuredProperties[i_properties];
                 entityProperties = e->property ( featureProperties_ );
@@ -1546,6 +1582,7 @@ std::cout << "Hatseflat5" << std::endl;
             entityProperties = measuredProperty;
 
         }
+std::cout << "Test zoveel" << std::endl;
         
         // determine convex hull and pose
         ed::ConvexHull new_chull;
@@ -1569,11 +1606,13 @@ std::cout << "Hatseflat5" << std::endl;
 	  ed::convex_hull::create ( convexHullPoints, sensor_pose.getOrigin().getZ(), sensor_pose.getOrigin().getZ(), new_chull, new_pose ); // height assumed to be similar to sensor-height
 	}
     
-    
+    std::cout << "Test zoveel2, ID = " << id << std::endl;
+     std::cout << "CircleValues : "; entityProperties.getCircle().printValues(); std::cout << "Prob = " << entityProperties.getFeatureProbabilities().get_pCircle();
+	    std::cout << "Rectangular Values : "; entityProperties.getRectangle().printValues();std::cout << "Prob = " << entityProperties.getFeatureProbabilities().get_pRectangle();
         // Set feature properties en publish geometries
         req.setProperty ( id, featureProperties_, entityProperties );
 	req.setConvexHullNew ( id, new_chull, new_pose, scan->header.stamp.toSec(), scan->header.frame_id );
-        publishFeatures ( entityProperties, marker_ID++, ObjectMarkers_pub_ );
+        //publishFeatures ( entityProperties, marker_ID++, ObjectMarkers_pub_ );
 
         // Set timestamp
         req.setLastUpdateTimestamp ( id, scan->header.stamp.toSec() );
