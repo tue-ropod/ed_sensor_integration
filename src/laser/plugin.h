@@ -24,7 +24,7 @@
 #define MAX_CORRIDOR_WIDTH 3 // [m]
 #define ADD_ASSOCIATION_DISTANCE 0.5 // [m]
 #define MIN_ASSOCIATION_DISTANCE 0.1 // [m]
-//#define MAX_CORRIDOR_WIDTH2 pow(MAX_CORRIDOR_WIDTH, 2.0)
+#define COORDINATE_OUTSIDE_MAP 1000.0 // [m]
 
 // ----------------------------------------------------------------------------------------------------
 
@@ -80,7 +80,7 @@ private:
     std::map<ed::UUID,geo::Pose3D> pose_cache;
     
     // 'Feature' property key
-    ed::PropertyKey<ed::tracking::FeatureProperties> featureProperties_;
+    ed::PropertyKey<ed::tracking::FeatureProperties> featureProperties_; // TODO double defined now for publishing-purposes in rviz
 
 };
 
