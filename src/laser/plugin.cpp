@@ -857,7 +857,7 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
             currentSegmentInfo.segmentRanges.push_back ( i );
 	    if(i == 0)
 	    {
-	      confidenceLow = 0;
+	      confidenceLow = 0; // Because we have no proof that the complete side of the object is observed
 	    } 
 	    else
 	    {
@@ -875,7 +875,7 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
     int gap_size = 0;
     std::vector<float> gapRanges;
     
-    std::cout << "Num beams = " << num_beams << " ranges = " << std::endl;
+//     std::cout << "Num beams = " << num_beams << " ranges = " << std::endl;
 
     for ( unsigned int i = currentSegmentInfo.segmentRanges.front(); i < num_beams; ++i ) 
     {
@@ -911,11 +911,16 @@ std::cout << rs << ", " ;
                     if ( ( bb .x > min_cluster_size_ || bb.y > min_cluster_size_ ) && bb.x < max_cluster_size_ && bb.y < max_cluster_size_ ) {
 
                         confidenceHigh = true;
+			std::cout << "\n\n";
                         for ( unsigned int l = currentSegmentInfo.segmentRanges.size() - POINTS_TO_CHECK_CONFIDENCE; confidenceHigh && l < currentSegmentInfo.segmentRanges.size(); l++ ) {
                             for ( unsigned int m = 0; confidenceHigh && m < gapRanges.size(); m++ ) {
-                                if ( gapRanges[m] < currentSegmentInfo.segmentRanges[l] && gapRanges[m] != 0 ) {
+			      		    bool check = gapRanges[m] < currentSegmentInfo.segmentRanges[l] ;
+				bool check2 = gapRanges[m] >= 0 + EPSILON;
+			      std::cout << "Confidence high: rsToCheck = " << gapRanges[m] << ", rsToCompare = " << sensor_ranges[currentSegmentInfo.segmentRanges[l]] << ", iterator = " << m << "Statement1 = " << check << ", Statement2 = " << check2;
+                                if ( gapRanges[m] < sensor_ranges[currentSegmentInfo.segmentRanges[l]] && gapRanges[m] >= 0 + EPSILON ) {
                                     confidenceHigh = false;
                                 }
+                                std::cout << " confidenceHigh = " << confidenceHigh << ", \t" ;
                             }
                         }
 
@@ -931,7 +936,9 @@ std::cout << rs << ", " ;
 
                 currentSegmentInfo.segmentRanges.clear();
                 gapRanges.clear();
-
+		
+		std::cout << " Confidence low = " << confidenceLow << ", Confindence high = " << confidenceHigh << " \n\n " << std::endl;
+		
                 // Find next good value
                 while ( sensor_ranges[i] == 0 && i < num_beams ) {
                     ++i; // check for confidence low
@@ -946,10 +953,15 @@ std::cout << rs << ", " ;
                 float rsToCheck = sensor_ranges[i];
                 for ( unsigned int l = i - nPointsToCheck; confidenceLow && l < i; l++ ) {
                     float rsToCompare = sensor_ranges[l];
-                    if ( rsToCheck < rsToCompare && rsToCompare != 0 ) {
+		    bool check = rsToCheck > rsToCompare;
+		    bool check2 = rsToCompare <= 0 + EPSILON;
+		    std::cout << "Confidence low: rsToCheck = " << rsToCheck << ", rsToCompare = " << rsToCompare << ", iterator = " << l << "Statement1 = " << check << ", Statement2 = " << check2;
+                    if ( rsToCheck > rsToCompare && rsToCompare >= 0 + EPSILON ) {
                         confidenceLow = false;
                     }
+                    std::cout << " confidenceLow = " << confidenceLow << std::endl;
                 }
+                
                 currentSegmentInfo.segmentRanges.push_back ( i );
             }
 
@@ -994,9 +1006,9 @@ std::cout << rs << ", " ;
 	std::string laserID = "-laser";
 	if( e->id().str().length() < laserID.length() )
 	  continue;
-// std::cout << "Test1.1" << std::endl;
+//  std::cout << "Test1.1" << std::endl;
         if ( e->id().str().substr ( e->id().str().length() - 6 ) == laserID ) { // entity described by laser before
-// 	  std::cout << "Test1.2" << std::endl;
+//  	  std::cout << "Test1.2" << std::endl;
             
 // 	    std::cout << "Test1.3" << std::endl;
 // 	    std::cout << "Test2, counter = " << counter << std::endl;
@@ -1099,10 +1111,10 @@ std::cout << rs << ", " ;
 
     int counter = 0;
     
-    std::cout << "\n n laserEntities = " << it_laserEntities.size() << ", nSegments = " << segments.size() << "with ?? elements per segments: " << std::endl;
-     for ( unsigned int iSegment = 0; iSegment < segments.size(); ++iSegment ) {
-       std::cout << segments[iSegment].segmentRanges.size() << ", " << std::endl;
-     }
+//     std::cout << "\n n laserEntities = " << it_laserEntities.size() << ", nSegments = " << segments.size() << "with ?? elements per segments: " << std::endl;
+//      for ( unsigned int iSegment = 0; iSegment < segments.size(); ++iSegment ) {
+//        std::cout << segments[iSegment].segmentRanges.size() << ", " << std::endl;
+//      }
     
     // Per entity, create a vector of points which associate to that entity. A closest-distance criterion is used
     std::vector< std::vector<geo::Vec2f> > pointsAssociatedList ( it_laserEntities.size() ); 
@@ -1141,11 +1153,11 @@ std::cout << rs << ", " ;
             }
         }
         
-        std::cout << "Points in segment = " << std::endl;
-        for (unsigned int iPoints = 0; iPoints < points.size(); iPoints++)
-	{
-	  std::cout << points[iPoints] << "; ";
-	}
+//         std::cout << "Points in segment = " << std::endl;
+//         for (unsigned int iPoints = 0; iPoints < points.size(); iPoints++)
+// 	{
+// 	  std::cout << points[iPoints] << "; ";
+// 	}
 //         std::cout << "Min-max values 3 = " << seg_min << ", " << seg_max << std::endl;
 
 	// After the properties of each segment are determined, check which clusters and entities might associate
@@ -1153,7 +1165,7 @@ std::cout << rs << ", " ;
 // 		    std::cout << "min-max to compare: seg min" << seg_min << " seg max = " << seg_max << std::endl;
         for ( unsigned int jj = 0; jj < it_laserEntities.size(); ++jj ) {
             const ed::EntityConstPtr& e = *it_laserEntities[jj];
-	    std::cout << "\n Sizes = " << it_laserEntities.size() << ", " << EntityProperties.size() << ", " << jj << std::endl;
+// 	    std::cout << "\n Sizes = " << it_laserEntities.size() << ", " << EntityProperties.size() << ", " << jj << std::endl;
            
             // check if 1 of the extrema of the segment might be related to the exploded entity
             bool check1 =  seg_min.x > EntityProperties[jj].entity_min.x && seg_min.x < EntityProperties[jj].entity_max.x ;
@@ -1161,13 +1173,13 @@ std::cout << rs << ", " ;
             bool check3 =  seg_min.y > EntityProperties[jj].entity_min.y && seg_min.y < EntityProperties[jj].entity_max.y ;
             bool check4 =  seg_max.y > EntityProperties[jj].entity_min.y && seg_max.y < EntityProperties[jj].entity_max.y ;
 
- 	    std::cout << "clusters: min/max = " << seg_min << ", " << seg_max << std::endl;
-	    std::cout << "Entity: min/max = " << EntityProperties[jj].entity_min << ", " <<  EntityProperties[jj].entity_max << std::endl;
+//  	    std::cout << "clusters: min/max = " << seg_min << ", " << seg_max << std::endl;
+// 	    std::cout << "Entity: min/max = " << EntityProperties[jj].entity_min << ", " <<  EntityProperties[jj].entity_max << std::endl;
 	    
             if ( check1 && check3 || check2 && check4 ) {
                 possibleClusterEntityAssociations.push_back ( jj );
         // which entities are related to which cluster?
-        std::cout << "Segment " << iSegment << " associated to entity with ID = " <<  e->id() << std::endl;
+//         std::cout << "Segment " << iSegment << " associated to entity with ID = " <<  e->id() << std::endl;
             }
 //         std::cout << "Min-max values 4 = " << seg_min << ", " << seg_max << std::endl;
 

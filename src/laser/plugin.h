@@ -27,6 +27,7 @@
 #define COORDINATE_OUTSIDE_MAP 1000.0 // [m]
 #define CONFIDENCE_REGION_HIGH_COVARIANCE 0.5 // [m] If the distance is smaller than this distance, we are not certain about the size of an object
 #define POINTS_TO_CHECK_CONFIDENCE 5 // [-]
+#define EPSILON 1e-2 // [m]
 
 // ----------------------------------------------------------------------------------------------------
 
