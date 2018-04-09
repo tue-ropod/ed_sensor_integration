@@ -23,8 +23,10 @@
 
 #define MAX_CORRIDOR_WIDTH 3 // [m]
 #define ADD_ASSOCIATION_DISTANCE 0.5 // [m]
-#define MIN_ASSOCIATION_DISTANCE 0.1 // [m]
+#define MIN_ASSOCIATION_DISTANCE 0.3 // [m] TODO reduce
 #define COORDINATE_OUTSIDE_MAP 1000.0 // [m]
+#define CONFIDENCE_REGION_HIGH_COVARIANCE 0.5 // [m] If the distance is smaller than this distance, we are not certain about the size of an object
+#define POINTS_TO_CHECK_CONFIDENCE 5 // [-]
 
 // ----------------------------------------------------------------------------------------------------
 
@@ -51,7 +53,7 @@ private:
     
     ros::Publisher door_pub_;
     
-    ros::Publisher ObjectMarkers_pub_;
+//     ros::Publisher ObjectMarkers_pub_;
 
     std::queue<sensor_msgs::LaserScan::ConstPtr> scan_buffer_;
 
@@ -77,6 +79,7 @@ private:
     bool check_door_status_;
 
     int max_gap_size_;
+    float entity_timeout_;
     std::map<ed::UUID,geo::Pose3D> pose_cache;
     
     // 'Feature' property key
