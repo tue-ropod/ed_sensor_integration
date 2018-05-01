@@ -306,7 +306,7 @@ void LaserPlugin::initialize ( ed::InitData& init )
 
     // Communication
     sub_scan_ = nh.subscribe<sensor_msgs::LaserScan> ( laser_topic, 3, &LaserPlugin::scanCallback, this );
-    door_pub_ = nh.advertise<ropod_demo_dec_2017::doorDetection> ( "door", 3 );
+//    door_pub_ = nh.advertise<ropod_demo_dec_2017::doorDetection> ( "door", 3 );
 //     ObjectMarkers_pub_ = nh.advertise<visualization_msgs::Marker> ( "ObjectMarkers", 3 );
 
     tf_listener_ = new tf::TransformListener;
