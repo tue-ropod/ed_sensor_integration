@@ -667,9 +667,9 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
 //                 double avg_dist = sum/counter;
 //                 // std::cout << "sum = " << sum << "counter = " << counter << std::endl;
 //                 double bound = 0.2;
-//
-//                 ropod_demo_dec_2017::doorDetection msg;
-//
+// 
+//                 ed_sensor_integration::doorDetection msg;
+// 
 //                 msg.id = id.str();
 //                 msg.type = "elevatordoor";
 //                 msg.open = 0;
