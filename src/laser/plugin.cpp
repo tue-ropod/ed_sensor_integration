@@ -41,7 +41,7 @@ struct ScanSegmentInfo
 
 struct EntityUpdate
 {
-    ed::ConvexHull chull;
+
     geo::Pose3D pose;
     std::string flag; // Temp for RoboCup 2015; todo: remove after
 };
@@ -857,7 +857,6 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
     }
 
 // - - - - - - - - - - - - - - - - - -
-// Convert the segments to convex hulls, and check for collisions with other convex hulls
     std::vector<EntityUpdate> clusters;
     std::vector<ed::tracking::FeatureProperties> measuredProperties ( pointsAssociatedList.size() ); // The first sequence in this vector (with the length of laser entitities) are the properties corresponding to existing entities
 
@@ -1047,14 +1046,11 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
         // --------------------------
     }
 
-    // pointsAssociatedList.size() is the number of entities being tracked by the laser. The first set of elements in measured-properties, namely with this pointsAssociatedList.size(), should correspond to these entities.
-    // TODO: if there are no points associated to an entity, an empty element should be added to measuredProperties indicating that there are no associations.
-    // TODO: what to do when data, which are associated to an entity, are splitted? Which part should be pushed back at the end of the measured-properties list and which part should associate to the existing entity?
-    // TODO: update properties of the entities. TODO: determine covariance-matrices
+    // TODO: update properties of the entities. Right properties, position updated. Maintaining of properties although not observed anymore. TODO: determine covariance-matrices
+    // TODO: simple version for tracking
     // TODO: set existence probability of the entities
-    // TODO: check which properties should be maintained, such as geometries, timestamp-update
-    // TODO: remove chull-properties
-    // TODO: Initiate new entities
+    // TODO: merging of entities (for example when there was a partial occlusion). Use the uncertainty about the size of the object for it! -> less relevant for now
+    // TODO: better localization based on laser data corresponding to data which are belonging to the environment by doing a fit-> smaller errors
     // TODO: Cleanup of source code
 
     unsigned int marker_ID = 0; // To Do: After tracking, the right ID's should be created. The ID's are used to have multiple markers.
