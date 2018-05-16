@@ -1093,7 +1093,7 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
             {
                 entityProperties = e->property ( featureProperties_ );
 
-                float Q = 0.1; // Measurement noise covariance. TODO: let it depend on if an object is occluded. Now, objects are assumed to be completely visible
+                float Q = 0.1; // Measurement noise covariance. TODO: let it depend on if an object is partially occluded. Now, objects are assumed to be completely visible
                 float R = 0.0; // Process noise covariance
 
                 Eigen::MatrixXd Qm ( 2, 2 ), Rm ( 2, 2 );
@@ -1102,11 +1102,11 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
                 Qm << Q, 0, 0, Q;
                 Rm << R, 0, 0, R;
 
-                z_k << measuredProperty.getRectangle().get_w(), measuredProperty.getRectangle().get_d();
+                z_k << measuredProperty.getRectangle().get_w(), measuredProperty.getRectangle().get_d(); // How are the width and depth determined? How to ensure the depth-information will not be confused with the width-information?
 
                 entityProperties.updateProbabilities ( measuredProperty.getFeatureProbabilities() ); // TODO: update probabilities of the features -> Do we still need to use them? Because this will be solved in the PF
-                entityProperties.updateCircleFeatures ( Q, R, measuredProperty.getCircle().get_R() );
-                entityProperties.updateRectangleFeatures ( Qm, Rm, z_k );
+                entityProperties.updateCircleSize ( Q, R, measuredProperty.getCircle().get_R() );
+                entityProperties.updateRectangleSize ( Qm, Rm, z_k );
             }
 
 
