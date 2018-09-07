@@ -703,7 +703,8 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
         float error_rectangle2 = ed::tracking::fitObject ( points, method,  &cornerIndex, &rectangle, &circle, &it_low, &it_high,  sensor_pose );
 
         ed::tracking::FeatureProbabilities prob;
-        prob.setMeasurementProbabilities ( error_rectangle2, error_circle2, 2*circle.get_R(), nominal_corridor_width_ );
+        Eigen::VectorXd diameter = 2*circle.get_R();
+        prob.setMeasurementProbabilities ( error_rectangle2, error_circle2, diameter(1,1) , nominal_corridor_width_ );
 
         ed::tracking::FeatureProperties properties;
         properties.setFeatureProbabilities ( prob );

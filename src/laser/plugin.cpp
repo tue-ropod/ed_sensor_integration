@@ -616,10 +616,11 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
             {
                 ed::tracking::Circle circle = featureProperties.getCircle();
 
-                currentProperty.entity_min.x = circle.get_x() - ( 0.5*ADD_ASSOCIATION_DISTANCE + circle.get_R() );
-                currentProperty.entity_max.x = circle.get_x() + ( 0.5*ADD_ASSOCIATION_DISTANCE + circle.get_R() );
-                currentProperty.entity_min.y = circle.get_y() - ( 0.5*ADD_ASSOCIATION_DISTANCE + circle.get_R() );
-                currentProperty.entity_max.y = circle.get_y() + ( 0.5*ADD_ASSOCIATION_DISTANCE + circle.get_R() );
+                Eigen::VectorXd radius = circle.get_R();
+                currentProperty.entity_min.x = circle.get_x() - ( 0.5*ADD_ASSOCIATION_DISTANCE + radius(1,1) );
+                currentProperty.entity_max.x = circle.get_x() + ( 0.5*ADD_ASSOCIATION_DISTANCE + radius(1,1) );
+                currentProperty.entity_min.y = circle.get_y() - ( 0.5*ADD_ASSOCIATION_DISTANCE + radius(1,1) );
+                currentProperty.entity_max.y = circle.get_y() + ( 0.5*ADD_ASSOCIATION_DISTANCE + radius(1,1) );
             }
             else
             {
@@ -725,7 +726,9 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
                 if ( featureProperties.getFeatureProbabilities().get_pCircle() > featureProperties.getFeatureProbabilities().get_pRectangle() )  // entity is considered to be a circle
                 {
                     ed::tracking::Circle circle = featureProperties.getCircle();
-                    dist = std::abs ( std::sqrt ( std::pow ( p.x - circle.get_x(), 2.0 ) + std::pow ( p.y - circle.get_y(), 2.0 ) ) - circle.get_R() ); // Distance of a point to a circle, see https://www.varsitytutors.com/hotmath/hotmath_help/topics/shortest-distance-between-a-point-and-a-circle
+                    Eigen::VectorXd radius = circle.get_R();
+                
+                    dist = std::abs ( std::sqrt ( std::pow ( p.x - circle.get_x(), 2.0 ) + std::pow ( p.y - circle.get_y(), 2.0 ) ) - radius(1,1) ); // Distance of a point to a circle, see https://www.varsitytutors.com/hotmath/hotmath_help/topics/shortest-distance-between-a-point-and-a-circle
                 }
                 else     // entity is considered to be a rectangle. Check if point is inside the rectangle
                 {
@@ -1006,14 +1009,15 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
             std::vector<geo::Vec2f>::iterator it_low, it_high;
 
             ed::tracking::FITTINGMETHOD method = ed::tracking::CIRCLE;
-            float error_circle2 = ed::tracking::fitObject ( points, cluster.pose, method, &cornerIndex, &rectangle, &circle, &it_low, &it_high, sensor_pose );
+            float error_circle2 = ed::tracking::fitObject ( points, method, &cornerIndex, &rectangle, &circle, &it_low, &it_high, sensor_pose );
 
             method = ed::tracking::determineCase ( points, &cornerIndex, &it_low, &it_high, sensor_pose ); // chose to fit a single line or a rectangle (2 lines)
 
-            float error_rectangle2 = ed::tracking::fitObject ( points, cluster.pose, method,  &cornerIndex, &rectangle, &circle, &it_low, &it_high,  sensor_pose );
+            float error_rectangle2 = ed::tracking::fitObject ( points, method,  &cornerIndex, &rectangle, &circle, &it_low, &it_high,  sensor_pose );
 
             ed::tracking::FeatureProbabilities prob;
-            prob.setMeasurementProbabilities ( error_rectangle2, error_circle2, 2*circle.get_R(), MAX_CORRIDOR_WIDTH );
+            Eigen::VectorXd radius = circle.get_R();
+            prob.setMeasurementProbabilities ( error_rectangle2, error_circle2, 2*radius(1,1), MAX_CORRIDOR_WIDTH );
 
             ed::tracking::FeatureProperties properties;
             properties.setFeatureProbabilities ( prob );
@@ -1105,7 +1109,8 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
                 z_k << measuredProperty.getRectangle().get_w(), measuredProperty.getRectangle().get_d(); // How are the width and depth determined? How to ensure the depth-information will not be confused with the width-information?
 
                 entityProperties.updateProbabilities ( measuredProperty.getFeatureProbabilities() ); // TODO: update probabilities of the features -> Do we still need to use them? Because this will be solved in the PF
-                entityProperties.updateCircleSize ( Q, R, measuredProperty.getCircle().get_R() );
+                Eigen::VectorXd radius = measuredProperty.getCircle().get_R();
+                entityProperties.updateCircleSize ( Q, R, radius(1,1) );
                 entityProperties.updateRectangleSize ( Qm, Rm, z_k );
             }
 
