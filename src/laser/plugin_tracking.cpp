@@ -44,15 +44,17 @@ visualization_msgs::Marker getMarker ( ed::tracking::FeatureProperties& featureP
     visualization_msgs::Marker marker;
     std_msgs::ColorRGBA color;
 
+    std::cout << featureProp.getFeatureProbabilities().get_pCircle() << ", " << featureProp.getFeatureProbabilities().get_pRectangle() << ", " << possiblyMobidik << std::endl;
+    
     if ( possiblyMobidik )
     {
         color.r = 0;
         color.g = 0;
         color.b = 1;
         color.a = ( float ) 0.5;
-        
         ed::tracking::Rectangle rectangle = featureProp.getRectangle();
         rectangle.setMarker ( marker , ID, color, "Mobidik" );
+        
     }
     else
     {
@@ -63,6 +65,7 @@ visualization_msgs::Marker getMarker ( ed::tracking::FeatureProperties& featureP
 
         if ( featureProp.getFeatureProbabilities().get_pCircle() > featureProp.getFeatureProbabilities().get_pRectangle() )
         {
+                std::cout << "Going to publish circle" << std::endl;
             ed::tracking::Circle circle = featureProp.getCircle();
             circle.setMarker ( marker , ID, color );
         }
@@ -660,10 +663,8 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
         }
     }
     
-
     std::vector<EntityUpdate> clusters;
     std::vector<ed::tracking::FeatureProperties> measuredProperties;
-
     for ( std::vector<ScanSegment>::const_iterator it = segments.begin(); it != segments.end(); ++it )
     {
         const ScanSegment& segment = *it;
@@ -685,17 +686,17 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
         std::vector<geo::Vec2f>::iterator it_start = points.begin();
         std::vector<geo::Vec2f>::iterator it_end = points.end();
         unsigned int cornerIndex = std::numeric_limits<unsigned int>::quiet_NaN();
-    
+          
         if( ed::tracking::findPossibleCorner ( points, &cornerIndices, &it_start, &it_end ) )
         {
                 cornerIndex = cornerIndices[0];
+                std::cout << "cornerIndex = " << cornerIndex << std::endl;
         }
-        
-        ed::tracking::Circle circle;
-        ed::tracking::Rectangle rectangle;
+
+        ed::tracking::Circle circle;   
+        ed::tracking::Rectangle rectangle;    
         std::vector<geo::Vec2f>::iterator it_low, it_high;
         
-
         ed::tracking::FITTINGMETHOD method = ed::tracking::CIRCLE;
         float error_circle2 = ed::tracking::fitObject ( points, method, &cornerIndex, &rectangle, &circle, &it_low, &it_high, sensor_pose );
 
@@ -703,8 +704,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
         float error_rectangle2 = ed::tracking::fitObject ( points, method,  &cornerIndex, &rectangle, &circle, &it_low, &it_high,  sensor_pose );
 
         ed::tracking::FeatureProbabilities prob;
-        Eigen::VectorXd diameter = 2*circle.get_R();
-        prob.setMeasurementProbabilities ( error_rectangle2, error_circle2, diameter(1,1) , nominal_corridor_width_ );
+        prob.setMeasurementProbabilities ( error_rectangle2, error_circle2,2*circle.get_radius() , nominal_corridor_width_ );
 
         ed::tracking::FeatureProperties properties;
         properties.setFeatureProbabilities ( prob );
@@ -720,7 +720,8 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
     for ( int ii = 0; ii < measuredProperties.size(); ii++ )
     {
         ed::tracking::FeatureProperties property = measuredProperties[ii];
-        bool possiblyMobidik = false;
+        bool possiblyMobidik = false;        
+        
         if ( property.getFeatureProbabilities().get_pRectangle() > property.getFeatureProbabilities().get_pCircle() && // Dimension check
                 property.rectangle_.get_d() < MOBIDIK_WIDTH + MOBIDIK_MARGIN &&
                 property.rectangle_.get_w() < MOBIDIK_WIDTH + MOBIDIK_MARGIN &&
@@ -768,6 +769,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
         markerArray.markers.push_back( marker );
         
     }
+    std::cout << "Publish marker " << std::endl;
     ObjectMarkers_pub_.publish( markerArray );
 }
 
