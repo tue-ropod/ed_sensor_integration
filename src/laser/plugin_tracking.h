@@ -25,6 +25,9 @@
 #define MOBIDIK_LENGTH 0.81
 #define MOBIDIK_MARGIN 0.1
 
+#define POINTS_TO_CHECK_CONFIDENCE 5 // [-]
+#define EPSILON 1e-4 // [m]
+
 #define INF 10000
 
 // ----------------------------------------------------------------------------------------------------

@@ -30,7 +30,12 @@ namespace
 
 typedef std::vector<unsigned int> ScanSegment;
 
-
+struct ScanSegmentInfo
+{
+    ScanSegment segmentRanges;
+    bool confidenceLeft;
+    bool confidenceRight;
+};
 
 struct EntityUpdate
 {
@@ -43,8 +48,6 @@ visualization_msgs::Marker getMarker ( ed::tracking::FeatureProperties& featureP
 {
     visualization_msgs::Marker marker;
     std_msgs::ColorRGBA color;
-
-    std::cout << featureProp.getFeatureProbabilities().get_pCircle() << ", " << featureProp.getFeatureProbabilities().get_pRectangle() << ", " << possiblyMobidik << std::endl;
     
     if ( possiblyMobidik )
     {
@@ -573,6 +576,8 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
     // - - - - - - - - - - - - - - - - - -
     // Try to associate sensor laser points to rendered model points, and filter out the associated ones
 
+    std::vector<float> sensor_rangesOriginal = sensor_ranges;
+    
     for(unsigned int i = 0; i < num_beams; ++i)
     {
         float rs = sensor_ranges[i];
@@ -587,46 +592,60 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
     // - - - - - - - - - - - - - - - - - -
     // Segment the remaining points into clusters
 
-    std::vector<ScanSegment> segments;
+    std::vector<ScanSegmentInfo> segments;
 
     // Find first valid value
-    ScanSegment current_segment;
-    for(unsigned int i = 0; i < num_beams; ++i)
+     ScanSegmentInfo currentSegmentInfo;
+    bool confidenceLeft; // check if the object might have been covered by an object on both sides to determine the confidence of the measurement
+    bool confidenceRight;
+    
+// TODO: confidence low/high should be compared to original data!
+    for ( unsigned int i = 0; i < num_beams - 1; ++i )
     {
-        if (sensor_ranges[i] > 0)
+        if ( sensor_ranges[i] > 0 )
         {
-            current_segment.push_back(i);
+            currentSegmentInfo.segmentRanges.push_back ( i );
+            if ( i == 0 )
+            {
+                confidenceLeft = 0; // Because we have no proof that the complete side of the object is observed
+            }
+            else
+            {
+                confidenceRight = 1;
+            }
             break;
         }
     }
 
-    if (current_segment.empty())
+    if ( currentSegmentInfo.segmentRanges.empty() )
     {
         return;
     }
 
     int gap_size = 0;
+    std::vector<float> gapRanges;
 
-    for(unsigned int i = current_segment.front(); i < num_beams - 1; ++i)
+    for(unsigned int i = currentSegmentInfo.segmentRanges.front(); i < num_beams - 1; ++i)
     {
         float rs = sensor_ranges[i];
 
-        if (rs == 0 || std::abs(rs - sensor_ranges[current_segment.back()]) > segment_depth_threshold_)
+        if (rs == 0 || std::abs(rs - sensor_ranges[currentSegmentInfo.segmentRanges.back()]) > segment_depth_threshold_ || i == num_beams - 1)
         {
             // Found a gap
             ++gap_size;
+            gapRanges.push_back ( rs );
 
-            if (gap_size >= max_gap_size_)
+            if (gap_size >= max_gap_size_ || i == num_beams - 1)
             {
-                i = current_segment.back() + 1;
+                 i = currentSegmentInfo.segmentRanges.back() + 1;
 
-                if (current_segment.size() >= min_segment_size_pixels_)
+                if (currentSegmentInfo.segmentRanges.size()  >= min_segment_size_pixels_)
                 {
                     // calculate bounding box
                     geo::Vec2 seg_min, seg_max;
-                    for(unsigned int k = 0; k < current_segment.size(); ++k)
+                    for(unsigned int k = 0; k <  currentSegmentInfo.segmentRanges.size(); ++k)
                     {
-                        geo::Vector3 p = lrf_model_.rayDirections()[current_segment[k]] * sensor_ranges[current_segment[k]];
+                        geo::Vector3 p = lrf_model_.rayDirections()[ currentSegmentInfo.segmentRanges[k]] * sensor_ranges[currentSegmentInfo.segmentRanges[k]];
 
                         if (k == 0)
                         {
@@ -643,36 +662,78 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                     }
 
                     geo::Vec2 bb = seg_max - seg_min;
-                    if ((bb.x > min_cluster_size_ || bb.y > min_cluster_size_) && bb.x < max_cluster_size_ && bb.y < max_cluster_size_)
-                        segments.push_back(current_segment);
+                    if ( ( bb .x > min_cluster_size_ || bb.y > min_cluster_size_ ) && bb.x < max_cluster_size_ && bb.y < max_cluster_size_ )
+                    {
+                        confidenceRight = true;
+                        for ( unsigned int l = currentSegmentInfo.segmentRanges.size() - POINTS_TO_CHECK_CONFIDENCE; confidenceRight && l < currentSegmentInfo.segmentRanges.size(); l++ )
+                        {
+                            for ( unsigned int m = 0; confidenceRight && m < gapRanges.size(); m++ )
+                            {
+                                bool check = gapRanges[m] < currentSegmentInfo.segmentRanges[l] ;
+                                bool check2 = gapRanges[m] >= 0 + EPSILON;
+                                if ( gapRanges[m] < sensor_rangesOriginal[currentSegmentInfo.segmentRanges[l]] && gapRanges[m] >= 0 + EPSILON)
+                                {
+                                    confidenceRight = false;
+                                }
+                            }
+                        }
+
+                        currentSegmentInfo.confidenceLeft = confidenceLeft;
+                        currentSegmentInfo.confidenceRight = confidenceRight;
+
+                        segments.push_back ( currentSegmentInfo );
+                    }   
                 }
 
-                current_segment.clear();
+                currentSegmentInfo.segmentRanges.clear();
+                gapRanges.clear();
 
                 // Find next good value
-                while(sensor_ranges[i] == 0 && i < num_beams)
-                    ++i;
+                while ( sensor_ranges[i] == 0 && i < num_beams )
+                {
+                    ++i; // check for confidence low
+                }
 
-                current_segment.push_back(i);
+                int nPointsToCheck = POINTS_TO_CHECK_CONFIDENCE;
+                if ( i < nPointsToCheck )
+                {
+                    nPointsToCheck = i;
+                }
+
+                confidenceLeft = true;
+                float rsToCheck = sensor_ranges[i];
+                for ( unsigned int l = i - nPointsToCheck; confidenceLeft && l < i; l++ )
+                {
+                    float rsToCompare = sensor_rangesOriginal[l];
+                    bool check = rsToCheck > rsToCompare;
+                    bool check2 = rsToCompare <= 0 + EPSILON;
+                    if ( rsToCheck > rsToCompare && rsToCompare >= 0 + EPSILON )
+                    {
+                        confidenceLeft = false;
+                    }
+                }
+
+                currentSegmentInfo.segmentRanges.push_back ( i );
             }
         }
         else
         {
             gap_size = 0;
-            current_segment.push_back(i);
+            gapRanges.clear();
+            currentSegmentInfo.segmentRanges.push_back ( i );
         }
     }
     
     std::vector<EntityUpdate> clusters;
     std::vector<ed::tracking::FeatureProperties> measuredProperties;
-    for ( std::vector<ScanSegment>::const_iterator it = segments.begin(); it != segments.end(); ++it )
+    for ( std::vector<ScanSegmentInfo>::const_iterator it = segments.begin(); it != segments.end(); ++it )
     {
-        const ScanSegment& segment = *it;
-        std::vector<geo::Vec2f> points ( segment.size() );
+        const ScanSegmentInfo& segment = *it;
+        std::vector<geo::Vec2f> points ( segment.segmentRanges.size() );
 
-        for ( unsigned int i = 0; i < segment.size(); ++i )
+        for ( unsigned int i = 0; i < segment.segmentRanges.size(); ++i )
         {
-            unsigned int j = segment[i];
+            unsigned int j = segment.segmentRanges[i];
             geo::Vector3 p_sensor = lrf_model_.rayDirections() [j] * sensor_ranges[j];
 
             // Transform to world frame
@@ -690,7 +751,6 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
         if( ed::tracking::findPossibleCorner ( points, &cornerIndices, &it_start, &it_end ) )
         {
                 cornerIndex = cornerIndices[0];
-                std::cout << "cornerIndex = " << cornerIndex << std::endl;
         }
 
         ed::tracking::Circle circle;   
@@ -769,7 +829,6 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
         markerArray.markers.push_back( marker );
         
     }
-    std::cout << "Publish marker " << std::endl;
     ObjectMarkers_pub_.publish( markerArray );
 }
 
