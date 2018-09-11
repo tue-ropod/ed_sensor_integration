@@ -68,7 +68,6 @@ visualization_msgs::Marker getMarker ( ed::tracking::FeatureProperties& featureP
 
         if ( featureProp.getFeatureProbabilities().get_pCircle() > featureProp.getFeatureProbabilities().get_pRectangle() )
         {
-                std::cout << "Going to publish circle" << std::endl;
             ed::tracking::Circle circle = featureProp.getCircle();
             circle.setMarker ( marker , ID, color );
         }
@@ -625,7 +624,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
     int gap_size = 0;
     std::vector<float> gapRanges;
 
-    for(unsigned int i = currentSegmentInfo.segmentRanges.front(); i < num_beams - 1; ++i)
+    for(unsigned int i = currentSegmentInfo.segmentRanges.front(); i < num_beams; ++i)
     {
         float rs = sensor_ranges[i];
 
@@ -740,7 +739,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
             geo::Vector3 p = sensor_pose * p_sensor;
 
             // Add to cv array
-            points[i] = geo::Vec2f ( p.x, p.y );
+            points[i] = geo::Vec2f ( p.x, p.y );            
         }
         
         std::vector<unsigned int> cornerIndices;
@@ -752,6 +751,11 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
         {
                 cornerIndex = cornerIndices[0];
         }
+        
+        for ( std::vector<unsigned int>::const_iterator it_in = cornerIndices.begin(); it_in != cornerIndices.end(); ++it_in )
+        {
+             const unsigned int& index = *it_in;
+        }
 
         ed::tracking::Circle circle;   
         ed::tracking::Rectangle rectangle;    
@@ -760,7 +764,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
         ed::tracking::FITTINGMETHOD method = ed::tracking::CIRCLE;
         float error_circle2 = ed::tracking::fitObject ( points, method, &cornerIndex, &rectangle, &circle, &it_low, &it_high, sensor_pose );
 
-        method = ed::tracking::determineCase ( points, &cornerIndex, &it_low, &it_high, sensor_pose ); // chose to fit a single line or a rectangle (2 lines)
+        method = ed::tracking::determineCase ( points, &cornerIndex, &it_low, &it_high, sensor_pose ); // chose to fit a single line or a rectangle (2 lines)        
         float error_rectangle2 = ed::tracking::fitObject ( points, method,  &cornerIndex, &rectangle, &circle, &it_low, &it_high,  sensor_pose );
 
         ed::tracking::FeatureProbabilities prob;
@@ -770,7 +774,6 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
         properties.setFeatureProbabilities ( prob );
         properties.setCircle ( circle );
         properties.setRectangle ( rectangle );
-
         measuredProperties.push_back ( properties );        
     }
             
