@@ -395,6 +395,11 @@ void LaserPluginTracking::initialize(ed::InitData& init)
     ObjectMarkers_pub_ = nh.advertise<visualization_msgs::MarkerArray> ( "ed/gui/objectMarkers", 3 );
 
     tf_listener_ = new tf::TransformListener;
+    
+    // example given in ED/ed/examples/custom_properties. Update the probabilities using an update-request
+    // TODO defined in multiple places now
+    init.properties.registerProperty ( "Feature", featureProperties_, new FeaturPropertiesInfo ); 
+    
 
     //pose_cache.clear();
 }
@@ -779,8 +784,127 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
             
     visualization_msgs::MarkerArray markerArray;
     
-    // Publish the fitted segments on the ObjectMarkers_pub_ -topic.
-    for ( int ii = 0; ii < measuredProperties.size(); ii++ )
+    
+    unsigned int marker_ID = 0; // To Do: After tracking, the right ID's should be created. The ID's are used to have multiple markers.
+
+    ed::tracking::FeatureProperties measuredProperty, entityProperties; // Measured properties and updated properties
+    ed::UUID id;
+    std::vector<ed::WorldModel::const_iterator> it_laserEntities; // TODO should contain all entities described by the laser
+/*
+    for ( unsigned int i_properties = 0; i_properties < measuredProperties.size(); i_properties++ )
+    {
+        measuredProperty = measuredProperties[i_properties];
+
+
+        double existenceProbability;
+        if ( i_properties < it_laserEntities.size() )
+        {
+            const ed::EntityConstPtr& e = * ( it_laserEntities[i_properties] );
+
+            // check if new properties are measured.
+            bool check1 = measuredProperty.getCircle().get_radius() != measuredProperty.getCircle().get_radius();
+            bool check2 = measuredProperty.getRectangle().get_w() != measuredProperty.getRectangle().get_w();
+            bool check3 = measuredProperty.getRectangle().get_d() != measuredProperty.getRectangle().get_d();
+
+
+            if ( check1 || ( check2 && check3 ) )
+            {
+                //Clear unassociated entities in view
+                const geo::Pose3D& pose = e->pose();
+                // Transform to sensor frame
+                geo::Vector3 p = sensor_pose.inverse() * pose.t;
+
+                if ( !pointIsPresent ( p, lrf_model_, sensor_ranges ) )
+                {
+                    double p_exist = e->existenceProbability();
+                    req.setExistenceProbability ( e->id(), std::max ( 0.0, p_exist - 0.1 ) ); // TODO: very ugly prob update
+                }
+                continue;
+            }
+
+            if ( !e->hasFlag ( "locked" ) )
+            {
+                entityProperties = e->property ( featureProperties_ );
+
+//                 float Q = 0.1; // Measurement noise covariance. TODO: let it depend on if an object is partially occluded. Now, objects are assumed to be completely visible
+//                 float R = 0.0; // Process noise covariance
+// 
+//                 Eigen::MatrixXd Qm ( 2, 2 ), Rm ( 2, 2 );
+//                 Eigen::VectorXd z_k ( 2, 1 );
+// 
+//                 Qm << Q, 0, 0, Q;
+//                 Rm << R, 0, 0, R;
+// 
+//                 z_k << measuredProperty.getRectangle().get_w(), measuredProperty.getRectangle().get_d(); // How are the width and depth determined? How to ensure the depth-information will not be confused with the width-information?
+// 
+//                 entityProperties.updateProbabilities ( measuredProperty.getFeatureProbabilities() ); // TODO: update probabilities of the features -> Do we still need to use them? Because this will be solved in the PF
+//                 entityProperties.updateCircleSize ( Q, R, measuredProperty.getCircle().get_radius() );
+//                 entityProperties.updateRectangleSize ( Qm, Rm, z_k );
+                
+
+            }
+
+
+            // Update existence probability
+            double p_exist = e->existenceProbability();
+            existenceProbability = std::min ( 1.0, p_exist + 0.1 ) ;// TODO: very ugly prob update
+            id = e->id();
+
+        }
+        else
+        {
+            // create a new entity
+            // Generate unique ID
+            id = ed::Entity::generateID().str() + "-laser";
+
+            // Update existence probability
+            existenceProbability = 1.0; // TODO magic number
+            entityProperties = measuredProperty;
+        }
+        geo::Pose3D new_pose;
+
+        if ( entityProperties.getFeatureProbabilities().get_pCircle() < entityProperties.getFeatureProbabilities().get_pRectangle() )
+        {
+            // determine corners
+            ed::tracking::Rectangle rectangle = entityProperties.getRectangle();
+            std::vector<geo::Vec2f> corners = entityProperties.getRectangle().determineCorners ( 0.0 );
+            new_pose = rectangle.getPose();
+        }
+        else
+        {
+            // determine cilinder-properties
+            ed::tracking::Circle circle = entityProperties.getCircle();
+            new_pose = circle.getPose();
+        }
+
+        bool check = true;
+        if ( new_pose.t.getX() != new_pose.t.getX() || std::abs ( new_pose.t.getX() ) > COORDINATE_OUTSIDE_MAP ||
+                new_pose.t.getZ() != new_pose.t.getZ() ||  std::abs ( new_pose.t.getY() ) > COORDINATE_OUTSIDE_MAP ||
+                new_pose.t.getY() != new_pose.t.getY() ||  std::abs ( new_pose.t.getZ() ) > COORDINATE_OUTSIDE_MAP ||
+                entityProperties.getFeatureProbabilities().get_pCircle() != entityProperties.getFeatureProbabilities().get_pCircle() ||
+                entityProperties.getFeatureProbabilities().get_pRectangle() != entityProperties.getFeatureProbabilities().get_pRectangle()
+           )
+        {
+            check = false;
+        }
+
+        // Set feature properties en publish geometries
+        if ( check )
+        {
+            req.setProperty ( id, featureProperties_, entityProperties );
+            req.setPose ( id, new_pose );
+
+            // Set timestamp
+            req.setLastUpdateTimestamp ( id, scan->header.stamp.toSec() );
+            req.setExistenceProbability ( id, existenceProbability );
+        }
+    }
+    
+    */
+    // Publish the fitted segments on the ObjectMarkers_pub_-topic // TODO: communicate via ED
+    //-------------------------------------------------------------------------------------
+     
+     for ( int ii = 0; ii < measuredProperties.size(); ii++ )
     {
         ed::tracking::FeatureProperties property = measuredProperties[ii];
         bool possiblyMobidik = false;        
@@ -833,6 +957,8 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
         
     }
     ObjectMarkers_pub_.publish( markerArray );
+    
+// ------------------------------------------------------------------------------------------------
 }
 
 // ----------------------------------------------------------------------------------------------------

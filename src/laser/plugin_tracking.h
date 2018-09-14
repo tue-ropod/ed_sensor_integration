@@ -20,15 +20,20 @@
 
 // Properties
 #include "ed/convex_hull.h"
+#include "ed/convex_hull_calc.h"
+#include "ed/featureProperties_info.h"
 
-#define MOBIDIK_WIDTH 0.72
-#define MOBIDIK_LENGTH 0.81
-#define MOBIDIK_MARGIN 0.1
+#define MOBIDIK_WIDTH 0.72            // [m]
+#define MOBIDIK_LENGTH 0.81           // [m]
+#define MOBIDIK_MARGIN 0.1            // [m]
 
-#define POINTS_TO_CHECK_CONFIDENCE 5 // [-]
-#define EPSILON 1e-4 // [m]
+#define COORDINATE_OUTSIDE_MAP 1000.0 // [m]
+
+#define POINTS_TO_CHECK_CONFIDENCE 5  // [-]
+#define EPSILON 1e-4                  // [m]
 
 #define INF 10000
+
 
 // ----------------------------------------------------------------------------------------------------
 
@@ -82,8 +87,10 @@ private:
     int max_gap_size_;
     std::map<ed::UUID,geo::Pose3D> pose_cache;
     
-    ros::Publisher ObjectMarkers_pub_; 
+    ros::Publisher ObjectMarkers_pub_; // TODO all communication of world-representation via ED, not via ROS
 
+    // 'Feature' property key
+    ed::PropertyKey<ed::tracking::FeatureProperties> featureProperties_; 
 };
 
 

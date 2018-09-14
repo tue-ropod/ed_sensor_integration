@@ -453,7 +453,7 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
     ScanSegmentInfo currentSegmentInfo;
     bool confidenceLow; // check if the object might have been covered by an object on both sides to determine the confidence of the measurement
     bool confidenceHigh;
-
+// TODO: confidence low/high should be compared to original data!
     for ( unsigned int i = 0; i < num_beams; ++i )
     {
         if ( sensor_ranges[i] > 0 )
@@ -611,7 +611,7 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
             ed::tracking::FeatureProperties featureProperties = e->property ( featureProperties_ );
             EntityProperty currentProperty;
 
-            // For the entities which already exist in the WM, determine the relevant properties in order to determine which entities might associate to which clusters
+            // For the entities which already exist in the WM, determine the relevant properties in order to determine which entities _might_ associate to which clusters
             if ( featureProperties.getFeatureProbabilities().get_pCircle() > featureProperties.getFeatureProbabilities().get_pRectangle() )
             {
                 ed::tracking::Circle circle = featureProperties.getCircle();
