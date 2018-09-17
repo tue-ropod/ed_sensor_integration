@@ -27,7 +27,8 @@
 #define MOBIDIK_LENGTH 0.81           // [m]
 #define MOBIDIK_MARGIN 0.1            // [m]
 
-#define COORDINATE_OUTSIDE_MAP 1000.0 // [m]
+#define ASSOCIATION_DISTANCE 0.5      // [m]
+#define MIN_ASSOCIATION_DISTANCE 0.3  // [m] TODO reduce
 
 #define POINTS_TO_CHECK_CONFIDENCE 5  // [-]
 #define EPSILON 1e-4                  // [m]
@@ -86,8 +87,6 @@ private:
 
     int max_gap_size_;
     std::map<ed::UUID,geo::Pose3D> pose_cache;
-    
-    ros::Publisher ObjectMarkers_pub_; // TODO all communication of world-representation via ED, not via ROS
 
     // 'Feature' property key
     ed::PropertyKey<ed::tracking::FeatureProperties> featureProperties_; 

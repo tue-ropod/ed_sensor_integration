@@ -44,6 +44,13 @@ struct EntityUpdate
     std::string flag; // Temp for RoboCup 2015; todo: remove after
 };
 
+struct EntityProperty
+{
+    geo::Vec2f entity_min;
+    geo::Vec2f entity_max;
+};
+
+/*
 visualization_msgs::Marker getMarker ( ed::tracking::FeatureProperties& featureProp, int ID, bool possiblyMobidik ) // TODO move to ed_rviz_plugins?
 {
     visualization_msgs::Marker marker;
@@ -80,7 +87,7 @@ visualization_msgs::Marker getMarker ( ed::tracking::FeatureProperties& featureP
     
     return marker;
 }
-
+*/
 
 // ----------------------------------------------------------------------------------------------------
 
@@ -390,9 +397,10 @@ void LaserPluginTracking::initialize(ed::InitData& init)
     nh.setCallbackQueue(&cb_queue_);
 
     // Communication
-    sub_scan_ = nh.subscribe<sensor_msgs::LaserScan>(laser_topic, 3, &LaserPluginTracking::scanCallback, this);
+    unsigned int bufferSize = 1; // TODO increase to 3(?) in order to make it possible to process more laser data in 1 iteration. Set low for testing purposes now.
+    sub_scan_ = nh.subscribe<sensor_msgs::LaserScan>(laser_topic, bufferSize, &LaserPluginTracking::scanCallback, this);
     door_pub_ = nh.advertise<ed_sensor_integration::doorDetection>("door", 3);
-    ObjectMarkers_pub_ = nh.advertise<visualization_msgs::MarkerArray> ( "ed/gui/objectMarkers", 3 );
+//    ObjectMarkers_pub_ = nh.advertise<visualization_msgs::MarkerArray> ( "ed/gui/objectMarkers", 3 );
 
     tf_listener_ = new tf::TransformListener;
     
@@ -409,6 +417,8 @@ void LaserPluginTracking::initialize(ed::InitData& init)
 void LaserPluginTracking::process(const ed::WorldModel& world, ed::UpdateRequest& req)
 {
     cb_queue_.callAvailable();
+    
+    std::cout << " Process started with buffer size of" << scan_buffer_.size() << std::endl;
 
     while(!scan_buffer_.empty())
     {
@@ -465,8 +475,17 @@ void LaserPluginTracking::process(const ed::WorldModel& world, ed::UpdateRequest
 void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs::LaserScan::ConstPtr& scan,
                          const geo::Pose3D& sensor_pose, ed::UpdateRequest& req)
 {
+    
     tue::Timer t_total;
     t_total.start();
+    double current_time = ros::Time::now().toSec();
+    
+    
+//      struct timeval now;
+//         gettimeofday(&now, NULL);
+// 
+//         std::cout << "Start of plugin at t = " << now.tv_sec << "." << now.tv_usec << std::endl;
+
 
     // - - - - - - - - - - - - - - - - - -
     // Update laser model
@@ -728,8 +747,311 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
         }
     }
     
-    std::vector<EntityUpdate> clusters;
-    std::vector<ed::tracking::FeatureProperties> measuredProperties;
+    // Try to associate remaining laser points to specific entities
+    std::vector<ed::WorldModel::const_iterator> it_laserEntities;
+    std::vector< EntityProperty > EntityPropertiesForAssociation;
+
+    // Check which entities might associate for tracking based on their latest location
+    for ( ed::WorldModel::const_iterator e_it = world.begin(); e_it != world.end(); ++e_it )
+    {
+        const ed::EntityConstPtr& e = *e_it;
+                     std::cout << "Going to check entity with id = " << e->id() << std::endl;
+        std::string laserID = "-laserTracking";
+
+        if ( e->id().str().length() < laserID.length() )
+        {
+            continue;
+        }
+        if ( e->id().str().substr ( e->id().str().length() - laserID.size() ) == laserID )  // entity described by laser before
+        {
+                /* // TODO where?
+            bool check1 = e->existenceProbability() < 0.3 ;
+            bool check2 = current_time - e->lastUpdateTimestamp() > entity_timeout_;
+
+            if ( e->existenceProbability() < 0.3 || current_time - e->lastUpdateTimestamp() > entity_timeout_ ) // Criterea to remove entity which were created from this plugin
+            {
+                if ( !e->hasFlag ( "locked" ) )
+                {
+                    req.removeEntity ( e->id() );
+                    continue;
+                }
+            }
+            */
+
+            it_laserEntities.push_back ( e_it );
+
+            ed::tracking::FeatureProperties featureProperties = e->property ( featureProperties_ );
+            EntityProperty currentProperty;
+
+            // For the entities which already exist in the WM, determine the relevant properties in order to determine which entities _might_ associate to which clusters
+            if ( featureProperties.getFeatureProbabilities().get_pCircle() > featureProperties.getFeatureProbabilities().get_pRectangle() )
+            {
+                ed::tracking::Circle circle = featureProperties.getCircle();
+                currentProperty.entity_min.x = circle.get_x() - ( 0.5*ASSOCIATION_DISTANCE + circle.get_radius() );
+                currentProperty.entity_max.x = circle.get_x() + ( 0.5*ASSOCIATION_DISTANCE + circle.get_radius() );
+                currentProperty.entity_min.y = circle.get_y() - ( 0.5*ASSOCIATION_DISTANCE + circle.get_radius() );
+                currentProperty.entity_max.y = circle.get_y() + ( 0.5*ASSOCIATION_DISTANCE + circle.get_radius() );
+            }
+            else
+            {
+                ed::tracking::Rectangle rectangle = featureProperties.getRectangle();
+
+                std::vector<geo::Vec2f> corners = rectangle.determineCorners ( ASSOCIATION_DISTANCE );
+                currentProperty.entity_min = corners[0];
+                currentProperty.entity_max = corners[0];
+
+                for ( unsigned int i_corner = 1; i_corner < corners.size(); i_corner++ )
+                {
+                    currentProperty.entity_min.x = std::min ( corners[i_corner].x, currentProperty.entity_min.x );
+                    currentProperty.entity_min.y = std::min ( corners[i_corner].y, currentProperty.entity_min.y );
+                    currentProperty.entity_max.x = std::max ( corners[i_corner].x, currentProperty.entity_max.x );
+                    currentProperty.entity_max.y = std::max ( corners[i_corner].y, currentProperty.entity_max.y );
+                }
+            }
+            EntityPropertiesForAssociation.push_back ( currentProperty );
+        }
+
+    }
+    
+//     std::cout << "laserEntities = " << std::endl;
+//     for(unsigned int iTest = 0; iTest < it_laserEntities.size(); iTest++)
+//     {
+//              const ed::EntityConstPtr& e = *it_laserEntities[iTest];
+//             std::cout << e->id() << ", " << EntityPropertiesForAssociation[iTest].entity_min.x  << ", " <<
+//             EntityPropertiesForAssociation[iTest].entity_min.y  << ", " << 
+//             EntityPropertiesForAssociation[iTest].entity_max.x  << ", " << 
+//             EntityPropertiesForAssociation[iTest].entity_max.y  << ", " << std::endl;
+//     }
+    
+    
+     std::vector< std::vector<geo::Vec2f> > associatedPointsList ( it_laserEntities.size() );
+     
+//      std::cout << "segments.size() = " << segments.size() << std::endl;
+    
+    for ( unsigned int iSegments = 0; iSegments < segments.size(); ++iSegments )
+    {
+        // First, determine the properties of each segment
+        ScanSegment& segment = segments[iSegments].segmentRanges;
+        unsigned int segment_size = segment.size();
+
+        std::vector<geo::Vec2f> points ( segment_size );
+        geo::Vec2f seg_min, seg_max;
+
+//         std::cout << "Points in segment " << iSegments << " = " << std::endl;
+        for ( unsigned int iSegment = 0; iSegment < segment_size; ++iSegment )
+        {
+            unsigned int j = segment[iSegment];
+            geo::Vector3 p_sensor = lrf_model_.rayDirections() [j] * sensor_ranges[j];
+
+            // Transform to world frame
+            geo::Vector3 p = sensor_pose * p_sensor;
+
+            // Add to cv array
+            points[iSegment] = geo::Vec2f ( p.x, p.y );
+            
+            std::cout << points[iSegment] << std::endl;
+            
+            if ( iSegment == 0 )
+            {
+                seg_min = points[iSegment];
+                seg_max = points[iSegment];
+            }
+            else
+            {
+                seg_min.x = std::min ( points[iSegment].x, seg_min.x );
+                seg_min.y = std::min ( points[iSegment].y, seg_min.y );
+                seg_max.x = std::max ( points[iSegment].x, seg_max.x );
+                seg_max.y = std::max ( points[iSegment].y, seg_max.y );
+            }
+        }
+        
+//         std::cout << "Segm min/mx = " <<   seg_min.x << ", " << 
+//         seg_min.y << ", " << 
+//         seg_max.x << ", " << 
+//         seg_max.y << std::endl;
+    
+        // After the properties of each segment are determined, check which clusters and entities might associate
+        std::vector< int > possibleSegmentEntityAssociations;
+//         std::cout << "it_laserEntities.size() = " << it_laserEntities.size() << std::endl;
+        for ( unsigned int jj = 0; jj < it_laserEntities.size(); ++jj )
+        {
+//                  const ed::EntityConstPtr& e = *it_laserEntities[jj];
+//                 std::cout << "Entity min/mx = " <<  EntityPropertiesForAssociation[jj].entity_min.x << ", " << 
+//                 EntityPropertiesForAssociation[jj].entity_max.x << ", " <<
+//                 EntityPropertiesForAssociation[jj].entity_min.y << ", " <<
+//                 EntityPropertiesForAssociation[jj].entity_max.y << std::endl;
+           
+            
+
+            // check if 1 of the extrema of the segment might be related to the exploded entity
+            bool check1 =  seg_min.x > EntityPropertiesForAssociation[jj].entity_min.x && seg_min.x < EntityPropertiesForAssociation[jj].entity_max.x ;
+            bool check2 =  seg_max.x > EntityPropertiesForAssociation[jj].entity_min.x && seg_max.x < EntityPropertiesForAssociation[jj].entity_max.x ;
+            bool check3 =  seg_min.y > EntityPropertiesForAssociation[jj].entity_min.y && seg_min.y < EntityPropertiesForAssociation[jj].entity_max.y ;
+            bool check4 =  seg_max.y > EntityPropertiesForAssociation[jj].entity_min.y && seg_max.y < EntityPropertiesForAssociation[jj].entity_max.y ;
+
+            if ( check1 && check3 || check2 && check4 )
+            {
+                possibleSegmentEntityAssociations.push_back ( jj );
+                const ed::EntityConstPtr& e = *it_laserEntities[jj];
+                 std::cout << "Possible association with entity " << e->id() << std::endl;
+            }           
+        }
+
+    
+    
+        // If a cluster could be associated to a (set of) entities, determine for each point to which entitiy it belongs based on a shortest distance criterion. 
+        // If the distance is too large, initiate a new entity
+        std::vector<geo::Vec2f> pointsNotAssociated;
+        std::vector<float> distances ( points.size() );
+        std::vector<unsigned int> IDs ( points.size() ); // IDs of the entity which is closest to that point
+
+        for ( unsigned int i_points = 0; i_points < points.size(); ++i_points )  // Determine closest object and distance to this object. If distance too large, relate to new object
+        {
+            geo::Vec2f p = points[i_points];
+            float shortestDistance = std::numeric_limits< float >::max();
+            unsigned int id_shortestEntity = std::numeric_limits< unsigned int >::max();
+
+            for ( unsigned int jj = 0; jj < possibleSegmentEntityAssociations.size(); ++jj )  // relevant entities only
+            {
+                const ed::EntityConstPtr& e = *it_laserEntities[ possibleSegmentEntityAssociations[jj] ];
+                ed::tracking::FeatureProperties featureProperties = e->property ( featureProperties_ );
+                float dist;
+
+                if ( featureProperties.getFeatureProbabilities().get_pCircle() > featureProperties.getFeatureProbabilities().get_pRectangle() )  // entity is considered to be a circle
+                {
+                    ed::tracking::Circle circle = featureProperties.getCircle();                
+                    dist = std::abs ( std::sqrt ( std::pow ( p.x - circle.get_x(), 2.0 ) + std::pow ( p.y - circle.get_y(), 2.0 ) ) - circle.get_radius() ); // Distance of a point to a circle, see https://www.varsitytutors.com/hotmath/hotmath_help/topics/shortest-distance-between-a-point-and-a-circle
+                }
+                else     // entity is considered to be a rectangle. Check if point is inside the rectangle
+                {
+                    ed::tracking::Rectangle rectangle = featureProperties.getRectangle();
+
+
+                    std::vector<geo::Vec2f> corners = rectangle.determineCorners ( 0.0 );
+
+                    geo::Vec2f vx = corners[1] - corners[0];
+                    geo::Vec2f vy = corners[3] - corners[0];
+
+                    geo::Vec2f pCorrected = p - corners[0];
+
+                    // Test if point is inside rectangle https://math.stackexchange.com/questions/190111/how-to-check-if-a-point-is-inside-a-rectangle
+                    geo::Vec2f OP = p - corners[0]; // Distance from origin to point which is tested
+                    geo::Vec2f OC1 = corners[1] - corners[0];
+                    geo::Vec2f OC3 = corners[3] - corners[0];
+
+                    float OP_OC1   = OP.dot ( OC1 ); // elementwise summation
+                    float OC1_OC1B = OC1.dot ( OC1 );
+                    float OP_OC3   = OP.dot ( OC3 );
+                    float OC3_OC3  = OC3.dot ( OC3 );
+
+                    float minDistance = std::numeric_limits< float >::infinity();
+
+                    if ( OP_OC1 > 0 && OC1_OC1B > OP_OC1 && OP_OC3 > 0 && OC3_OC3 > OP_OC3 )   // point is inside the rectangle
+                    {
+                        std::vector<geo::Vec2f> p1Check = corners;
+
+                        std::vector<geo::Vec2f> p2Check = corners; // place last element at begin
+                        p2Check.insert ( p2Check.begin(), p2Check.back() );
+                        p2Check.erase ( p2Check.end() );
+
+                        for ( unsigned int ii_dist = 0; ii_dist < p1Check.size(); ii_dist++ )
+                        {
+
+                            float x1 = p1Check[ii_dist].x;
+                            float x2 = p2Check[ii_dist].x;
+
+                            float y1 = p1Check[ii_dist].y;
+                            float y2 = p2Check[ii_dist].y;
+
+                            float distance = std::abs ( ( y2 - y1 ) *p.x - ( x2 - x1 ) *p.y + x2*y1 -y2*x1 ) /std::sqrt ( std::pow ( y2-y1, 2.0 ) + std::pow ( x2-x1, 2.0 ) );
+                            
+                            if ( distance < minDistance )
+                            {
+                                minDistance = distance;
+                            }
+                        }
+                    }
+                    else     // point is outside the rectangle, https://stackoverflow.com/questions/44824512/how-to-find-the-closest-point-on-a-right-rectangular-prism-3d-rectangle/44824522#44824522
+                    {
+                        float tx = pCorrected.dot ( vx ) / ( vx.dot ( vx ) );
+                        float ty = pCorrected.dot ( vy ) / ( vy.dot ( vy ) );
+
+                        tx = tx < 0 ? 0 : tx > 1 ? 1 : tx;
+                        ty = ty < 0 ? 0 : ty > 1 ? 1 : ty;
+
+                        geo::Vec2f closestPoint = tx*vx + ty*vy + corners[0];
+
+                        geo::Vec2f vector2Point = p - closestPoint;
+                        minDistance = std::sqrt ( vector2Point.dot ( vector2Point ) );
+                    }
+
+                    dist = minDistance;
+                }
+
+                if ( dist < shortestDistance )
+                {
+                    shortestDistance = dist;
+                    id_shortestEntity = jj;
+                }
+            }
+
+            distances[i_points] = shortestDistance;
+            IDs[i_points] = id_shortestEntity;
+        }
+        
+        unsigned int IDtoCheck = IDs[0];
+        unsigned int firstElement = 0;
+
+        for ( unsigned int iDistances = 1; iDistances < distances.size(); iDistances++ )
+        {
+            if ( IDs[iDistances] == IDtoCheck && iDistances != distances.size() - 1 ) // ID similar and not at final reading, check next element
+            {
+                continue;
+            }
+
+            unsigned int length = iDistances - firstElement;
+           // bool test = length < min_segment_size_pixels_ ;
+
+            if ( length >= min_segment_size_pixels_ )
+            {
+                float minDistance = distances[firstElement];
+                for ( unsigned int iiDistances = 1; iiDistances < iDistances; iiDistances++ )
+                {
+                    if ( distances[firstElement] < minDistance )
+                    {
+                        minDistance = distances[iiDistances];
+                    }
+                }
+
+                if ( minDistance < MIN_ASSOCIATION_DISTANCE )  // add all points to associated entity
+                {
+                    const ed::EntityConstPtr& entityToTest = *it_laserEntities[ possibleSegmentEntityAssociations[IDtoCheck] ];
+                    for ( unsigned int i_points = firstElement; i_points < iDistances; ++i_points )
+                    {
+                        associatedPointsList.at ( possibleSegmentEntityAssociations[IDtoCheck] ).push_back ( points[i_points] );
+                    }
+                }
+                else
+                {
+                    pointsNotAssociated.clear();
+                    for ( unsigned int i_points = firstElement; i_points < iDistances; ++i_points )
+                    {
+                        pointsNotAssociated.push_back ( points[i_points] );
+                    }
+                    associatedPointsList.push_back ( pointsNotAssociated );
+                }
+            }
+            firstElement = iDistances;
+            IDtoCheck = IDs[iDistances];
+        }
+
+    }
+    
+    
+    // TODO check at which point the segment should be splitted
+    
+   std::vector<ed::tracking::FeatureProperties> measuredProperties;
+//     std::vector<ed::tracking::FeatureProperties> measuredProperties ( associatedPointsList.size() ); // The first sequence in this vector (with the length of laser entitities) are the properties corresponding to existing entities
     for ( std::vector<ScanSegmentInfo>::const_iterator it = segments.begin(); it != segments.end(); ++it )
     {
         const ScanSegmentInfo& segment = *it;
@@ -780,18 +1102,15 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
         properties.setCircle ( circle );
         properties.setRectangle ( rectangle );
         measuredProperties.push_back ( properties );        
-    }
-            
-    visualization_msgs::MarkerArray markerArray;
-    
+    }  
     
     unsigned int marker_ID = 0; // To Do: After tracking, the right ID's should be created. The ID's are used to have multiple markers.
 
     ed::tracking::FeatureProperties measuredProperty, entityProperties; // Measured properties and updated properties
     ed::UUID id;
-    std::vector<ed::WorldModel::const_iterator> it_laserEntities; // TODO should contain all entities described by the laser
-/*
-    for ( unsigned int i_properties = 0; i_properties < measuredProperties.size(); i_properties++ )
+//     std::vector<ed::WorldModel::const_iterator> it_laserEntities; // TODO should contain all entities described by the laser
+
+    for ( unsigned int i_properties = 0; i_properties < measuredProperties.size(); i_properties++ ) // Update associated entities
     {
         measuredProperty = measuredProperties[i_properties];
 
@@ -828,24 +1147,27 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
 
 //                 float Q = 0.1; // Measurement noise covariance. TODO: let it depend on if an object is partially occluded. Now, objects are assumed to be completely visible
 //                 float R = 0.0; // Process noise covariance
-// 
+//
 //                 Eigen::MatrixXd Qm ( 2, 2 ), Rm ( 2, 2 );
 //                 Eigen::VectorXd z_k ( 2, 1 );
-// 
+//
 //                 Qm << Q, 0, 0, Q;
 //                 Rm << R, 0, 0, R;
-// 
+//
 //                 z_k << measuredProperty.getRectangle().get_w(), measuredProperty.getRectangle().get_d(); // How are the width and depth determined? How to ensure the depth-information will not be confused with the width-information?
-// 
+//
 //                 entityProperties.updateProbabilities ( measuredProperty.getFeatureProbabilities() ); // TODO: update probabilities of the features -> Do we still need to use them? Because this will be solved in the PF
 //                 entityProperties.updateCircleSize ( Q, R, measuredProperty.getCircle().get_radius() );
 //                 entityProperties.updateRectangleSize ( Qm, Rm, z_k );
-                
+
+                // TODO determine properties of updated entities instead of current measurements
+
+                std::cout << "Association with entity " << e->id() << " need to update properties" << std::endl;
 
             }
 
-
             // Update existence probability
+            entityProperties = measuredProperty; // TODO temporary, need to update this with KF-update
             double p_exist = e->existenceProbability();
             existenceProbability = std::min ( 1.0, p_exist + 0.1 ) ;// TODO: very ugly prob update
             id = e->id();
@@ -855,7 +1177,8 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
         {
             // create a new entity
             // Generate unique ID
-            id = ed::Entity::generateID().str() + "-laser";
+            id = ed::Entity::generateID().str() + "-laserTracking";
+            std::cout << "New entity created with ID = " << id  << "from scan with timestamp = " << scan->header.stamp.toSec() << ". Pos = " << measuredProperty.getRectangle().get_x() << ", " << measuredProperty.getRectangle().get_y() << std::endl;
 
             // Update existence probability
             existenceProbability = 1.0; // TODO magic number
@@ -867,7 +1190,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
         {
             // determine corners
             ed::tracking::Rectangle rectangle = entityProperties.getRectangle();
-            std::vector<geo::Vec2f> corners = entityProperties.getRectangle().determineCorners ( 0.0 );
+            //   std::vector<geo::Vec2f> corners = entityProperties.getRectangle().determineCorners ( 0.0 );
             new_pose = rectangle.getPose();
         }
         else
@@ -878,9 +1201,9 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
         }
 
         bool check = true;
-        if ( new_pose.t.getX() != new_pose.t.getX() || std::abs ( new_pose.t.getX() ) > COORDINATE_OUTSIDE_MAP ||
-                new_pose.t.getZ() != new_pose.t.getZ() ||  std::abs ( new_pose.t.getY() ) > COORDINATE_OUTSIDE_MAP ||
-                new_pose.t.getY() != new_pose.t.getY() ||  std::abs ( new_pose.t.getZ() ) > COORDINATE_OUTSIDE_MAP ||
+        if ( new_pose.t.getX() != new_pose.t.getX() ||
+                new_pose.t.getZ() != new_pose.t.getZ() ||
+                new_pose.t.getY() != new_pose.t.getY() ||
                 entityProperties.getFeatureProbabilities().get_pCircle() != entityProperties.getFeatureProbabilities().get_pCircle() ||
                 entityProperties.getFeatureProbabilities().get_pRectangle() != entityProperties.getFeatureProbabilities().get_pRectangle()
            )
@@ -900,10 +1223,11 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
         }
     }
     
-    */
+    // TODO: determine mobidik-properties somewhere else
+    
     // Publish the fitted segments on the ObjectMarkers_pub_-topic // TODO: communicate via ED
     //-------------------------------------------------------------------------------------
-     
+/*     
      for ( int ii = 0; ii < measuredProperties.size(); ii++ )
     {
         ed::tracking::FeatureProperties property = measuredProperties[ii];
@@ -956,9 +1280,11 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
         markerArray.markers.push_back( marker );
         
     }
-    ObjectMarkers_pub_.publish( markerArray );
+    */
     
-// ------------------------------------------------------------------------------------------------
+// - - - - - - - - - - - - - - - - -
+
+    std::cout << "Total took " << t_total.getElapsedTimeInMilliSec() << " ms. \n\n\n" << std::endl;
 }
 
 // ----------------------------------------------------------------------------------------------------
