@@ -1202,17 +1202,17 @@ std::cout << "Debug 12 \t";
                 float Q = 0.1; // Measurement noise covariance. TODO: let it depend on if an object is partially occluded. Now, objects are assumed to be completely visible
                 float R = 0.2; // Process noise covariance
                 float dt = scan->header.stamp.toSec() - e->lastUpdateTimestamp();
-                std::cout << "Test1 \t" << std::endl;
+                std::cout << "Test 1  \t";
                 
                 // update rectangular properties
                 Eigen::MatrixXd QmRectangle = Eigen::MatrixXd::Zero( 8, 8 );
                 Eigen::MatrixXd RmRectangle = Eigen::MatrixXd::Zero( 5,5 );
                 
-                std::cout << "Test2 \t" << std::endl;
+                std::cout << "Test 2 \t";
                 QmRectangle.diagonal() << Q, Q, Q, Q, Q, Q, Q, Q;
                 RmRectangle.diagonal() << R, R, R, R, R;
                 
-                std::cout << "Test3 \t" << std::endl;
+                std::cout << "Test 3 \t";
                 
                 // As there are model differences between the width and the depth of the entity and the latest measurement, the position information should be corrected for that
                 
@@ -1234,31 +1234,31 @@ std::cout << "Debug 12 \t";
                 measuredProperty.getRectangle().get_w(), 
                 measuredProperty.getRectangle().get_d();
                 
-                std::cout << "Test4 \t" << std::endl;
+                std::cout << "Test 4 \t";
                 entityProperties.updateRectangleFeatures(QmRectangle, RmRectangle, zmRectangle, dt);
              
                 // update circular properties
                 Eigen::MatrixXd QmCircle = Eigen::MatrixXd::Zero( 5, 5 );
                 Eigen::MatrixXd RmCircle = Eigen::MatrixXd::Zero( 3, 3 );
                 
-                std::cout << "Test5 \t" << std::endl;
+                std::cout << "Test 5 \t";
                 QmCircle.diagonal() << Q, Q, Q, Q, Q;
                 RmCircle.diagonal() << R, R, R;
                 
-                std::cout << "Test6 \t" << std::endl;
+                std::cout << "Test 6 \t";
                 Eigen::VectorXd zmCircle( 3 );
                 zmCircle <<
                 measuredProperty.getCircle().get_x(),
                 measuredProperty.getCircle().get_y(),
                 measuredProperty.getCircle().get_radius();
                 
-                std::cout << "Test7 \t" << std::endl;
+                std::cout << "Test 7 \t";
                 entityProperties.updateCircleFeatures(QmCircle, RmCircle, zmCircle, dt);
                 
-                std::cout << "Test8 \t" << std::endl;
+                std::cout << "Test 8 \t";
                 entityProperties.updateProbabilities ( measuredProperty.getFeatureProbabilities() );
                 
-                std::cout << "Test9 \t" << std::endl;
+                std::cout << "Test 9 \t";
 //                 float Q = 0.1; // Measurement noise covariance. TODO: let it depend on if an object is partially occluded. Now, objects are assumed to be completely visible
 //                 float R = 0.0; // Process noise covariance
 //
