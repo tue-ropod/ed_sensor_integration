@@ -25,6 +25,8 @@
 #include <cmath>
 #include <iterator>
 
+#define DEBUG false
+
 namespace
 {
 
@@ -475,7 +477,8 @@ void LaserPluginTracking::process(const ed::WorldModel& world, ed::UpdateRequest
 void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs::LaserScan::ConstPtr& scan,
                          const geo::Pose3D& sensor_pose, ed::UpdateRequest& req)
 {
-    std::cout << "Debug 1 \t";
+    if( DEBUG )
+            std::cout << "Debug 1 \t";
     
     tue::Timer t_total;
     t_total.start();
@@ -528,7 +531,8 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
             sensor_ranges[i] = sensor_ranges[i - 1];
         }
     }
-    std::cout << "Debug 2 \t";
+    if( DEBUG )
+            std::cout << "Debug 2 \t";
 
     // - - - - - - - - - - - - - - - - - -
     // Render world model as if seen by laser
@@ -554,7 +558,8 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
 
     // - - - - - - - - - - - - - - - - - -
     // Fit the doors
-std::cout << "Debug 3 \t";
+    if( DEBUG )
+            std::cout << "Debug 3 \t";
     if (fit_entities_)
     {
 
@@ -602,7 +607,8 @@ std::cout << "Debug 3 \t";
         }
     }
     
-    std::cout << "Debug 4 \t";
+//     if( DEBUG )
+//             std::cout << "Debug 4 \t";
 
     // - - - - - - - - - - - - - - - - - -
     // Try to associate sensor laser points to rendered model points, and filter out the associated ones
@@ -623,7 +629,8 @@ std::cout << "Debug 3 \t";
     // - - - - - - - - - - - - - - - - - -
     // Segment the remaining points into clusters
 
-    std::cout << "Debug 5 \t";
+//     if( DEBUG )
+//             std::cout << "Debug 5 \t";
     
     std::vector<ScanSegmentInfo> segments;
 
@@ -650,15 +657,16 @@ std::cout << "Debug 3 \t";
         }
     }
     
-    std::cout << "Debug 6 \t";
+//     if( DEBUG )
+//             std::cout << "Debug 6 \t";
 
     if ( currentSegmentInfo.segmentRanges.empty() )
     {
         return;
     }
 
-    
-    std::cout << "Debug 7 \t";
+//     if( DEBUG )
+//             std::cout << "Debug 7 \t";
     int gap_size = 0;
     std::vector<float> gapRanges;
 
@@ -761,7 +769,8 @@ std::cout << "Debug 3 \t";
         }
     }
     
-    std::cout << "Debug 8 \t";
+//     if( DEBUG )
+//             std::cout << "Debug 8 \t";
     
     // Try to associate remaining laser points to specific entities
     std::vector<ed::WorldModel::const_iterator> it_laserEntities;
@@ -842,7 +851,8 @@ std::cout << "Debug 3 \t";
 //             EntityPropertiesForAssociation[iTest].entity_max.y  << ", " << std::endl;
 //     }
     
-    std::cout << "Debug 9 \t";
+//     if( DEBUG )
+//             std::cout << "Debug 9 \t";
     
      std::vector< std::vector<geo::Vec2f> > associatedPointsList ( it_laserEntities.size() );
      
@@ -857,7 +867,8 @@ std::cout << "Debug 3 \t";
         std::vector<geo::Vec2f> points ( segment_size );
         geo::Vec2f seg_min, seg_max;
 
-        std::cout << "Debug 10 \t";
+//         if( DEBUG )
+//                 std::cout << "Debug 10 \t";
         
 //         std::cout << "Points in segment " << iSegments << " = " << std::endl;
         for ( unsigned int iSegment = 0; iSegment < segment_size; ++iSegment )
@@ -892,7 +903,8 @@ std::cout << "Debug 3 \t";
 //         seg_max.x << ", " << 
 //         seg_max.y << std::endl;
 
-std::cout << "Debug 11 \t";
+// if( DEBUG )
+//         std::cout << "Debug 11 \t";
     
         // After the properties of each segment are determined, check which clusters and entities might associate
         std::vector< int > possibleSegmentEntityAssociations;
@@ -905,8 +917,8 @@ std::cout << "Debug 11 \t";
 //                 EntityPropertiesForAssociation[jj].entity_min.y << ", " <<
 //                 EntityPropertiesForAssociation[jj].entity_max.y << std::endl;
            
-            
-std::cout << "Debug 12 \t";
+//    if( DEBUG )
+//            std::cout << "Debug 12 \t";
             // check if 1 of the extrema of the segment might be related to the exploded entity
             bool check1 =  seg_min.x > EntityPropertiesForAssociation[jj].entity_min.x && seg_min.x < EntityPropertiesForAssociation[jj].entity_max.x ;
             bool check2 =  seg_max.x > EntityPropertiesForAssociation[jj].entity_min.x && seg_max.x < EntityPropertiesForAssociation[jj].entity_max.x ;
@@ -921,35 +933,49 @@ std::cout << "Debug 12 \t";
             }           
         }
 
-    
-    std::cout << "Debug 13 \t";
+//     if( DEBUG )
+//             std::cout << "Debug 13 \t";
         // If a cluster could be associated to a (set of) entities, determine for each point to which entitiy it belongs based on a shortest distance criterion. 
         // If the distance is too large, initiate a new entity
         std::vector<geo::Vec2f> pointsNotAssociated;
         std::vector<float> distances ( points.size() );
         std::vector<unsigned int> IDs ( points.size() ); // IDs of the entity which is closest to that point
 
+//             if( DEBUG )
+//             std::cout << "Debug 13.1 \t";
+        
         for ( unsigned int i_points = 0; i_points < points.size(); ++i_points )  // Determine closest object and distance to this object. If distance too large, relate to new object
         {
+//                     if( DEBUG )
+//             std::cout << "Debug 13.2 \t";
             geo::Vec2f p = points[i_points];
             float shortestDistance = std::numeric_limits< float >::max();
             unsigned int id_shortestEntity = std::numeric_limits< unsigned int >::max();
+//                 if( DEBUG )
+//             std::cout << "Debug 13.3 \t";
 
             for ( unsigned int jj = 0; jj < possibleSegmentEntityAssociations.size(); ++jj )  // relevant entities only
             {
+                        if( DEBUG )
+            std::cout << "Debug 13.4 \t";
                 const ed::EntityConstPtr& e = *it_laserEntities[ possibleSegmentEntityAssociations[jj] ];
                 ed::tracking::FeatureProperties featureProperties = e->property ( featureProperties_ );
                 float dist;
                 float dt = scan->header.stamp.toSec() - e->lastUpdateTimestamp();
-                
+                    if( DEBUG )
+            std::cout << "Debug 13.5 \t";
                 if ( featureProperties.getFeatureProbabilities().get_pCircle() > featureProperties.getFeatureProbabilities().get_pRectangle() )  // entity is considered to be a circle
                 {
+//                             if( DEBUG )
+//             std::cout << "Debug 13.6 \t";
                     ed::tracking::Circle circle = featureProperties.getCircle();  
 //                     circle.predictAndUpdatePos( dt );
                     dist = std::abs ( std::sqrt ( std::pow ( p.x - circle.get_x(), 2.0 ) + std::pow ( p.y - circle.get_y(), 2.0 ) ) - circle.get_radius() ); // Distance of a point to a circle, see https://www.varsitytutors.com/hotmath/hotmath_help/topics/shortest-distance-between-a-point-and-a-circle
                 }
                 else     // entity is considered to be a rectangle. Check if point is inside the rectangle
                 {
+//                             if( DEBUG )
+//             std::cout << "Debug 13.7 \t";
                     ed::tracking::Rectangle rectangle = featureProperties.getRectangle();
 //                     rectangle.predictAndUpdatePos( dt );
 
@@ -971,24 +997,34 @@ std::cout << "Debug 12 \t";
                     float OC3_OC3  = OC3.dot ( OC3 );
 
                     float minDistance = std::numeric_limits< float >::infinity();
-
+//     if( DEBUG )
+//             std::cout << "Debug 13.8 \t";
                     if ( OP_OC1 > 0 && OC1_OC1B > OP_OC1 && OP_OC3 > 0 && OC3_OC3 > OP_OC3 )   // point is inside the rectangle
                     {
+//                                 if( DEBUG )
+//             std::cout << "Debug 13.9 \t";
                         std::vector<geo::Vec2f> p1Check = corners;
 
                         std::vector<geo::Vec2f> p2Check = corners; // place last element at begin
                         p2Check.insert ( p2Check.begin(), p2Check.back() );
                         p2Check.erase ( p2Check.end() );
-
+//    if( DEBUG )
+//             std::cout << "Debug 13.10 \t";
                         for ( unsigned int ii_dist = 0; ii_dist < p1Check.size(); ii_dist++ )
                         {
 
+//                                     if( DEBUG )
+//             std::cout << "Debug 13.10.1 \t";
                             float x1 = p1Check[ii_dist].x;
                             float x2 = p2Check[ii_dist].x;
 
+//                                                                 if( DEBUG )
+//             std::cout << "Debug 13.10.2 \t";
                             float y1 = p1Check[ii_dist].y;
                             float y2 = p2Check[ii_dist].y;
 
+//                                                                 if( DEBUG )
+//             std::cout << "Debug 13.10.3 \t";
                             float distance = std::abs ( ( y2 - y1 ) *p.x - ( x2 - x1 ) *p.y + x2*y1 -y2*x1 ) /std::sqrt ( std::pow ( y2-y1, 2.0 ) + std::pow ( x2-x1, 2.0 ) );
                             
                             if ( distance < minDistance )
@@ -999,6 +1035,8 @@ std::cout << "Debug 12 \t";
                     }
                     else     // point is outside the rectangle, https://stackoverflow.com/questions/44824512/how-to-find-the-closest-point-on-a-right-rectangular-prism-3d-rectangle/44824522#44824522
                     {
+//                                 if( DEBUG )
+//             std::cout << "Debug 13.11 \t";
                         float tx = pCorrected.dot ( vx ) / ( vx.dot ( vx ) );
                         float ty = pCorrected.dot ( vy ) / ( vy.dot ( vy ) );
 
@@ -1011,25 +1049,40 @@ std::cout << "Debug 12 \t";
                         minDistance = std::sqrt ( vector2Point.dot ( vector2Point ) );
                     }
 
+                                                    if( DEBUG )
+            std::cout << "Debug 13.11.1 \t";
                     dist = minDistance;
                 }
-
+                                                    if( DEBUG )
+            std::cout << "Debug 13.11.2 \t";
                 if ( dist < shortestDistance )
                 {
+                                                                            if( DEBUG )
+            std::cout << "Debug 13.11.3 \t";
                     shortestDistance = dist;
+                                                                        if( DEBUG )
+            std::cout << "Debug 13.11.4 \t";
+//             std::cout << "possibleSegmentEntityAssociations.size() = " << possibleSegmentEntityAssociations.size() << "jj = " << jj << std::endl;
+//             std::cout << "id_shortestEntity = " << id_shortestEntity << std::endl;
                     id_shortestEntity = jj;
                 }
             }
-
+                                                    if( DEBUG )
+            std::cout << "Debug 13.11.5 \t";
             distances[i_points] = shortestDistance;
+                                                                if( DEBUG )
+            std::cout << "Debug 13.11.6 \t";
             IDs[i_points] = id_shortestEntity;
         }
-        
+            if( DEBUG )
+            std::cout << "Debug 13.12 \t";
         unsigned int IDtoCheck = IDs[0];
         unsigned int firstElement = 0;
 
         for ( unsigned int iDistances = 1; iDistances < distances.size(); iDistances++ )
         {
+                    if( DEBUG )
+            std::cout << "Debug 13.13 \t";
             if ( IDs[iDistances] == IDtoCheck && iDistances != distances.size() - 1 ) // ID similar and not at final reading, check next element
             {
                 continue;
@@ -1040,6 +1093,8 @@ std::cout << "Debug 12 \t";
 
             if ( length >= min_segment_size_pixels_ )
             {
+                        if( DEBUG )
+            std::cout << "Debug 13.14 \t";
                 float minDistance = distances[firstElement];
                 for ( unsigned int iiDistances = 1; iiDistances < iDistances; iiDistances++ )
                 {
@@ -1051,6 +1106,8 @@ std::cout << "Debug 12 \t";
 
                 if ( minDistance < MIN_ASSOCIATION_DISTANCE )  // add all points to associated entity
                 {
+                            if( DEBUG )
+            std::cout << "Debug 13.15 \t";
                     const ed::EntityConstPtr& entityToTest = *it_laserEntities[ possibleSegmentEntityAssociations[IDtoCheck] ];
                     for ( unsigned int i_points = firstElement; i_points < iDistances; ++i_points )
                     {
@@ -1059,6 +1116,8 @@ std::cout << "Debug 12 \t";
                 }
                 else
                 {
+                            if( DEBUG )
+            std::cout << "Debug 13.16 \t";
                     pointsNotAssociated.clear();
                     for ( unsigned int i_points = firstElement; i_points < iDistances; ++i_points )
                     {
@@ -1073,7 +1132,8 @@ std::cout << "Debug 12 \t";
 
     }
     
-    std::cout << "Debug 14 \t";
+    if( DEBUG )
+            std::cout << "Debug 14 \t";
     
     // TODO check at which point the segment should be splitted
     
@@ -1107,7 +1167,8 @@ std::cout << "Debug 12 \t";
 //             points[i] = geo::Vec2f ( p.x, p.y );            
 //         }
         
-       std::cout << "Debug 15 \t";
+       if( DEBUG )
+               std::cout << "Debug 15 \t";
        
         std::vector<unsigned int> cornerIndices;
         std::vector<geo::Vec2f>::iterator it_start = points.begin();
@@ -1124,7 +1185,8 @@ std::cout << "Debug 12 \t";
              const unsigned int& index = *it_in;
         }
         
-        std::cout << "Debug 16 \t";
+        if( DEBUG )
+                std::cout << "Debug 16 \t";
 
         ed::tracking::Circle circle;   
         ed::tracking::Rectangle rectangle;    
@@ -1137,18 +1199,30 @@ std::cout << "Debug 12 \t";
         float error_rectangle2 = ed::tracking::fitObject ( points, method,  &cornerIndex, &rectangle, &circle, &it_low, &it_high,  sensor_pose );
 
         ed::tracking::FeatureProbabilities prob;
-        prob.setMeasurementProbabilities ( error_rectangle2, error_circle2,2*circle.get_radius() , nominal_corridor_width_ );
+        if ( prob.setMeasurementProbabilities ( error_rectangle2, error_circle2,2*circle.get_radius() , nominal_corridor_width_ ) )
+        {
 
-        ed::tracking::FeatureProperties properties;
-        properties.setFeatureProbabilities ( prob );
-        properties.setCircle ( circle );
-        properties.setRectangle ( rectangle );
-        measuredProperties[iList] =  properties ;        
-        propertiesDescribed[iList] = true;
+            ed::tracking::FeatureProperties properties;
+            properties.setFeatureProbabilities ( prob );
+            properties.setCircle ( circle );
+            properties.setRectangle ( rectangle );
+
+            if ( rectangle.get_x() != rectangle.get_x() )
+            {
+                ROS_WARN ( "Rectangle: invalid properties set" );
+                rectangle.printValues();
+                std::cout << "Prob = " << prob.get_pCircle() << ", " << prob.get_pRectangle() << std::endl;
+                std::cout << "Method = " << method << std::endl;
+                std::cout << "Errors = " << error_rectangle2 << ", " << error_circle2 << std::endl;
+            }
+
+            measuredProperties[iList] =  properties ;
+            propertiesDescribed[iList] = true;
+        }
     }  
     
-    
-    std::cout << "Debug 17 \t";
+    if( DEBUG )
+            std::cout << "Debug 17 \t";
     
     unsigned int marker_ID = 0; // To Do: After tracking, the right ID's should be created. The ID's are used to have multiple markers.
 
@@ -1156,19 +1230,32 @@ std::cout << "Debug 12 \t";
     ed::UUID id;
 //     std::vector<ed::WorldModel::const_iterator> it_laserEntities; // TODO should contain all entities described by the laser
 
-    std::cout << "Debug 18 \t";
+    if( DEBUG )
+            std::cout << "Debug 18 \t";
     
     for ( unsigned int iProperties = 0; iProperties < measuredProperties.size(); iProperties++ ) // Update associated entities
     {
+                if( DEBUG )
+            std::cout << "Debug 18.1 \t";
             if(!propertiesDescribed[iProperties] ) 
                     continue;
             
+                if( DEBUG )
+            std::cout << "Debug 18.2 \t";
+            
         measuredProperty = measuredProperties[iProperties];
+        
+        measuredProperty.getRectangle().printValues();
+        measuredProperty.getCircle().printProperties();
+        std::cout << "prob = " << measuredProperty.getFeatureProbabilities().get_pCircle() << ", " << measuredProperty.getFeatureProbabilities().get_pRectangle() << std::endl;
 
+            if( DEBUG )
+            std::cout << "Debug 18.3 \t";
         double existenceProbability;
         if ( iProperties < it_laserEntities.size() )
         {
             const ed::EntityConstPtr& e = * ( it_laserEntities[iProperties] );
+            std::cout << "Going to update entity " << e->id() << std::endl;
 
             // check if new properties are measured.
             bool check1 = measuredProperty.getCircle().get_radius() != measuredProperty.getCircle().get_radius();
@@ -1191,7 +1278,8 @@ std::cout << "Debug 12 \t";
                 continue;
             }
             
-            std::cout << "Debug 1 " << std::endl;
+            if( DEBUG )
+                    std::cout << "Debug 1 " << std::endl;
 
             if ( !e->hasFlag ( "locked" ) )
             {
@@ -1202,17 +1290,22 @@ std::cout << "Debug 12 \t";
                 float Q = 0.1; // Measurement noise covariance. TODO: let it depend on if an object is partially occluded. Now, objects are assumed to be completely visible
                 float R = 0.2; // Process noise covariance
                 float dt = scan->header.stamp.toSec() - e->lastUpdateTimestamp();
-                std::cout << "Test 1  \t";
+                
+                if( DEBUG )
+                        std::cout << "Test 1  \t";
                 
                 // update rectangular properties
                 Eigen::MatrixXd QmRectangle = Eigen::MatrixXd::Zero( 8, 8 );
-                Eigen::MatrixXd RmRectangle = Eigen::MatrixXd::Zero( 5,5 );
+                Eigen::MatrixXd RmRectangle = Eigen::MatrixXd::Zero( 5, 5 );
                 
-                std::cout << "Test 2 \t";
+                if( DEBUG )
+                        std::cout << "Test 2 \t";
                 QmRectangle.diagonal() << Q, Q, Q, Q, Q, Q, Q, Q;
                 RmRectangle.diagonal() << R, R, R, R, R;
                 
-                std::cout << "Test 3 \t";
+//                 std::cout << "QmRectangle = " << QmRectangle << ", RmRectangle = " << RmRectangle << std::endl;
+                if( DEBUG )
+                        std::cout << "Test 3 \t";
                 
                 // As there are model differences between the width and the depth of the entity and the latest measurement, the position information should be corrected for that
                 
@@ -1234,31 +1327,36 @@ std::cout << "Debug 12 \t";
                 measuredProperty.getRectangle().get_w(), 
                 measuredProperty.getRectangle().get_d();
                 
-                std::cout << "Test 4 \t";
+                if( DEBUG )
+                        std::cout << "Test 4 \t";
                 entityProperties.updateRectangleFeatures(QmRectangle, RmRectangle, zmRectangle, dt);
              
                 // update circular properties
                 Eigen::MatrixXd QmCircle = Eigen::MatrixXd::Zero( 5, 5 );
                 Eigen::MatrixXd RmCircle = Eigen::MatrixXd::Zero( 3, 3 );
                 
-                std::cout << "Test 5 \t";
+                if( DEBUG )
+                        std::cout << "Test 5 \t";
                 QmCircle.diagonal() << Q, Q, Q, Q, Q;
                 RmCircle.diagonal() << R, R, R;
                 
-                std::cout << "Test 6 \t";
+                if( DEBUG )
+                        std::cout << "Test 6 \t";
                 Eigen::VectorXd zmCircle( 3 );
                 zmCircle <<
                 measuredProperty.getCircle().get_x(),
                 measuredProperty.getCircle().get_y(),
                 measuredProperty.getCircle().get_radius();
                 
-                std::cout << "Test 7 \t";
+                if( DEBUG )
+                        std::cout << "Test 7 \t";
                 entityProperties.updateCircleFeatures(QmCircle, RmCircle, zmCircle, dt);
-                
-                std::cout << "Test 8 \t";
+                if( DEBUG )
+                        std::cout << "Test 8 \t";
                 entityProperties.updateProbabilities ( measuredProperty.getFeatureProbabilities() );
                 
-                std::cout << "Test 9 \t";
+                if( DEBUG )
+                        std::cout << "Test 9 \t";
 //                 float Q = 0.1; // Measurement noise covariance. TODO: let it depend on if an object is partially occluded. Now, objects are assumed to be completely visible
 //                 float R = 0.0; // Process noise covariance
 //
@@ -1291,13 +1389,42 @@ std::cout << "Debug 12 \t";
         {
             // create a new entity
             // Generate unique ID
+                
             id = ed::Entity::generateID().str() + "-laserTracking";
           //  std::cout << "New entity created with ID = " << id  << "from scan with timestamp = " << scan->header.stamp.toSec() << ". Pos = " << measuredProperty.getRectangle().get_x() << ", " << measuredProperty.getRectangle().get_y() << std::endl;
-
+// ROS_WARN("New entity created"); std::cout << "ID of new entity = " << id << std::endl;
             // Update existence probability
             existenceProbability = 1.0; // TODO magic number
             entityProperties = measuredProperty;
             
+//             measuredProperty.getRectangle().printValues();
+//             measuredProperty.getCircle().printProperties();
+//             std::cout << "Probabilities = " << measuredProperty.getFeatureProbabilities().get_pCircle() << ", " << measuredProperty.getFeatureProbabilities().get_pRectangle() << std::endl;
+//             
+            std::vector< bool > checks;
+            checks.push_back( measuredProperty.getRectangle().get_x() != measuredProperty.getRectangle().get_x() );
+            checks.push_back( measuredProperty.getRectangle().get_y() != measuredProperty.getRectangle().get_y() );
+            checks.push_back( measuredProperty.getRectangle().get_z() != measuredProperty.getRectangle().get_z() );
+            checks.push_back( measuredProperty.getFeatureProbabilities().get_pCircle() != measuredProperty.getFeatureProbabilities().get_pCircle() );
+            checks.push_back( measuredProperty.getFeatureProbabilities().get_pRectangle() != measuredProperty.getFeatureProbabilities().get_pRectangle() );
+
+            std::cout << "checks = " << checks[0] << checks[1] << checks[2] << checks[3] << checks[4] << std::endl;
+            
+            bool all = false;
+            std::vector<bool>::iterator it = checks.begin();
+            
+            while ( !all && it != checks.end() ) // Stops early if it hits a false
+            {
+                all &= *it;
+                ++it;
+            }
+
+            if ( all )
+            {
+                ROS_FATAL  ( "Unvalid entity pub." );
+                exit (EXIT_FAILURE);
+            }
+
 //             std::cout << "For id = " << std::endl;
         }
         geo::Pose3D new_pose;
@@ -1319,6 +1446,18 @@ std::cout << "Debug 12 \t";
         }
 
         bool check = true;
+//         std::cout << "new_pose.t.getX() = " << new_pose.t.getX() << std::endl;
+//         std::cout << "new_pose.t.getZ() = " << new_pose.t.getZ() << std::endl;
+//         std::cout << "new_pose.t.getY() = " << new_pose.t.getY() << std::endl;
+//         std::cout << "entityProperties.getFeatureProbabilities().get_pCircle() = " << entityProperties.getFeatureProbabilities().get_pCircle() << std::endl;
+//         std::cout << "entityProperties.getFeatureProbabilities().get_pRectangle() = " << entityProperties.getFeatureProbabilities().get_pRectangle()  << std::endl;
+//         std::cout << "Checks = " << (new_pose.t.getX() != new_pose.t.getX() ) << " " <<
+//                 (new_pose.t.getZ() != new_pose.t.getZ() ) << " " <<
+//                 ( new_pose.t.getY() != new_pose.t.getY() ) << " " <<
+//                 ( entityProperties.getFeatureProbabilities().get_pCircle() != entityProperties.getFeatureProbabilities().get_pCircle() )  << " " <<
+//                 (entityProperties.getFeatureProbabilities().get_pRectangle() != entityProperties.getFeatureProbabilities().get_pRectangle()) << std::endl;
+        
+        
         if ( new_pose.t.getX() != new_pose.t.getX() ||
                 new_pose.t.getZ() != new_pose.t.getZ() ||
                 new_pose.t.getY() != new_pose.t.getY() ||
@@ -1334,6 +1473,10 @@ std::cout << "Debug 12 \t";
         {
             req.setProperty ( id, featureProperties_, entityProperties );
             req.setPose ( id, new_pose );
+            std::cout << "Properties of ID = " << id << " are "  << std::endl;
+            entityProperties.printProperties();
+            
+//             std::cout << "For entity " << id << " new pose = " << new_pose << std::endl;
 
             // Set timestamp
             req.setLastUpdateTimestamp ( id, scan->header.stamp.toSec() );
