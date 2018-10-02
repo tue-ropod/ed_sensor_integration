@@ -60,6 +60,10 @@ private:
     ros::Subscriber sub_scan_;
     
     ros::Publisher door_pub_;
+    
+    ros::Publisher ObjectMarkers_pub_; // ############################## TEMP ############################
+    
+    ros::Publisher PointMarkers_pub_;// ############################## TEMP ############################
 
     std::queue<sensor_msgs::LaserScan::ConstPtr> scan_buffer_;
 

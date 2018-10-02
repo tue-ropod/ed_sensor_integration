@@ -1095,8 +1095,8 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
                 float Q = 0.1; // Measurement noise covariance. TODO: let it depend on if an object is partially occluded. Now, objects are assumed to be completely visible
                 float R = 0.0; // Process noise covariance
 
-                Eigen::MatrixXd Qm ( 2, 2 ), Rm ( 2, 2 );
-                Eigen::VectorXd z_k ( 2, 1 );
+                Eigen::MatrixXf Qm ( 2, 2 ), Rm ( 2, 2 );
+                Eigen::VectorXf z_k ( 2, 1 );
 
                 Qm << Q, 0, 0, Q;
                 Rm << R, 0, 0, R;

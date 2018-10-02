@@ -52,26 +52,15 @@ struct EntityProperty
     geo::Vec2f entity_max;
 };
 
-/*
-visualization_msgs::Marker getMarker ( ed::tracking::FeatureProperties& featureProp, int ID, bool possiblyMobidik ) // TODO move to ed_rviz_plugins?
+
+visualization_msgs::Marker getMarker ( ed::tracking::FeatureProperties& featureProp, int ID) // TODO move to ed_rviz_plugins?
+// ############################## TEMP ############################
 {
     visualization_msgs::Marker marker;
     std_msgs::ColorRGBA color;
-    
-    if ( possiblyMobidik )
-    {
-        color.r = 0;
-        color.g = 0;
-        color.b = 1;
-        color.a = ( float ) 0.5;
-        ed::tracking::Rectangle rectangle = featureProp.getRectangle();
-        rectangle.setMarker ( marker , ID, color, "Mobidik" );
-        
-    }
-    else
-    {
-        color.r = 0;
-        color.g = 1;
+
+        color.r = 1;
+        color.g = 140/255;
         color.b = 0;
         color.a = ( float ) 0.5;
 
@@ -85,12 +74,62 @@ visualization_msgs::Marker getMarker ( ed::tracking::FeatureProperties& featureP
             ed::tracking::Rectangle rectangle = featureProp.getRectangle();
             rectangle.setMarker ( marker , ID, color );
         }
-    }
-    
+
     return marker;
 }
-*/
 
+
+float COLORS[27][3] = { { 1.0, 0.0, 0.0},// ############################## TEMP ############################
+                        { 0.0, 1.0, 0.0},
+                        { 0.0, 0.0, 1.0},
+                        { 1.0, 0.0, 1.0},
+                        { 0.0, 1.0, 1.0},
+                        { 1.0, 1.0, 1.0},
+                        { 1.0, 0.0, 0.0},
+                        { 0.0, 0.0, 0.0}
+                      };
+
+
+void pubPoints ( visualization_msgs::MarkerArray *markerArray, std::vector<geo::Vec2f> points, unsigned int *ID )
+// ############################## TEMP ############################
+{
+    visualization_msgs::Marker marker;
+    marker.header.frame_id = "/map";
+    marker.header.stamp = ros::Time::now();
+    marker.ns = "points";
+    marker.id = ( *ID ) ++;
+    marker.type = visualization_msgs::Marker::POINTS;
+    marker.action = visualization_msgs::Marker::ADD;
+
+    marker.pose.position.x = 0.0;
+    marker.pose.position.y = 0.0;
+    marker.pose.position.z = 0.3;
+    marker.pose.orientation = tf::createQuaternionMsgFromRollPitchYaw ( 0.0, 0.0, 0.0 );
+    marker.scale.x = 0.05;
+    marker.scale.y = 0.05;
+    marker.scale.z = 0.05;
+
+    int i_color = *ID % 8;
+    marker.color.r = COLORS[i_color][0];
+    marker.color.g = COLORS[i_color][1];
+    marker.color.b = COLORS[i_color][2];
+    marker.color.a = ( float ) 0.5;
+
+    marker.lifetime = ros::Duration ( TIMEOUT_TIME );
+
+    for ( unsigned int ii = 0; ii < points.size(); ii++ )
+    {
+
+        geometry_msgs::Point p;
+        p.x = points[ii].x;
+        p.y = points[ii].y;
+        p.z = 0.0;
+        marker.points.push_back ( p );
+    }
+    
+    markerArray->markers.push_back ( marker );
+}
+ 
 // ----------------------------------------------------------------------------------------------------
 
 double getFittingError(const ed::Entity& e, const geo::LaserRangeFinder& lrf, const geo::Pose3D& rel_pose,
@@ -402,7 +441,8 @@ void LaserPluginTracking::initialize(ed::InitData& init)
     unsigned int bufferSize = 1; // TODO increase to 3(?) in order to make it possible to process more laser data in 1 iteration. Set low for testing purposes now.
     sub_scan_ = nh.subscribe<sensor_msgs::LaserScan>(laser_topic, bufferSize, &LaserPluginTracking::scanCallback, this);
     door_pub_ = nh.advertise<ed_sensor_integration::doorDetection>("door", 3);
-//    ObjectMarkers_pub_ = nh.advertise<visualization_msgs::MarkerArray> ( "ed/gui/objectMarkers", 3 );
+    ObjectMarkers_pub_ = nh.advertise<visualization_msgs::MarkerArray> ( "ed/gui/objectMarkers2", 3 );
+    PointMarkers_pub_ = nh.advertise<visualization_msgs::MarkerArray> ( "ed/gui/pointMarkers", 3 );
 
     tf_listener_ = new tf::TransformListener;
     
@@ -1108,7 +1148,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                 {
                             if( DEBUG )
             std::cout << "Debug 13.15 \t";
-                    const ed::EntityConstPtr& entityToTest = *it_laserEntities[ possibleSegmentEntityAssociations[IDtoCheck] ];
+//                     const ed::EntityConstPtr& entityToTest = *it_laserEntities[ possibleSegmentEntityAssociations[IDtoCheck] ];
                     for ( unsigned int i_points = firstElement; i_points < iDistances; ++i_points )
                     {
                         associatedPointsList.at ( possibleSegmentEntityAssociations[IDtoCheck] ).push_back ( points[i_points] );
@@ -1132,6 +1172,9 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
 
     }
     
+ 
+    
+    
     if( DEBUG )
             std::cout << "Debug 14 \t";
     
@@ -1139,8 +1182,8 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
     
 //    std::vector<ed::tracking::FeatureProperties> measuredProperties;
     std::vector<ed::tracking::FeatureProperties> measuredProperties ( associatedPointsList.size() ); // The first sequence in this vector (with the length of laser entitities) are the properties corresponding to existing entities
-   
-    std::cout << "associatedPointsList.size() = " << associatedPointsList.size() << std::endl;
+//     std::cout << "associatedPointsList.size() = " << associatedPointsList.size() << std::endl;
+    visualization_msgs::MarkerArray markerArrayPoints;
     
     std::vector<bool> propertiesDescribed( associatedPointsList.size(), false );
    for ( unsigned int iList = 0; iList < associatedPointsList.size(); iList++ )
@@ -1166,6 +1209,39 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
 //             // Add to cv array
 //             points[i] = geo::Vec2f ( p.x, p.y );            
 //         }
+       
+       // ############################## TEMP ############################
+    
+    unsigned int IDPoints = 0;
+    
+    // Print all points associated to a specific entity
+//     for(unsigned int iTest = 0; iTest < it_laserEntities.size(); iTest++)
+//     {
+            
+            if( iList < it_laserEntities.size() )
+            {
+            const ed::EntityConstPtr& e = *it_laserEntities[ iList ];
+            std::cout << "Points associated to entity " << e->id() << " are \n";
+            }
+            else
+            {
+                    std::cout << "Points associated to new entity = \n " ;
+            }
+//             std::cout << "associatedPointsList.size() = " << associatedPointsList.size() << std::endl;
+            
+            std::vector<geo::Vec2f> pointsToPrint = associatedPointsList[iList];
+            
+            pubPoints(&markerArrayPoints, pointsToPrint, &IDPoints);
+            
+            for( unsigned int iTest1 = 0; iTest1 < pointsToPrint.size(); iTest1++)
+            {
+                    std::cout << pointsToPrint[iTest1] << "\t";
+            }
+            
+            std::cout << "\n\n ";
+//     }
+    
+ // ############################## TEMP ############################
         
        if( DEBUG )
                std::cout << "Debug 15 \t";
@@ -1218,10 +1294,24 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
 
             measuredProperties[iList] =  properties ;
             propertiesDescribed[iList] = true;
+            
+             if( iList < it_laserEntities.size() )
+            {
+                const ed::EntityConstPtr& e = *it_laserEntities[ iList ];
+                std::cout << "New measurement of entity " << e->id() << " is \n";
+            }
+            else
+            {
+                std::cout << "Measured properties of new entity equals" << std::endl;
+            }
+            properties.printProperties();
         }
+        
     }  
     
-    if( DEBUG )
+   PointMarkers_pub_.publish( markerArrayPoints );
+       
+   if( DEBUG )
             std::cout << "Debug 17 \t";
     
     unsigned int marker_ID = 0; // To Do: After tracking, the right ID's should be created. The ID's are used to have multiple markers.
@@ -1232,6 +1322,9 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
 
     if( DEBUG )
             std::cout << "Debug 18 \t";
+    
+    visualization_msgs::MarkerArray markers;
+    unsigned int ID = 100;
     
     for ( unsigned int iProperties = 0; iProperties < measuredProperties.size(); iProperties++ ) // Update associated entities
     {
@@ -1245,9 +1338,13 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
             
         measuredProperty = measuredProperties[iProperties];
         
-        measuredProperty.getRectangle().printValues();
-        measuredProperty.getCircle().printProperties();
-        std::cout << "prob = " << measuredProperty.getFeatureProbabilities().get_pCircle() << ", " << measuredProperty.getFeatureProbabilities().get_pRectangle() << std::endl;
+        // temporary: pub measured properties in order to visualize the properties which are added
+        markers.markers.push_back( getMarker(measuredProperty, ID++) );
+
+        
+//         measuredProperty.getRectangle().printValues();
+//         measuredProperty.getCircle().printProperties();
+//         std::cout << "prob = " << measuredProperty.getFeatureProbabilities().get_pCircle() << ", " << measuredProperty.getFeatureProbabilities().get_pRectangle() << std::endl;
 
             if( DEBUG )
             std::cout << "Debug 18.3 \t";
@@ -1295,8 +1392,8 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                         std::cout << "Test 1  \t";
                 
                 // update rectangular properties
-                Eigen::MatrixXd QmRectangle = Eigen::MatrixXd::Zero( 8, 8 );
-                Eigen::MatrixXd RmRectangle = Eigen::MatrixXd::Zero( 5, 5 );
+                Eigen::MatrixXf QmRectangle = Eigen::MatrixXf::Zero( 8, 8 );
+                Eigen::MatrixXf RmRectangle = Eigen::MatrixXf::Zero( 5, 5 );
                 
                 if( DEBUG )
                         std::cout << "Test 2 \t";
@@ -1319,7 +1416,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                 float deltaX =   deltaWidth * ct + deltaDepth * st;
                 float deltaY = - deltaWidth * st + deltaDepth * ct;
                       
-                Eigen::VectorXd zmRectangle( 5 );
+                Eigen::VectorXf zmRectangle( 5 );
                 zmRectangle <<  
                 measuredProperty.getRectangle().get_x() + deltaX, 
                 measuredProperty.getRectangle().get_y() + deltaY, 
@@ -1332,8 +1429,8 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                 entityProperties.updateRectangleFeatures(QmRectangle, RmRectangle, zmRectangle, dt);
              
                 // update circular properties
-                Eigen::MatrixXd QmCircle = Eigen::MatrixXd::Zero( 5, 5 );
-                Eigen::MatrixXd RmCircle = Eigen::MatrixXd::Zero( 3, 3 );
+                Eigen::MatrixXf QmCircle = Eigen::MatrixXf::Zero( 5, 5 );
+                Eigen::MatrixXf RmCircle = Eigen::MatrixXf::Zero( 3, 3 );
                 
                 if( DEBUG )
                         std::cout << "Test 5 \t";
@@ -1342,7 +1439,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                 
                 if( DEBUG )
                         std::cout << "Test 6 \t";
-                Eigen::VectorXd zmCircle( 3 );
+                Eigen::VectorXf zmCircle( 3 );
                 zmCircle <<
                 measuredProperty.getCircle().get_x(),
                 measuredProperty.getCircle().get_y(),
@@ -1484,6 +1581,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
         }
     }
     
+    ObjectMarkers_pub_.publish(markers);
     // TODO: determine mobidik-properties somewhere else
     
     // Publish the fitted segments on the ObjectMarkers_pub_-topic // TODO: communicate via ED
