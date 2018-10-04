@@ -16,29 +16,36 @@
 #include <queue>
 #include <sensor_msgs/LaserScan.h>
 #include <ed_sensor_integration/doorDetection.h>
+#include <visualization_msgs/MarkerArray.h>
 
 // Properties
 #include "ed/convex_hull.h"
 #include "ed/convex_hull_calc.h"
+#include "ed/featureProperties_info.h"
 
-#define MAX_CORRIDOR_WIDTH 3 // [m]
-#define ADD_ASSOCIATION_DISTANCE 0.5 // [m]
-#define MIN_ASSOCIATION_DISTANCE 0.3 // [m] TODO reduce
-#define COORDINATE_OUTSIDE_MAP 1000.0 // [m]
-#define CONFIDENCE_REGION_HIGH_COVARIANCE 0.5 // [m] If the distance is smaller than this distance, we are not certain about the size of an object
-#define POINTS_TO_CHECK_CONFIDENCE 5 // [-]
-#define EPSILON 1e-2 // [m]
+#define MOBIDIK_WIDTH 0.72            // [m]
+#define MOBIDIK_LENGTH 0.81           // [m]
+#define MOBIDIK_MARGIN 0.1            // [m]
+
+#define ASSOCIATION_DISTANCE 0.5      // [m]
+#define MIN_ASSOCIATION_DISTANCE 0.3  // [m] TODO reduce
+
+#define POINTS_TO_CHECK_CONFIDENCE 5  // [-]
+#define EPSILON 1e-4                  // [m]
+
+#define INF 10000
+
 
 // ----------------------------------------------------------------------------------------------------
 
-class LaserPlugin : public ed::Plugin
+class LaserPluginTracking : public ed::Plugin
 {
 
 public:
 
-    LaserPlugin();
+    LaserPluginTracking();
 
-    virtual ~LaserPlugin();
+    virtual ~LaserPluginTracking();
 
     void initialize(ed::InitData& init);
 
@@ -54,7 +61,9 @@ private:
     
     ros::Publisher door_pub_;
     
-//     ros::Publisher ObjectMarkers_pub_;
+    ros::Publisher ObjectMarkers_pub_; // ############################## TEMP ############################
+    
+    ros::Publisher PointMarkers_pub_;// ############################## TEMP ############################
 
     std::queue<sensor_msgs::LaserScan::ConstPtr> scan_buffer_;
 
@@ -78,14 +87,13 @@ private:
     double max_cluster_size_;
     bool fit_entities_;
     bool check_door_status_;
+    float nominal_corridor_width_;
 
     int max_gap_size_;
-    float entity_timeout_;
     std::map<ed::UUID,geo::Pose3D> pose_cache;
-    
-    // 'Feature' property key
-    ed::PropertyKey<ed::tracking::FeatureProperties> featureProperties_; // TODO double defined now for publishing-purposes in rviz
 
+    // 'Feature' property key
+    ed::PropertyKey<ed::tracking::FeatureProperties> featureProperties_; 
 };
 
 

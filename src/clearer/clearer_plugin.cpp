@@ -42,11 +42,25 @@ void ClearerPlugin::process(const ed::PluginInput& data, ed::UpdateRequest& req)
 
         const std::map<std::string, ed::MeasurementConvexHull>& chull_map = e->convexHullMap();
 
-        if (chull_map.empty())
+        std::string laserID = "-laserTracking"; // the entities described for tracking do not have chull properties, so treat them like that
+        if ( ! ( e->id().str().length() < laserID.length() ) )
+        {
+            bool check1 = e->id().str().substr ( e->id().str().length() - laserID.length() ) == laserID; // entity described by laser
+            bool check2 = e->lastUpdateTimestamp() + entity_timeout_ < current_time;
+            if ( check1 && check2 )
+            {
+                req.removeEntity ( e->id() );
+                continue;
+            }
+        }
+
+        if ( chull_map.empty() )
+        {
             continue;
+        }
 
         std::vector<std::string> removed_sources;
-        for(std::map<std::string, ed::MeasurementConvexHull>::const_iterator it2 = chull_map.begin(); it2 != chull_map.end(); ++it2)
+        for ( std::map<std::string, ed::MeasurementConvexHull>::const_iterator it2 = chull_map.begin(); it2 != chull_map.end(); ++it2 )
         {
             const ed::MeasurementConvexHull& m = it2->second;
             if (m.timestamp + entity_timeout_ < current_time)
