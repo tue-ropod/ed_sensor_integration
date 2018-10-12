@@ -30,8 +30,8 @@
 #define ASSOCIATION_DISTANCE 0.5      // [m]
 #define MIN_ASSOCIATION_DISTANCE 0.3  // [m] TODO reduce
 
-#define POINTS_TO_CHECK_CONFIDENCE 5  // [-]
-#define EPSILON 1e-4                  // [m]
+// #define POINTS_TO_CHECK_CONFIDENCE 3  // [-]
+// #define EPSILON 1e-4                  // [m]
 
 #define INF 10000
 
@@ -61,9 +61,11 @@ private:
     
     ros::Publisher door_pub_;
     
-    ros::Publisher ObjectMarkers_pub_; // ############################## TEMP ############################
+//     ros::Publisher ObjectMarkers_pub_; // ############################## TEMP ############################
     
-    ros::Publisher PointMarkers_pub_;// ############################## TEMP ############################
+//     ros::Publisher PointMarkers_pub_; // ############################## TEMP ############################
+    
+//     ros::Publisher processedLaserPoints_pub_; // ############################## TEMP ############################
 
     std::queue<sensor_msgs::LaserScan::ConstPtr> scan_buffer_;
 
