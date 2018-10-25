@@ -29,7 +29,7 @@
 
 #define ASSOCIATION_DISTANCE 0.5      // [m]
 #define MIN_ASSOCIATION_DISTANCE 0.3  // [m] TODO reduce
-
+#define ANGLE_MARGIN_FITTING 30*M_PI/180 // [rad]
 // #define POINTS_TO_CHECK_CONFIDENCE 3  // [-]
 // #define EPSILON 1e-4                  // [m]
 

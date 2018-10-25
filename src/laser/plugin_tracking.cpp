@@ -1357,9 +1357,6 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
         method = ed::tracking::determineCase ( points, &cornerIndex, &it_low, &it_high, sensor_pose ); // chose to fit a single line or a rectangle (2 lines)        
         float error_rectangle2 = ed::tracking::fitObject ( points, method,  &cornerIndex, &rectangle, &circle, &it_low, &it_high,  sensor_pose );
 
-
-
-        
         measuredProperties[iList].confidenceRectangleWidth = false;
         measuredProperties[iList].confidenceRectangleDepth = false;
 
@@ -1377,31 +1374,111 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                 
         
         if( method == ed::tracking::LINE )
-        {
-                measuredProperties[iList].confidenceRectangleWidth = ed::tracking::determineSegmentConfidence ( scan, elementLow, elementHigh);
+        {        
+                 geo::Quaternion sensorQuaternion  = sensor_pose.getQuaternion();
+                 tf::Quaternion q ( sensorQuaternion.getX(), sensorQuaternion.getY(), sensorQuaternion.getZ(), sensorQuaternion.getW() );
+                 tf::Matrix3x3 m ( q );
+                 double LRF_roll, LRF_pitch, LRF_yaw;
+                 m.getRPY ( LRF_roll, LRF_pitch, LRF_yaw );
+                 
+                 float avgAngle = 0.0;
+                 for(unsigned int iiAssPoints = elementLow; iiAssPoints < elementHigh; iiAssPoints++)
+                 {
+//                          unsigned int element = associatedPointsInfo[iList].laserIDs[iiAssPoints];
+                         avgAngle +=  LRF_yaw + lrf_model_.getAngleMin() + lrf_model_.getAngleIncrement()*iiAssPoints;
+                 }         
+                 avgAngle /= (elementHigh - elementLow);
+                 ed::tracking::unwrap (&avgAngle, rectangle.get_yaw());
+                 
+                 if (std::fabs(rectangle.get_yaw() - avgAngle) < ANGLE_MARGIN_FITTING)
+                 {
+                         std::cout << "Statement = true"  << std::endl;
+                         measuredProperties[iList].confidenceRectangleWidth = false;
+                 }
+                 else
+                 {
+                          std::cout << "Statement = false"  << std::endl;
+                         measuredProperties[iList].confidenceRectangleWidth = ed::tracking::determineSegmentConfidence ( scan, elementLow, elementHigh);
+                         
+                         geo::Vector3 pLow = sensor_pose*lrf_model_.rayDirections()[ elementLow] * sensor_ranges[elementLow];
+                         geo::Vector3 pHigh = sensor_pose*lrf_model_.rayDirections()[ elementHigh] * sensor_ranges[elementHigh];
+                         std::cout << " Method = " << method << ", elementLow, elementHigh = " << elementLow << ", " << elementHigh << " Coordinates Low, High = " << pLow << ", " << pHigh << std::endl;
+                 }
                 
-                geo::Vector3 pLow = sensor_pose*lrf_model_.rayDirections()[ elementLow] * sensor_ranges[elementLow];
-                geo::Vector3 pHigh = sensor_pose*lrf_model_.rayDirections()[ elementHigh] * sensor_ranges[elementHigh];
-                std::cout << " Method = " << method << ", elementLow, elementHigh = " << elementLow << ", " << elementHigh << " Coordinates Low, High = " << pLow << ", " << pHigh << std::endl;
+                
+                
         }
 
         if( method == ed::tracking::RECTANGLE )
         {
+                // For width-information
                 elementLow = associatedPointsInfo[iList].laserIDs[0];
                 elementHigh = associatedPointsInfo[iList].laserIDs[0] + cornerIndex;
-                std::cout << "For determining confidence of width: " << std::endl;
-                measuredProperties[iList].confidenceRectangleWidth = ed::tracking::determineSegmentConfidence ( scan, elementLow, elementHigh);
-                geo::Vector3 pLow = sensor_pose*lrf_model_.rayDirections()[ elementLow] * sensor_ranges[elementLow];
-                geo::Vector3 pHigh = sensor_pose*lrf_model_.rayDirections()[ elementHigh] * sensor_ranges[elementHigh];
-                std::cout << " Method = " << method << ", elementLow, elementHigh = " << elementLow << ", " << elementHigh << " Coordinates Low, High = " << pLow << ", " << pHigh << std::endl;
                 
+                 geo::Quaternion sensorQuaternion  = sensor_pose.getQuaternion();
+                 tf::Quaternion q ( sensorQuaternion.getX(), sensorQuaternion.getY(), sensorQuaternion.getZ(), sensorQuaternion.getW() );
+                 tf::Matrix3x3 m ( q );
+                 double LRF_roll, LRF_pitch, LRF_yaw;
+                 m.getRPY ( LRF_roll, LRF_pitch, LRF_yaw );
+                 
+                 std::cout << " LRF_yaw, lrf_model_.getAngleMin(),  lrf_model_.getAngleIncrement(), elementHigh, elementLow = " ;
+                 std::cout << LRF_yaw << ", " << lrf_model_.getAngleMin() << ", " << lrf_model_.getAngleIncrement()<< " , " << elementHigh << ", " << elementLow << std::endl;
+                 
+                 float avgAngle = 0.0;
+                 for(unsigned int iiAssPoints = elementLow; iiAssPoints < elementHigh; iiAssPoints++)
+                 {
+                         avgAngle +=  LRF_yaw + lrf_model_.getAngleMin() + lrf_model_.getAngleIncrement()*iiAssPoints;
+                 }
+                       
+                 avgAngle /= (elementHigh - elementLow);
+                 ed::tracking::unwrap (&avgAngle, rectangle.get_yaw());
+                 
+                 std::cout << termcolor::magenta << "avgAngle = " << avgAngle << ", yaw = " <<rectangle.get_yaw() << " diff = " ;
+                 std::cout << std::fabs(rectangle.get_yaw() - avgAngle) << " margin = " << ANGLE_MARGIN_FITTING <<  termcolor::reset << std::endl;
+                 
+                 std::cout << termcolor::magenta << "avgAngle = " << avgAngle << ", yaw = " <<rectangle.get_yaw() << termcolor::reset << std::endl;
+                 
+                 if (std::fabs(rectangle.get_yaw() - avgAngle) < ANGLE_MARGIN_FITTING)
+                 {
+                         std::cout << "Statement = true"  << std::endl;
+                         measuredProperties[iList].confidenceRectangleWidth = false;
+                 }
+                 else
+                 {
+                         std::cout << "Statement = false"  << std::endl;
+                         measuredProperties[iList].confidenceRectangleWidth = ed::tracking::determineSegmentConfidence ( scan, elementLow, elementHigh);
+                         
+                         geo::Vector3 pLow = sensor_pose*lrf_model_.rayDirections()[ elementLow] * sensor_ranges[elementLow];
+                         geo::Vector3 pHigh = sensor_pose*lrf_model_.rayDirections()[ elementHigh] * sensor_ranges[elementHigh];
+                         std::cout << " Method = " << method << ", elementLow, elementHigh = " << elementLow << ", " << elementHigh << " Coordinates Low, High = " << pLow << ", " << pHigh << std::endl;
+                 }
+                
+                // For depth information
                 elementLow = elementHigh; // cause corner belongs to both points. TODO what if the corner is occluded? Does this automatically lead to low confidences? -> TEST
                 elementHigh = associatedPointsInfo[iList].laserIDs.back();
-                std::cout << "For determining confidence of depth: " << std::endl;
-                measuredProperties[iList].confidenceRectangleDepth = ed::tracking::determineSegmentConfidence ( scan, elementLow, elementHigh);    
-                pLow = sensor_pose*lrf_model_.rayDirections()[ elementLow] * sensor_ranges[elementLow];
-                pHigh = sensor_pose*lrf_model_.rayDirections()[ elementHigh] * sensor_ranges[elementHigh];
-                std::cout << " Method = " << method << ", elementLow, elementHigh = " << elementLow << ", " << elementHigh << " Coordinates Low, High = " << pLow << ", " << pHigh << std::endl;
+                
+                 avgAngle = 0.0;
+                 for(unsigned int iiAssPoints = elementLow; iiAssPoints < elementHigh; iiAssPoints++)
+                 {
+                         avgAngle +=  LRF_yaw + lrf_model_.getAngleMin() + lrf_model_.getAngleIncrement()*iiAssPoints;
+                 }
+                       
+                 avgAngle /= (elementHigh - elementLow);
+                 ed::tracking::unwrap (&avgAngle, rectangle.get_yaw()); // TODO set correct reference angle! just add pi/2 should suffice?
+                 
+                 if (std::fabs(rectangle.get_yaw() - avgAngle) < ANGLE_MARGIN_FITTING)
+                 {
+                         std::cout << "Statement = true"  << std::endl;
+                         measuredProperties[iList].confidenceRectangleDepth = false;
+                 }
+                 else
+                 {
+                         std::cout << "For determining confidence of depth: " << std::endl;
+                         measuredProperties[iList].confidenceRectangleDepth = ed::tracking::determineSegmentConfidence ( scan, elementLow, elementHigh);    
+                 }
+//                 pLow = sensor_pose*lrf_model_.rayDirections()[ elementLow] * sensor_ranges[elementLow];
+//                 pHigh = sensor_pose*lrf_model_.rayDirections()[ elementHigh] * sensor_ranges[elementHigh];
+//                 std::cout << " Method = " << method << ", elementLow, elementHigh = " << elementLow << ", " << elementHigh << " Coordinates Low, High = " << pLow << ", " << pHigh << std::endl;
         }
         
         ed::tracking::FeatureProbabilities prob;
@@ -1554,25 +1631,15 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
 //                 std::cout << "QmRectangle = " << QmRectangle << ", RmRectangle = " << RmRectangle << std::endl;
                 if( DEBUG )
                         std::cout << "Test 3 \t";
-                
-                // As there are model differences between the width and the depth of the entity and the latest measurement, the position information should be corrected for that
-                float thetaPred = entityRectangle.get_yaw() + dt*entityRectangle.get_yawVel();
-                float deltaWidth =  entityRectangle.get_w() - measuredProperty.getRectangle().get_w();
-                float deltaDepth = entityRectangle.get_d() - measuredProperty.getRectangle().get_d();
-                
-                float st = std::sin( thetaPred );
-                float ct = std::cos( thetaPred );
-                
-                float deltaX =   deltaWidth * ct + deltaDepth * st;
-                float deltaY = - deltaWidth * st + deltaDepth * ct;
-                      
+               
                 Eigen::VectorXf zmRectangle( 5 );
                 zmRectangle <<  
-                measuredProperty.getRectangle().get_x() + 0.5*deltaX, // TODO: how to compensate for reference point? Signs not always ok!
-                measuredProperty.getRectangle().get_y() - 0.5*deltaY, 
+                measuredProperty.getRectangle().get_x(),
+                measuredProperty.getRectangle().get_y(), 
                 measuredProperty.getRectangle().get_yaw(),  
                 measuredProperty.getRectangle().get_w(), 
                 measuredProperty.getRectangle().get_d();
+               
                 
                 std::cout << "Entity Properties" << std::endl;
                 entityRectangle.printValues();
@@ -1580,7 +1647,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                 std::cout << "Measured Properties" << std::endl;
                 measuredProperty.getRectangle().printValues();
                 
-                std::cout << "Deltas = " << deltaWidth << ", " << deltaDepth << ", " << deltaX << ", " << deltaY << ", " << thetaPred << std::endl;
+//                 std::cout << "Deltas = " << deltaWidth << ", " << deltaDepth << ", " << deltaX << ", " << deltaY << ", " << thetaPred << std::endl;
                 
                 if (measuredProperty.getRectangle().get_yaw() != measuredProperty.getRectangle().get_yaw())
                 {
