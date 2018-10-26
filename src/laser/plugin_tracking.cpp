@@ -94,6 +94,19 @@ visualization_msgs::Marker getMarker ( ed::tracking::FeatureProperties& featureP
     return marker;
 }
 
+template <typename T>
+void append(std::vector<T>& a, const std::vector<T>& b)
+{
+    a.reserve(a.size() + b.size());
+    a.insert(a.end(), b.begin(), b.end());
+}
+
+template <typename T>
+void append(std::vector<T>& a, const std::vector<T>& b, int bStart, int bEnd)
+{
+    a.reserve(a.size() + bEnd - bStart );
+    a.insert(a.end(), b.begin() + bStart, b.begin() + bEnd);
+}
 
 float COLORS[27][3] = { { 1.0, 0.0, 0.0},// ############################## TEMP ############################
                         { 0.0, 1.0, 0.0},
@@ -929,7 +942,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
         unsigned int segment_size = segment.size();
 
         std::vector<geo::Vec2f> points ( segment_size );
-        std::vector<int> segmentIDs ( segment_size );
+        std::vector<unsigned int> segmentIDs ( segment_size );
         geo::Vec2f seg_min, seg_max;
 
 //         if( DEBUG )
@@ -1164,6 +1177,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
             std::cout << "Debug 13.12 \t";
         unsigned int IDtoCheck = IDs[0];
         unsigned int firstElement = 0;
+        bool previousSegmentAssociated = false;
 
         // check groups of segments associated to a specific entity
         for ( unsigned int iDistances = 1; iDistances < distances.size(); iDistances++ )
@@ -1185,32 +1199,114 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                 float minDistance = distances[firstElement];
                 for ( unsigned int iiDistances = 1; iiDistances < iDistances; iiDistances++ )
                 {
-                    if ( distances[firstElement] < minDistance )
+                    if ( distances[iiDistances] < minDistance )
                     {
                         minDistance = distances[iiDistances];
                     }
                 }
-
-                if ( minDistance < MIN_ASSOCIATION_DISTANCE )  // add all points to associated entity
+                
+//                 std::cout << "Debug 13.15 \t";
+                bool associated = minDistance < MIN_ASSOCIATION_DISTANCE;
+                
+                std::cout << "associated, previousSegmentAssociated" << associated << previousSegmentAssociated << std::endl;
+                
+                if( associated && !previousSegmentAssociated && firstElement > 0 ) // check for possibility to reassociate previous section
                 {
+//                         std::cout << "Debug 13.16 \t";
+                         geo::Vec2f lastPointPreviousSegment = points[firstElement - 1];
+//                          std::cout << "Debug 13.17 \t";
+                        geo::Vec2f firstPointCurrentSegment = points[firstElement];
+//                         std::cout << "Debug 13.18 \t";
+                        float interSegmentDistance = std::sqrt( std::pow(lastPointPreviousSegment.x-firstPointCurrentSegment.x, 2.0) + std::pow(lastPointPreviousSegment.y-firstPointCurrentSegment.y, 2.0) );
+                        
+                        std::cout << termcolor::cyan << "Try to reassociate previous section: interSegmentDistance = " << interSegmentDistance << termcolor::reset << std::endl;;
+                        
+                        std::cout << "Points.size() = " << points.size() << " firstElement = " << firstElement << " lastPointPreviousSegment = " << lastPointPreviousSegment;
+//                         std::cout << " firstPointCurrentSegment = " << firstPointCurrentSegment << " Test = " << associatedPointsInfo.back().points.back() << std::endl;
+                        
+                        std::cout << "Points = " << std::endl;
+                        for(unsigned int iPointsPrint = 0; iPointsPrint < points.size(); iPointsPrint++)
+                        {
+                                std::cout << points[iPointsPrint] << "\t";
+                        }
+                        std::cout << "\n";
+                        
+                        if( interSegmentDistance < MIN_ASSOCIATION_DISTANCE_SEGMENTS)  // reassociate previous section
+                        {
+                                
+                                std::cout << termcolor::cyan << "reassociate previous section" << termcolor::reset << std::endl;;
+                                
+//                                 std::cout << "Debug 13.19 \t";
+                                previousSegmentAssociated = true;
+                                unsigned int previousID = IDs[iDistances - 1];
+//                                 std::cout << "Debug 13.20 \t";
+                                
+                                const ed::EntityConstPtr& e1 = *it_laserEntities[ possibleSegmentEntityAssociations[IDtoCheck] ];
+                                const ed::EntityConstPtr& e2 = *it_laserEntities[ possibleSegmentEntityAssociations[previousID] ];                                                                
+                                std::cout << "Entity IDs = " << e1->id() << ", " << e2->id() << std::endl;
+                                
+                                append(associatedPointsInfo.at ( possibleSegmentEntityAssociations[IDtoCheck] ).points, associatedPointsInfo.back().points);
+                                append(associatedPointsInfo.at ( possibleSegmentEntityAssociations[IDtoCheck] ).laserIDs, associatedPointsInfo.back().laserIDs);
+//                                 std::cout << "Debug 13.21 \t";
+                                associatedPointsInfo.erase ( associatedPointsInfo.end() );
+                        }        
+                        
+                     
+                }
+                
+                if ( !associated && previousSegmentAssociated) 
+                {
+//                         std::cout << "Debug 13.22 \t";
+                        // boundaries for distance and that those boundaries are associated to a object                                
+                        geo::Vec2f lastPointPreviousSegment = points[firstElement - 1];
+//                         std::cout << "Debug 13.23 \t";
+                        geo::Vec2f firstPointCurrentSegment = points[firstElement];
+//                         std::cout << "Debug 13.24 \t";
+                        
+                        float interSegmentDistance = std::sqrt( std::pow(lastPointPreviousSegment.x-firstPointCurrentSegment.x, 2.0) + std::pow(lastPointPreviousSegment.y-firstPointCurrentSegment.y, 2.0) );
+                        
+                        std::cout << "!associated && previousSegmentAssociated: interSegmentDistance = " << interSegmentDistance << std::endl;
+                        
+//                         std::cout << "Debug 13.25 \t";
+                        if( interSegmentDistance < MIN_ASSOCIATION_DISTANCE_SEGMENTS)
+                        {
+//                                 std::cout << "Debug 13.26 \t";
+                                associated = true;
+                                unsigned int previousID = IDs[iDistances - 1];
+//                                 std::cout << "Debug 13.27 \t";
+                                IDtoCheck = previousID;
+                        }           
+                }
+
+                if ( associated )  // add all points to associated entity
+                {
+                        previousSegmentAssociated = true;
                             if( DEBUG )
             std::cout << "Debug 13.15 \t";
 //                     const ed::EntityConstPtr& entityToTest = *it_laserEntities[ possibleSegmentEntityAssociations[IDtoCheck] ];
 //             std::cout << "iDistances = " << iDistances << " points.size() = " << points.size() << " segmentIDs.size() = " << segmentIDs.size() << std::endl;
-                    for ( unsigned int i_points = firstElement; i_points <= iDistances; ++i_points )
-                    {
-//                             std::cout << "points[i_points] = " << points[i_points] << " segmentIDs[i_points] = " << segmentIDs[i_points] << std::endl;
-//                         associatedPointsList.at ( possibleSegmentEntityAssociations[IDtoCheck] ).push_back ( points[i_points] );
-                        associatedPointsInfo.at ( possibleSegmentEntityAssociations[IDtoCheck] ).points.push_back ( points[i_points] );
-                        associatedPointsInfo.at ( possibleSegmentEntityAssociations[IDtoCheck] ).laserIDs.push_back ( segmentIDs[i_points] );
-                    }
+            
+            append( associatedPointsInfo.at ( possibleSegmentEntityAssociations[IDtoCheck] ).points, points, firstElement, iDistances );
+            append( associatedPointsInfo.at ( possibleSegmentEntityAssociations[IDtoCheck] ).laserIDs, segmentIDs, firstElement, iDistances );
+            
+            
+//                     for ( unsigned int i_points = firstElement; i_points <= iDistances; ++i_points )
+//                     {
+// //                             std::cout << "points[i_points] = " << points[i_points] << " segmentIDs[i_points] = " << segmentIDs[i_points] << std::endl;
+// //                         associatedPointsList.at ( possibleSegmentEntityAssociations[IDtoCheck] ).push_back ( points[i_points] );
+//                         associatedPointsInfo.at ( possibleSegmentEntityAssociations[IDtoCheck] ).points.push_back ( points[i_points] );
+//                         associatedPointsInfo.at ( possibleSegmentEntityAssociations[IDtoCheck] ).laserIDs.push_back ( segmentIDs[i_points] );
+//                     }
                 }
                 else
                 {
                             if( DEBUG )
             std::cout << "Debug 13.16 \t";
 //                     pointsNotAssociated.clear();
+            
+            previousSegmentAssociated = false;
             pointsNotAssociated = PointsInfo();
+            
                     for ( unsigned int i_points = firstElement; i_points < iDistances; ++i_points )
                     {
                         pointsNotAssociated.points.push_back ( points[i_points] );
@@ -1220,6 +1316,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                         associatedPointsInfo.push_back ( pointsNotAssociated );
                 }
             }
+            
             firstElement = iDistances;
             IDtoCheck = IDs[iDistances];
         }
@@ -1230,9 +1327,9 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
      // ############################## TEMP ############################
     
 //     unsigned int IDPoints = 0;
-//     
-// //     Print all points associated to a specific entity
-//     for(unsigned int iTest = 0; iTest < it_laserEntities.size(); iTest++)
+    
+//     Print all points associated to a specific entity
+//     for(unsigned int iTest = 0; iTest < associatedPointsInfo.size(); iTest++)
 //     {
 //             
 //             if( iTest < it_laserEntities.size() )
@@ -1242,21 +1339,21 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
 //             }
 //             else
 //             {
-//                     std::cout << "Points associated to new entity = \n " ;
+//                     std::cout << termcolor::red << "Points associated to new entity = \n "  << termcolor::reset;
 //             }
-// //             std::cout << "associatedPointsList.size() = " << associatedPointsInfo.size() << std::endl;
-//             
+//             std::cout << "associatedPointsList.size() = " << associatedPointsInfo.size() << std::endl;
+            
 //             std::vector<geo::Vec2f> pointsToPrint  = associatedPointsInfo[iTest].points ;
-// //             pubPoints(&markerArrayPoints, pointsToPrint, &IDPoints);
-// //             IDPoints++;
-//             
+//             pubPoints(&markerArrayPoints, pointsToPrint, &IDPoints);
+//             IDPoints++;
+            
 //             for( unsigned int iTest1 = 0; iTest1 < pointsToPrint.size(); iTest1++)
 //             {
 //                     std::cout << pointsToPrint[iTest1] << "\t";
 //             }
-//             
+            
 //             std::vector<unsigned int> laserIDsToPrint = associatedPointsInfo[iTest].laserIDs;
-// 
+
 //             std::cout << "LaserIds = " << std::endl;
 //             for( unsigned int iTest1 = 0; iTest1 < laserIDsToPrint.size(); iTest1++)
 //             {
@@ -1268,7 +1365,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
 //             {
 //                     std::cout << sensor_ranges[laserIDsToPrint[iTest1]] << "\t";
 //             }
-//             
+            
 //             std::cout << "\n\n ";
 //     }
     
@@ -1362,25 +1459,64 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
 
 
                 
-        if( iList < it_laserEntities.size() )
-        {
-             const ed::EntityConstPtr& eTest = *it_laserEntities[ iList ];
-             std::cout << "For points associated to entity " << eTest->id();
-        }
-        else
-        {
-                std::cout << " For points associated to a NEW entity ";
-        }
-                
+//         if( iList < it_laserEntities.size() )
+//         {
+//              const ed::EntityConstPtr& eTest = *it_laserEntities[ iList ];
+//              std::cout << "For points associated to entity " << eTest->id();
+//         }
+//         else
+//         {
+//                 std::cout << " For points associated to a NEW entity ";
+//         }
+        
+        geo::Quaternion sensorQuaternion  = sensor_pose.getQuaternion();
+        tf::Quaternion q ( sensorQuaternion.getX(), sensorQuaternion.getY(), sensorQuaternion.getZ(), sensorQuaternion.getW() );
+        tf::Matrix3x3 m ( q );
+        double LRF_roll, LRF_pitch, LRF_yaw;
+        m.getRPY ( LRF_roll, LRF_pitch, LRF_yaw );
+        
+        
+        unsigned int elementLowWidth = 0, elementHighWidth = 0, elementLowDepth = 0, elementHighDepth = 0;
         
         if( method == ed::tracking::LINE )
-        {        
-                 geo::Quaternion sensorQuaternion  = sensor_pose.getQuaternion();
-                 tf::Quaternion q ( sensorQuaternion.getX(), sensorQuaternion.getY(), sensorQuaternion.getZ(), sensorQuaternion.getW() );
-                 tf::Matrix3x3 m ( q );
-                 double LRF_roll, LRF_pitch, LRF_yaw;
-                 m.getRPY ( LRF_roll, LRF_pitch, LRF_yaw );
-                 
+        {       
+                elementLowWidth = associatedPointsInfo[iList].laserIDs[0];
+                elementHighWidth = associatedPointsInfo[iList].laserIDs.back();
+        }
+        else if ( method == ed::tracking::RECTANGLE )
+        {
+                // For width-information
+                elementLowWidth = associatedPointsInfo[iList].laserIDs[0];
+                elementHighWidth = associatedPointsInfo[iList].laserIDs[0] + cornerIndex;
+                
+                // For depth information
+                elementLowDepth = elementHighWidth; // cause corner belongs to both points. TODO what if the corner is occluded? Does this automatically lead to low confidences? -> TEST
+                elementHighDepth = associatedPointsInfo[iList].laserIDs.back();
+        }
+        
+        for(unsigned int iConfidence = 0; iConfidence < 2; iConfidence++) // Determine for both with and depth
+        {
+                bool determineWidthConfidence = false, determineDepthConfidence = false; 
+                
+                if(iConfidence == 0)
+                {
+                        determineWidthConfidence = true;
+                        elementLow = elementLowWidth;
+                        elementHigh = elementHighWidth;
+                } 
+                
+                if(iConfidence == 1)
+                {
+                        determineDepthConfidence = true;
+                        elementLow = elementLowDepth; // cause corner belongs to both points. TODO what if the corner is occluded? Does this automatically lead to low confidences? -> TEST
+                        elementHigh = elementHighDepth;
+                }
+                
+//                 std::cout << "elementLow = " << elementLow << ", elementHigh = " << elementHigh << ", determineWidthConfidence = " << determineWidthConfidence << ", determineDepthConfidence = " << determineDepthConfidence<< std::endl;
+                
+                if(elementLow == 0 && elementHigh == 0) // skip if no relevant information can be obtained
+                        continue;
+                
                  float avgAngle = 0.0;
                  for(unsigned int iiAssPoints = elementLow; iiAssPoints < elementHigh; iiAssPoints++)
                  {
@@ -1388,98 +1524,165 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                          avgAngle +=  LRF_yaw + lrf_model_.getAngleMin() + lrf_model_.getAngleIncrement()*iiAssPoints;
                  }         
                  avgAngle /= (elementHigh - elementLow);
-                 ed::tracking::unwrap (&avgAngle, rectangle.get_yaw());
                  
-                 if (std::fabs(rectangle.get_yaw() - avgAngle) < ANGLE_MARGIN_FITTING)
+//                   std::cout << " LRF_yaw, lrf_model_.getAngleMin(),  lrf_model_.getAngleIncrement(), elementHigh, elementLow = " ;
+//                  std::cout << LRF_yaw << ", " << lrf_model_.getAngleMin() << ", " << lrf_model_.getAngleIncrement()<< " , " << elementHigh << ", " << elementLow << std::endl;
+                 
+                 if(determineWidthConfidence)
                  {
-                         std::cout << "Statement = true"  << std::endl;
-                         measuredProperties[iList].confidenceRectangleWidth = false;
+                         ed::tracking::unwrap (&avgAngle, rectangle.get_yaw(), M_PI);
+                 }
+                 else if (determineDepthConfidence)
+                 {
+                          ed::tracking::unwrap (&avgAngle, rectangle.get_yaw() + M_PI_2, M_PI);
+                 }
+                 
+//                  if(determineWidthConfidence)
+//                   {
+//                  std::cout << termcolor::magenta << "avgAngle = " << avgAngle << ", yaw = " <<rectangle.get_yaw() << " diff = " ;
+//                  std::cout << std::fabs(rectangle.get_yaw() - avgAngle) << " margin = " << ANGLE_MARGIN_FITTING <<  termcolor::reset << std::endl;           
+//                   }
+//                  
+//                  if(determineDepthConfidence)
+//                   {
+//                  std::cout << termcolor::magenta << "avgAngle = " << avgAngle << ", yaw = " <<rectangle.get_yaw()+M_PI_2 << " diff = " ;
+//                  std::cout << std::fabs(rectangle.get_yaw() +M_PI_2 - avgAngle) << " margin = " << ANGLE_MARGIN_FITTING <<  termcolor::reset << std::endl;           
+//                   }
+                
+//                  if(determineWidthConfidence)
+//                  {
+//                           if (std::fabs(rectangle.get_yaw() - avgAngle) < ANGLE_MARGIN_FITTING)
+//                           {
+//                                   measuredProperties[iList].confidenceRectangleWidth = false;
+//                           }      
+//                           else
+//                           {
+//                                   measuredProperties[iList].confidenceRectangleWidth = ed::tracking::determineSegmentConfidence ( scan, elementLow, elementHigh);
+//                           }
+//                  }
+//                  
+//                  if(determineDepthConfidence)
+//                  {
+//                           if (std::fabs(rectangle.get_yaw() + M_PI_2 - avgAngle) < ANGLE_MARGIN_FITTING)
+//                           {
+//                                   measuredProperties[iList].confidenceRectangleDepth = false;
+//                           }       
+//                           else
+//                           {
+//                                   measuredProperties[iList].confidenceRectangleDepth = ed::tracking::determineSegmentConfidence ( scan, elementLow, elementHigh);
+//                           }
+//                  }
+                 
+//                  bool check1 = std::fabs(rectangle.get_yaw() - avgAngle) < ANGLE_MARGIN_FITTING;
+//                   bool check2 = std::fabs(rectangle.get_yaw() + M_PI_2 - avgAngle) < ANGLE_MARGIN_FITTING;
+//                   bool check3 = (check1 && determineWidthConfidence);
+//                   bool check4 = check2 && determineWidthConfidence;
+//                   bool check5 = check3 || check4;
+//                  
+//                  std::cout << "Checks = " << check1;
+//                  std::cout << determineWidthConfidence ;
+//                  std::cout << check2;
+//                  std::cout << determineDepthConfidence;
+//                  std::cout <<  check3;
+//                  std::cout << (std::fabs(rectangle.get_yaw() + M_PI_2 - avgAngle) < ANGLE_MARGIN_FITTING && determineDepthConfidence) ;
+//                  std::cout << (std::fabs(rectangle.get_yaw() - avgAngle) < ANGLE_MARGIN_FITTING && determineWidthConfidence) || (std::fabs(rectangle.get_yaw() + M_PI_2 - avgAngle) < ANGLE_MARGIN_FITTING && determineDepthConfidence) <<std::endl;
+                 
+                 if ( (std::fabs(rectangle.get_yaw() - avgAngle) < ANGLE_MARGIN_FITTING && determineWidthConfidence) || (std::fabs(rectangle.get_yaw() + M_PI_2 - avgAngle) < ANGLE_MARGIN_FITTING && determineDepthConfidence) )
+                 {
+//                          std::cout << "Statement = true"  << std::endl;
+                         if(determineWidthConfidence)
+                                 measuredProperties[iList].confidenceRectangleWidth = false;
+                                 
+                         if (determineDepthConfidence)
+                                 measuredProperties[iList].confidenceRectangleDepth = false;
+                                 
                  }
                  else
                  {
-                          std::cout << "Statement = false"  << std::endl;
-                         measuredProperties[iList].confidenceRectangleWidth = ed::tracking::determineSegmentConfidence ( scan, elementLow, elementHigh);
+//                           std::cout << "Statement = false"  << std::endl;
+                         if(determineWidthConfidence)
+                                 measuredProperties[iList].confidenceRectangleWidth = ed::tracking::determineSegmentConfidence ( scan, elementLow, elementHigh);
                          
-                         geo::Vector3 pLow = sensor_pose*lrf_model_.rayDirections()[ elementLow] * sensor_ranges[elementLow];
-                         geo::Vector3 pHigh = sensor_pose*lrf_model_.rayDirections()[ elementHigh] * sensor_ranges[elementHigh];
-                         std::cout << " Method = " << method << ", elementLow, elementHigh = " << elementLow << ", " << elementHigh << " Coordinates Low, High = " << pLow << ", " << pHigh << std::endl;
-                 }
-                
-                
-                
+                          if (determineDepthConfidence)
+                                  measuredProperties[iList].confidenceRectangleDepth = ed::tracking::determineSegmentConfidence ( scan, elementLow, elementHigh);
+                         
+//                          std::cout << "determineWidthConfidence = " << determineWidthConfidence << ", determineDepthConfidence = " << determineDepthConfidence << std::endl;
+//                          geo::Vector3 pLow = sensor_pose*lrf_model_.rayDirections()[ elementLow] * sensor_ranges[elementLow];
+//                          geo::Vector3 pHigh = sensor_pose*lrf_model_.rayDirections()[ elementHigh] * sensor_ranges[elementHigh];
+//                          std::cout << " Method = " << method << ", elementLow, elementHigh = " << elementLow << ", " << elementHigh << " Coordinates Low, High = " << pLow << ", " << pHigh << std::endl;
+                  }    
         }
 
-        if( method == ed::tracking::RECTANGLE )
-        {
-                // For width-information
-                elementLow = associatedPointsInfo[iList].laserIDs[0];
-                elementHigh = associatedPointsInfo[iList].laserIDs[0] + cornerIndex;
-                
-                 geo::Quaternion sensorQuaternion  = sensor_pose.getQuaternion();
-                 tf::Quaternion q ( sensorQuaternion.getX(), sensorQuaternion.getY(), sensorQuaternion.getZ(), sensorQuaternion.getW() );
-                 tf::Matrix3x3 m ( q );
-                 double LRF_roll, LRF_pitch, LRF_yaw;
-                 m.getRPY ( LRF_roll, LRF_pitch, LRF_yaw );
-                 
-                 std::cout << " LRF_yaw, lrf_model_.getAngleMin(),  lrf_model_.getAngleIncrement(), elementHigh, elementLow = " ;
-                 std::cout << LRF_yaw << ", " << lrf_model_.getAngleMin() << ", " << lrf_model_.getAngleIncrement()<< " , " << elementHigh << ", " << elementLow << std::endl;
-                 
-                 float avgAngle = 0.0;
-                 for(unsigned int iiAssPoints = elementLow; iiAssPoints < elementHigh; iiAssPoints++)
-                 {
-                         avgAngle +=  LRF_yaw + lrf_model_.getAngleMin() + lrf_model_.getAngleIncrement()*iiAssPoints;
-                 }
-                       
-                 avgAngle /= (elementHigh - elementLow);
-                 ed::tracking::unwrap (&avgAngle, rectangle.get_yaw());
-                 
-                 std::cout << termcolor::magenta << "avgAngle = " << avgAngle << ", yaw = " <<rectangle.get_yaw() << " diff = " ;
-                 std::cout << std::fabs(rectangle.get_yaw() - avgAngle) << " margin = " << ANGLE_MARGIN_FITTING <<  termcolor::reset << std::endl;
-                 
-                 std::cout << termcolor::magenta << "avgAngle = " << avgAngle << ", yaw = " <<rectangle.get_yaw() << termcolor::reset << std::endl;
-                 
-                 if (std::fabs(rectangle.get_yaw() - avgAngle) < ANGLE_MARGIN_FITTING)
-                 {
-                         std::cout << "Statement = true"  << std::endl;
-                         measuredProperties[iList].confidenceRectangleWidth = false;
-                 }
-                 else
-                 {
-                         std::cout << "Statement = false"  << std::endl;
-                         measuredProperties[iList].confidenceRectangleWidth = ed::tracking::determineSegmentConfidence ( scan, elementLow, elementHigh);
-                         
-                         geo::Vector3 pLow = sensor_pose*lrf_model_.rayDirections()[ elementLow] * sensor_ranges[elementLow];
-                         geo::Vector3 pHigh = sensor_pose*lrf_model_.rayDirections()[ elementHigh] * sensor_ranges[elementHigh];
-                         std::cout << " Method = " << method << ", elementLow, elementHigh = " << elementLow << ", " << elementHigh << " Coordinates Low, High = " << pLow << ", " << pHigh << std::endl;
-                 }
-                
-                // For depth information
-                elementLow = elementHigh; // cause corner belongs to both points. TODO what if the corner is occluded? Does this automatically lead to low confidences? -> TEST
-                elementHigh = associatedPointsInfo[iList].laserIDs.back();
-                
-                 avgAngle = 0.0;
-                 for(unsigned int iiAssPoints = elementLow; iiAssPoints < elementHigh; iiAssPoints++)
-                 {
-                         avgAngle +=  LRF_yaw + lrf_model_.getAngleMin() + lrf_model_.getAngleIncrement()*iiAssPoints;
-                 }
-                       
-                 avgAngle /= (elementHigh - elementLow);
-                 ed::tracking::unwrap (&avgAngle, rectangle.get_yaw()); // TODO set correct reference angle! just add pi/2 should suffice?
-                 
-                 if (std::fabs(rectangle.get_yaw() - avgAngle) < ANGLE_MARGIN_FITTING)
-                 {
-                         std::cout << "Statement = true"  << std::endl;
-                         measuredProperties[iList].confidenceRectangleDepth = false;
-                 }
-                 else
-                 {
-                         std::cout << "For determining confidence of depth: " << std::endl;
-                         measuredProperties[iList].confidenceRectangleDepth = ed::tracking::determineSegmentConfidence ( scan, elementLow, elementHigh);    
-                 }
-//                 pLow = sensor_pose*lrf_model_.rayDirections()[ elementLow] * sensor_ranges[elementLow];
-//                 pHigh = sensor_pose*lrf_model_.rayDirections()[ elementHigh] * sensor_ranges[elementHigh];
-//                 std::cout << " Method = " << method << ", elementLow, elementHigh = " << elementLow << ", " << elementHigh << " Coordinates Low, High = " << pLow << ", " << pHigh << std::endl;
-        }
+
+//         if( method == ed::tracking::RECTANGLE )
+//         {
+//                 // For width-information
+//                 elementLow = associatedPointsInfo[iList].laserIDs[0];
+//                 elementHigh = associatedPointsInfo[iList].laserIDs[0] + cornerIndex;
+//                 
+//                  
+//                  std::cout << " LRF_yaw, lrf_model_.getAngleMin(),  lrf_model_.getAngleIncrement(), elementHigh, elementLow = " ;
+//                  std::cout << LRF_yaw << ", " << lrf_model_.getAngleMin() << ", " << lrf_model_.getAngleIncrement()<< " , " << elementHigh << ", " << elementLow << std::endl;
+//                  
+//                  float avgAngle = 0.0;
+//                  for(unsigned int iiAssPoints = elementLow; iiAssPoints < elementHigh; iiAssPoints++)
+//                  {
+//                          avgAngle +=  LRF_yaw + lrf_model_.getAngleMin() + lrf_model_.getAngleIncrement()*iiAssPoints;
+//                  }
+//                        
+//                  avgAngle /= (elementHigh - elementLow);
+//                  ed::tracking::unwrap (&avgAngle, rectangle.get_yaw(), M_PI);
+//                  
+// //                  std::cout << termcolor::magenta << "avgAngle = " << avgAngle << ", yaw = " <<rectangle.get_yaw() << " diff = " ;
+// //                  std::cout << std::fabs(rectangle.get_yaw() - avgAngle) << " margin = " << ANGLE_MARGIN_FITTING <<  termcolor::reset << std::endl;           
+// //                  std::cout << termcolor::magenta << "avgAngle = " << avgAngle << ", yaw = " <<rectangle.get_yaw() << termcolor::reset << std::endl;
+//                  
+//                  if (std::fabs(rectangle.get_yaw() - avgAngle) < ANGLE_MARGIN_FITTING)
+//                  {
+//                          std::cout << "Statement = true"  << std::endl;
+//                          measuredProperties[iList].confidenceRectangleWidth = false;
+//                  }
+//                  else
+//                  {
+//                          std::cout << "Statement = false"  << std::endl;
+//                          measuredProperties[iList].confidenceRectangleWidth = ed::tracking::determineSegmentConfidence ( scan, elementLow, elementHigh);
+//                          
+// //                          geo::Vector3 pLow = sensor_pose*lrf_model_.rayDirections()[ elementLow] * sensor_ranges[elementLow];
+// //                          geo::Vector3 pHigh = sensor_pose*lrf_model_.rayDirections()[ elementHigh] * sensor_ranges[elementHigh];
+// //                          std::cout << " Method = " << method << ", elementLow, elementHigh = " << elementLow << ", " << elementHigh << " Coordinates Low, High = " << pLow << ", " << pHigh << std::endl;
+//                  }
+//                 
+//                 // For depth information
+//                 elementLow = elementHigh; // cause corner belongs to both points. TODO what if the corner is occluded? Does this automatically lead to low confidences? -> TEST
+//                 elementHigh = associatedPointsInfo[iList].laserIDs.back();
+//                 
+//                  avgAngle = 0.0;
+//                  for(unsigned int iiAssPoints = elementLow; iiAssPoints < elementHigh; iiAssPoints++)
+//                  {
+//                          avgAngle +=  LRF_yaw + lrf_model_.getAngleMin() + lrf_model_.getAngleIncrement()*iiAssPoints;
+//                  }
+//                        
+//                  avgAngle /= (elementHigh - elementLow);
+//                  ed::tracking::unwrap (&avgAngle, rectangle.get_yaw() + M_PI_2, M_PI);
+//                  
+// //                  std::cout << termcolor::magenta << "avgAngle = " << avgAngle << ", yaw = " <<rectangle.get_yaw() << " diff = " ;
+// //                  std::cout << std::fabs(rectangle.get_yaw() - avgAngle) << " margin = " << ANGLE_MARGIN_FITTING <<  termcolor::reset << std::endl;           
+// //                  std::cout << termcolor::magenta << "avgAngle = " << avgAngle << ", yaw = " <<rectangle.get_yaw() << termcolor::reset << std::endl;
+//                  
+//                  if (std::fabs(rectangle.get_yaw() - avgAngle) < ANGLE_MARGIN_FITTING)
+//                  {
+//                          std::cout << "Statement = true"  << std::endl;
+//                          measuredProperties[iList].confidenceRectangleDepth = false;
+//                  }
+//                  else
+//                  {
+//                          std::cout << "For determining confidence of depth: " << std::endl;
+//                          measuredProperties[iList].confidenceRectangleDepth = ed::tracking::determineSegmentConfidence ( scan, elementLow, elementHigh);    
+//                  }
+// //                 pLow = sensor_pose*lrf_model_.rayDirections()[ elementLow] * sensor_ranges[elementLow];
+// //                 pHigh = sensor_pose*lrf_model_.rayDirections()[ elementHigh] * sensor_ranges[elementHigh];
+// //                 std::cout << " Method = " << method << ", elementLow, elementHigh = " << elementLow << ", " << elementHigh << " Coordinates Low, High = " << pLow << ", " << pHigh << std::endl;
+//         }
         
         ed::tracking::FeatureProbabilities prob;
         if ( prob.setMeasurementProbabilities ( error_rectangle2, error_circle2, 2*circle.get_radius() , nominal_corridor_width_ ) )
@@ -1493,10 +1696,10 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
             if ( rectangle.get_x() != rectangle.get_x() )
             {
                 ROS_WARN ( "Rectangle: invalid properties set" );
-                rectangle.printValues();
-                std::cout << "Prob = " << prob.get_pCircle() << ", " << prob.get_pRectangle() << std::endl;
-                std::cout << "Method = " << method << std::endl;
-                std::cout << "Errors = " << error_rectangle2 << ", " << error_circle2 << std::endl;
+//                 rectangle.printValues();
+//                 std::cout << "Prob = " << prob.get_pCircle() << ", " << prob.get_pRectangle() << std::endl;
+//                 std::cout << "Method = " << method << std::endl;
+//                 std::cout << "Errors = " << error_rectangle2 << ", " << error_circle2 << std::endl;
             }
 
             measuredProperties[iList].featureProperty =  properties ;
@@ -1559,7 +1762,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
         if ( iProperties < it_laserEntities.size() )
         {
             const ed::EntityConstPtr& e = * ( it_laserEntities[iProperties] );
-            std::cout << "Going to update entity " << e->id() << std::endl;
+//             std::cout << "Going to update entity " << e->id() << std::endl;
 
             // check if new properties are measured.
             bool check1 = measuredProperty.getCircle().get_radius() != measuredProperty.getCircle().get_radius();
@@ -1621,10 +1824,11 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                         RmRectangle( 4, 4 ) = largeCovariance;
                 } 
                 
-                std::cout << "For entity " << termcolor::blue << e->id() << termcolor::reset << " confidenceRectangleWidth, depth, circle = " <<
-                measuredProperties[iProperties].confidenceRectangleWidth << 
-                measuredProperties[iProperties].confidenceRectangleDepth << 
-                measuredProperties[iProperties].confidenceCircle << std::endl;
+                std::cout << "For entity " << termcolor::blue << e->id() << termcolor::reset << std::endl;
+//                 std::cout << "For entity " << termcolor::blue << e->id() << termcolor::reset << " confidenceRectangleWidth, depth, circle = " <<
+//                 measuredProperties[iProperties].confidenceRectangleWidth << 
+//                 measuredProperties[iProperties].confidenceRectangleDepth << 
+//                 measuredProperties[iProperties].confidenceCircle << std::endl;
                 
 //                 std::cout << " QmRectangle = " << QmRectangle << std::endl;
                 
@@ -1641,11 +1845,11 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                 measuredProperty.getRectangle().get_d();
                
                 
-                std::cout << "Entity Properties" << std::endl;
-                entityRectangle.printValues();
+//                 std::cout << "Entity Properties" << std::endl;
+//                 entityRectangle.printValues();
                 
-                std::cout << "Measured Properties" << std::endl;
-                measuredProperty.getRectangle().printValues();
+//                 std::cout << "Measured Properties" << std::endl;
+//                 measuredProperty.getRectangle().printValues();
                 
 //                 std::cout << "Deltas = " << deltaWidth << ", " << deltaDepth << ", " << deltaX << ", " << deltaY << ", " << thetaPred << std::endl;
                 
