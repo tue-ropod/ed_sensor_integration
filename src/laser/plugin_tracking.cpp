@@ -1178,6 +1178,13 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
         unsigned int IDtoCheck = IDs[0];
         unsigned int firstElement = 0;
         bool previousSegmentAssociated = false;
+        
+//         std::cout << "possibleSegmentEntityAssociations = " << std::endl;
+//         for (unsigned int iTest = 0; iTest < possibleSegmentEntityAssociations.size(); iTest++)
+//         {
+//                 std::cout << possibleSegmentEntityAssociations[iTest] << "\t" << std::endl;
+//         }
+//         std::cout << "\n";
 
         // check groups of segments associated to a specific entity
         for ( unsigned int iDistances = 1; iDistances < distances.size(); iDistances++ )
@@ -1186,17 +1193,24 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
             std::cout << "Debug 13.13 \t";
             if ( IDs[iDistances] == IDtoCheck && iDistances != distances.size() - 1 ) // ID similar and not at final reading, check if next element is similar or not
             {
+                    if( DEBUG )
+                    std::cout << "Debug 13.13.0 \t";
                 continue;
             }
+            
+            if( DEBUG )
+            std::cout << "Debug 13.13.1 \t";
 
             unsigned int length = iDistances - firstElement;
            // bool test = length < min_segment_size_pixels_ ;
 
             if ( length >= min_segment_size_pixels_ )
             {
-                        if( DEBUG )
+// //                         if( DEBUG )
             std::cout << "Debug 13.14 \t";
                 float minDistance = distances[firstElement];
+                if( DEBUG )
+                std::cout << "Debug 13.14.0 \t";
                 for ( unsigned int iiDistances = 1; iiDistances < iDistances; iiDistances++ )
                 {
                     if ( distances[iiDistances] < minDistance )
@@ -1205,55 +1219,78 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                     }
                 }
                 
+                if( DEBUG )
+                std::cout << "Debug 13.14.1 \t";
+                
 //                 std::cout << "Debug 13.15 \t";
                 bool associated = minDistance < MIN_ASSOCIATION_DISTANCE;
                 
-                std::cout << "associated, previousSegmentAssociated" << associated << previousSegmentAssociated << std::endl;
+//                 std::cout << "associated, previousSegmentAssociated, firstElement" << associated << previousSegmentAssociated << firstElement<< std::endl;
                 
                 if( associated && !previousSegmentAssociated && firstElement > 0 ) // check for possibility to reassociate previous section
                 {
-//                         std::cout << "Debug 13.16 \t";
+                        if( DEBUG )
+                        std::cout << "Debug 13.16 \t";
                          geo::Vec2f lastPointPreviousSegment = points[firstElement - 1];
-//                          std::cout << "Debug 13.17 \t";
+                         if( DEBUG )
+                         std::cout << "Debug 13.17 \t";
                         geo::Vec2f firstPointCurrentSegment = points[firstElement];
-//                         std::cout << "Debug 13.18 \t";
+                        if( DEBUG )
+                        std::cout << "Debug 13.18 \t";
                         float interSegmentDistance = std::sqrt( std::pow(lastPointPreviousSegment.x-firstPointCurrentSegment.x, 2.0) + std::pow(lastPointPreviousSegment.y-firstPointCurrentSegment.y, 2.0) );
+
+//                         std::cout << termcolor::cyan << "Try to reassociate previous section: interSegmentDistance = " << interSegmentDistance << termcolor::reset << std::endl;;
                         
-                        std::cout << termcolor::cyan << "Try to reassociate previous section: interSegmentDistance = " << interSegmentDistance << termcolor::reset << std::endl;;
-                        
-                        std::cout << "Points.size() = " << points.size() << " firstElement = " << firstElement << " lastPointPreviousSegment = " << lastPointPreviousSegment;
+//                         std::cout << "Points.size() = " << points.size() << " firstElement = " << firstElement << " lastPointPreviousSegment = " << lastPointPreviousSegment;
 //                         std::cout << " firstPointCurrentSegment = " << firstPointCurrentSegment << " Test = " << associatedPointsInfo.back().points.back() << std::endl;
                         
-                        std::cout << "Points = " << std::endl;
-                        for(unsigned int iPointsPrint = 0; iPointsPrint < points.size(); iPointsPrint++)
-                        {
-                                std::cout << points[iPointsPrint] << "\t";
-                        }
-                        std::cout << "\n";
+//                         std::cout << "Points = " << std::endl;
+//                         for(unsigned int iPointsPrint = 0; iPointsPrint < points.size(); iPointsPrint++)
+//                         {
+//                                 std::cout << points[iPointsPrint] << "\t";
+//                         }
+//                         std::cout << "\n";
                         
                         if( interSegmentDistance < MIN_ASSOCIATION_DISTANCE_SEGMENTS)  // reassociate previous section
                         {
                                 
-                                std::cout << termcolor::cyan << "reassociate previous section" << termcolor::reset << std::endl;;
+//                                 std::cout << termcolor::cyan << "reassociate previous section" << termcolor::reset << std::endl;;
                                 
 //                                 std::cout << "Debug 13.19 \t";
                                 previousSegmentAssociated = true;
+//                                 std::cout << "Debug 13.19.1 \t";
                                 unsigned int previousID = IDs[iDistances - 1];
 //                                 std::cout << "Debug 13.20 \t";
                                 
                                 const ed::EntityConstPtr& e1 = *it_laserEntities[ possibleSegmentEntityAssociations[IDtoCheck] ];
                                 const ed::EntityConstPtr& e2 = *it_laserEntities[ possibleSegmentEntityAssociations[previousID] ];                                                                
-                                std::cout << "Entity IDs = " << e1->id() << ", " << e2->id() << std::endl;
+//                                 std::cout << "Entity IDs = " << e1->id() << ", " << e2->id() << std::endl;
                                 
                                 append(associatedPointsInfo.at ( possibleSegmentEntityAssociations[IDtoCheck] ).points, associatedPointsInfo.back().points);
                                 append(associatedPointsInfo.at ( possibleSegmentEntityAssociations[IDtoCheck] ).laserIDs, associatedPointsInfo.back().laserIDs);
 //                                 std::cout << "Debug 13.21 \t";
-                                associatedPointsInfo.erase ( associatedPointsInfo.end() );
+                                
+                                
+                                if( associatedPointsInfo.size() > it_laserEntities.size() ) // Unassociated points were added
+                                {
+                                        associatedPointsInfo.erase ( associatedPointsInfo.end() );
+//                                                                 std::cout << "Debug 13.22 \t";
+//                                                                 std::cout << termcolor::magenta << "associatedPointsInfo.erase ( associatedPointsInfo.end() )" << termcolor::reset << std::endl;
+                                }
+                                else // keep the possibility to associate points to a specific entity
+                                {
+                                        associatedPointsInfo.at ( possibleSegmentEntityAssociations[IDtoCheck] ).points.clear();
+                                        associatedPointsInfo.at ( possibleSegmentEntityAssociations[IDtoCheck] ).laserIDs.clear();
+                                }
+                                
                         }        
-                        
+//                          std::cout << "Debug 13.23 \t";
                      
                 }
                 
+//             std::cout << "Debug 13.18.1 \t";
+//             std::cout << "2: associated, previousSegmentAssociated" << associated << previousSegmentAssociated << std::endl;
+            
                 if ( !associated && previousSegmentAssociated) 
                 {
 //                         std::cout << "Debug 13.22 \t";
@@ -1265,12 +1302,15 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                         
                         float interSegmentDistance = std::sqrt( std::pow(lastPointPreviousSegment.x-firstPointCurrentSegment.x, 2.0) + std::pow(lastPointPreviousSegment.y-firstPointCurrentSegment.y, 2.0) );
                         
-                        std::cout << "!associated && previousSegmentAssociated: interSegmentDistance = " << interSegmentDistance << std::endl;
+//                         std::cout << "!associated && previousSegmentAssociated: interSegmentDistance = " << interSegmentDistance << std::endl;
                         
 //                         std::cout << "Debug 13.25 \t";
                         if( interSegmentDistance < MIN_ASSOCIATION_DISTANCE_SEGMENTS)
                         {
 //                                 std::cout << "Debug 13.26 \t";
+                                
+//                                 std::cout << "associated set to true in --!associated && previousSegmentAssociated-- -section"  << std::endl;
+                                
                                 associated = true;
                                 unsigned int previousID = IDs[iDistances - 1];
 //                                 std::cout << "Debug 13.27 \t";
@@ -1278,18 +1318,24 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                         }           
                 }
 
+//                 std::cout << "Debug 13.18.2 \t";
+//                 std::cout << "3: associated, previousSegmentAssociated" << associated << previousSegmentAssociated << std::endl;
                 if ( associated )  // add all points to associated entity
                 {
                         previousSegmentAssociated = true;
-                            if( DEBUG )
-            std::cout << "Debug 13.15 \t";
+//                             if( DEBUG )
+//             std::cout << "Debug 13.15 \t";
 //                     const ed::EntityConstPtr& entityToTest = *it_laserEntities[ possibleSegmentEntityAssociations[IDtoCheck] ];
 //             std::cout << "iDistances = " << iDistances << " points.size() = " << points.size() << " segmentIDs.size() = " << segmentIDs.size() << std::endl;
+//             std::cout << "IDtoCheck = " << IDtoCheck << " firstElement = " << firstElement << " iDistances = " << iDistances << std::endl;
+//             std::cout << "associatedPointsInfo.size() = " << associatedPointsInfo.size() << ", possibleSegmentEntityAssociations.size() = " << possibleSegmentEntityAssociations.size() << std::endl;
+//             std::cout << "possibleSegmentEntityAssociations[IDtoCheck] = " << possibleSegmentEntityAssociations[IDtoCheck] << std::endl;
             
             append( associatedPointsInfo.at ( possibleSegmentEntityAssociations[IDtoCheck] ).points, points, firstElement, iDistances );
+//             std::cout << "Debug 13.15.0 \t";
             append( associatedPointsInfo.at ( possibleSegmentEntityAssociations[IDtoCheck] ).laserIDs, segmentIDs, firstElement, iDistances );
             
-            
+//              std::cout << "Debug 13.15.1 \t";
 //                     for ( unsigned int i_points = firstElement; i_points <= iDistances; ++i_points )
 //                     {
 // //                             std::cout << "points[i_points] = " << points[i_points] << " segmentIDs[i_points] = " << segmentIDs[i_points] << std::endl;
@@ -1300,8 +1346,8 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                 }
                 else
                 {
-                            if( DEBUG )
-            std::cout << "Debug 13.16 \t";
+//                             if( DEBUG )
+//             std::cout << "Debug 13.16 \t";
 //                     pointsNotAssociated.clear();
             
             previousSegmentAssociated = false;
@@ -1314,6 +1360,8 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                     }
 //                     associatedPointsList.push_back ( pointsNotAssociated );
                         associatedPointsInfo.push_back ( pointsNotAssociated );
+                        
+//                         std::cout << termcolor::magenta << "AssociatedPointsInfo extended" << termcolor::reset << std::endl;
                 }
             }
             
