@@ -1731,7 +1731,15 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
 // //                 pHigh = sensor_pose*lrf_model_.rayDirections()[ elementHigh] * sensor_ranges[elementHigh];
 // //                 std::cout << " Method = " << method << ", elementLow, elementHigh = " << elementLow << ", " << elementHigh << " Coordinates Low, High = " << pLow << ", " << pHigh << std::endl;
 //         }
-        
+
+
+//          measuredProperties[iList];
+//          
+//          if( iList < it_laserEntities.size() )
+//             {
+//                 const ed::EntityConstPtr& e = *it_laserEntities[ iList ];
+//             }
+         
         ed::tracking::FeatureProbabilities prob;
         if ( prob.setMeasurementProbabilities ( error_rectangle2, error_circle2, 2*circle.get_radius() , nominal_corridor_width_ ) )
         {
@@ -1859,6 +1867,9 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                 QmRectangle.diagonal() << Q, Q, Q, Q, Q, Q, Q, Q;
                 RmRectangle.diagonal() << R, R, R, R, R;
                 
+                std::cout << "Confidence width = " << measuredProperties[iProperties].confidenceRectangleWidth << ", confidence depth = " << measuredProperties[iProperties].confidenceRectangleDepth << std::endl;
+                
+                
                 // TODO what to do with position information if there is low confidence in with and depth? Position information should be updated with respect to an anchor point!
                 if( measuredProperties[iProperties].confidenceRectangleWidth == false )
                 {
@@ -1914,8 +1925,19 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                 
                 if( DEBUG )
                         std::cout << "Test 4 \t";
+                
+                
+                std::cout << "Before update: " << std::endl;
+                entityProperties.rectangle_.printValues();
+                
                 entityProperties.updateRectangleFeatures(QmRectangle, RmRectangle, zmRectangle, dt);
              
+                std::cout << "After update: " << std::endl;
+                entityProperties.rectangle_.printValues();
+                
+                std::cout << "Measurement: " << std::endl;
+                measuredProperty.rectangle_.printValues();
+                
                 // update circular properties
                 Eigen::MatrixXf QmCircle = Eigen::MatrixXf::Zero( 5, 5 );
                 Eigen::MatrixXf RmCircle = Eigen::MatrixXf::Zero( 3, 3 );
@@ -1985,19 +2007,14 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
         else
         {
             // create a new entity
-            // Generate unique ID
                 
+            // Generate unique ID
             id = ed::Entity::generateID().str() + "-laserTracking";
-          //  std::cout << "New entity created with ID = " << id  << "from scan with timestamp = " << scan->header.stamp.toSec() << ". Pos = " << measuredProperty.getRectangle().get_x() << ", " << measuredProperty.getRectangle().get_y() << std::endl;
-// ROS_WARN("New entity created"); std::cout << "ID of new entity = " << id << std::endl;
+            
             // Update existence probability
             existenceProbability = 1.0; // TODO magic number
             entityProperties = measuredProperty;
-            
-//             measuredProperty.getRectangle().printValues();
-//             measuredProperty.getCircle().printProperties();
-//             std::cout << "Probabilities = " << measuredProperty.getFeatureProbabilities().get_pCircle() << ", " << measuredProperty.getFeatureProbabilities().get_pRectangle() << std::endl;
-//             
+                     
             std::vector< bool > checks;
             checks.push_back( measuredProperty.getRectangle().get_x() != measuredProperty.getRectangle().get_x() );
             checks.push_back( measuredProperty.getRectangle().get_y() != measuredProperty.getRectangle().get_y() );
@@ -2022,7 +2039,6 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                 exit (EXIT_FAILURE);
             }
 
-//             std::cout << "For id = " << std::endl;
         }
         geo::Pose3D new_pose;
 
@@ -2030,30 +2046,16 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
         {
             // determine corners
             ed::tracking::Rectangle rectangle = entityProperties.getRectangle();
-//             std::cout << "For id = " << id << " properties are: " ; rectangle.printValues();
-            //   std::vector<geo::Vec2f> corners = entityProperties.getRectangle().determineCorners ( 0.0 );
             new_pose = rectangle.getPose();
         }
         else
         {
             // determine cilinder-properties
             ed::tracking::Circle circle = entityProperties.getCircle();
-//             std::cout << "For id = " << id << " properties are: " ;  circle.printProperties();
             new_pose = circle.getPose();
         }
 
         bool check = true;
-//         std::cout << "new_pose.t.getX() = " << new_pose.t.getX() << std::endl;
-//         std::cout << "new_pose.t.getZ() = " << new_pose.t.getZ() << std::endl;
-//         std::cout << "new_pose.t.getY() = " << new_pose.t.getY() << std::endl;
-//         std::cout << "entityProperties.getFeatureProbabilities().get_pCircle() = " << entityProperties.getFeatureProbabilities().get_pCircle() << std::endl;
-//         std::cout << "entityProperties.getFeatureProbabilities().get_pRectangle() = " << entityProperties.getFeatureProbabilities().get_pRectangle()  << std::endl;
-//         std::cout << "Checks = " << (new_pose.t.getX() != new_pose.t.getX() ) << " " <<
-//                 (new_pose.t.getZ() != new_pose.t.getZ() ) << " " <<
-//                 ( new_pose.t.getY() != new_pose.t.getY() ) << " " <<
-//                 ( entityProperties.getFeatureProbabilities().get_pCircle() != entityProperties.getFeatureProbabilities().get_pCircle() )  << " " <<
-//                 (entityProperties.getFeatureProbabilities().get_pRectangle() != entityProperties.getFeatureProbabilities().get_pRectangle()) << std::endl;
-        
         
         if ( new_pose.t.getX() != new_pose.t.getX() ||
                 new_pose.t.getZ() != new_pose.t.getZ() ||
@@ -2070,10 +2072,6 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
         {
             req.setProperty ( id, featureProperties_, entityProperties );
             req.setPose ( id, new_pose );
-//             std::cout << "Properties of ID = " << termcolor::blue << id << termcolor::reset <<  " are "  << std::endl;
-//             entityProperties.printProperties();
-            
-//             std::cout << "For entity " << id << " new pose = " << new_pose << std::endl;
 
             // Set timestamp
             req.setLastUpdateTimestamp ( id, scan->header.stamp.toSec() );
@@ -2082,65 +2080,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
     }
     
 //     ObjectMarkers_pub_.publish(markers);
-    // TODO: determine mobidik-properties somewhere else
-    
-    // Publish the fitted segments on the ObjectMarkers_pub_-topic // TODO: communicate via ED
-    //-------------------------------------------------------------------------------------
-/*     
-     for ( int ii = 0; ii < measuredProperties.size(); ii++ )
-    {
-        ed::tracking::FeatureProperties property = measuredProperties[ii];
-        bool possiblyMobidik = false;        
-        
-        if ( property.getFeatureProbabilities().get_pRectangle() > property.getFeatureProbabilities().get_pCircle() && // Dimension check
-                property.rectangle_.get_d() < MOBIDIK_WIDTH + MOBIDIK_MARGIN &&
-                property.rectangle_.get_w() < MOBIDIK_WIDTH + MOBIDIK_MARGIN &&
-                ( property.rectangle_.get_d() > MOBIDIK_WIDTH - MOBIDIK_MARGIN ||
-                  property.rectangle_.get_w() > MOBIDIK_WIDTH - MOBIDIK_MARGIN ) )
-        {
 
-            for ( ed::WorldModel::const_iterator it = world.begin(); it != world.end(); ++it )
-            {
-                const ed::EntityConstPtr& e = *it;
-
-                std::string MobiDikWaitingAreaID = "MobidikArea";
-
-                if ( e->id().str().length() < MobiDikWaitingAreaID.length() )
-                {
-                    continue;
-                }
-
-                if ( e->id().str().substr ( 0, MobiDikWaitingAreaID.length() ) == MobiDikWaitingAreaID )
-                {
-                        // It is assumed here that there is a navigation task, so only points on the ground are taken into consideration
-                        
-                        std::vector<geo::Vector3> points = e.get()->shape().get()->getMesh().getPoints();
-                        std::vector<geo::Vector3> groundPoints;
-                        const geo::Vec3T<double> pose = e.get()->pose().getOrigin();
-                        
-                        for(unsigned int iPoints = 0; iPoints < points.size(); iPoints++)
-                        {
-                                if(points[iPoints].getZ() == 0)
-                                {
-                                        groundPoints.push_back( points[iPoints] + pose );
-                                }
-                        }        
-                       geo::Vector3 mobidikPoint( property.getRectangle().get_x(), property.getRectangle().get_y(), property.getRectangle().get_z() );
-                       
-                    if( isInside( groundPoints, mobidikPoint) )
-                    {
-                        possiblyMobidik = true;
-                    }
-                }   
-            }
-        }
-        
-        visualization_msgs::Marker marker = getMarker ( property, ii, possiblyMobidik ); // TODO make an entity within ED of the object (correct data-association!!) and do a query via a plugin if objects of a certain type are required
-        markerArray.markers.push_back( marker );
-        
-    }
-    */
-    
 // - - - - - - - - - - - - - - - - -
 
     std::cout << "Total took " << t_total.getElapsedTimeInMilliSec() << " ms. \n\n\n" << std::endl;
