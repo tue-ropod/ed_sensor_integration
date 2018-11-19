@@ -69,7 +69,8 @@ struct measuredPropertyInfo
        bool confidenceRectangleDepth; 
        bool confidenceRectangleDepthLow;
        bool confidenceRectangleDepthHigh;
-       ed::tracking::FITTINGMETHOD methodRectangle; // 
+       ed::tracking::FITTINGMETHOD methodRectangle; //
+       std::vector<geo::Vec2f> measuredCorners;
 };
 
 visualization_msgs::Marker getMarker ( ed::tracking::FeatureProperties& featureProp, int ID) // TODO move to ed_rviz_plugins?
@@ -609,7 +610,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
 //     processedLaserPoints_pub_.publish( processedLRFScan );
 
     
-    if( DEBUG )
+//     if( DEBUG )
             std::cout << "Debug 2 \t";
 
     // - - - - - - - - - - - - - - - - - -
@@ -636,7 +637,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
 
     // - - - - - - - - - - - - - - - - - -
     // Fit the doors
-    if( DEBUG )
+//     if( DEBUG )
             std::cout << "Debug 3 \t";
     if (fit_entities_)
     {
@@ -686,7 +687,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
     }
     
 //     if( DEBUG )
-//             std::cout << "Debug 4 \t";
+            std::cout << "Debug 4 \t";
 
 //        // ############################## TEMP ############################
 // 
@@ -734,7 +735,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
     // Segment the remaining points into clusters
 
 //     if( DEBUG )
-//             std::cout << "Debug 5 \t";
+            std::cout << "Debug 5 \t";
     
     std::vector<ScanSegment> segments;
 
@@ -763,7 +764,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
     }
 
 //     if( DEBUG )
-//             std::cout << "Debug 7 \t";
+            std::cout << "Debug 7 \t";
     int gap_size = 0;
     std::vector<float> gapRanges;
 
@@ -1330,14 +1331,14 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                         previousSegmentAssociated = true;
 //                             if( DEBUG )
             std::cout << "Debug 13.15 \t";
-//                     const ed::EntityConstPtr& entityToTest = *it_laserEntities[ possibleSegmentEntityAssociations[IDtoCheck] ];
-//             std::cout << "iDistances = " << iDistances << " points.size() = " << points.size() << " segmentIDs.size() = " << segmentIDs.size() << std::endl;
-//             std::cout << "IDtoCheck = " << IDtoCheck << " firstElement = " << firstElement << " iDistances = " << iDistances << std::endl;
-//             std::cout << "associatedPointsInfo.size() = " << associatedPointsInfo.size() << ", possibleSegmentEntityAssociations.size() = " << possibleSegmentEntityAssociations.size() << std::endl;
-//             std::cout << "possibleSegmentEntityAssociations[IDtoCheck] = " << possibleSegmentEntityAssociations[IDtoCheck] << std::endl;
+                    const ed::EntityConstPtr& entityToTest = *it_laserEntities[ possibleSegmentEntityAssociations[IDtoCheck] ];
+            std::cout << "iDistances = " << iDistances << " points.size() = " << points.size() << " segmentIDs.size() = " << segmentIDs.size() << std::endl;
+            std::cout << "IDtoCheck = " << IDtoCheck << " firstElement = " << firstElement << " iDistances = " << iDistances << std::endl;
+            std::cout << "associatedPointsInfo.size() = " << associatedPointsInfo.size() << ", possibleSegmentEntityAssociations.size() = " << possibleSegmentEntityAssociations.size() << std::endl;
+            std::cout << "possibleSegmentEntityAssociations[IDtoCheck] = " << possibleSegmentEntityAssociations[IDtoCheck] << std::endl;
             
             append( associatedPointsInfo.at ( possibleSegmentEntityAssociations[IDtoCheck] ).points, points, firstElement, iDistances );
-//             std::cout << "Debug 13.15.0 \t";
+            std::cout << "Debug 13.15.0 \t";
             append( associatedPointsInfo.at ( possibleSegmentEntityAssociations[IDtoCheck] ).laserIDs, segmentIDs, firstElement, iDistances );
             
 //              std::cout << "Debug 13.15.1 \t";
@@ -1348,6 +1349,8 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
 //                         associatedPointsInfo.at ( possibleSegmentEntityAssociations[IDtoCheck] ).points.push_back ( points[i_points] );
 //                         associatedPointsInfo.at ( possibleSegmentEntityAssociations[IDtoCheck] ).laserIDs.push_back ( segmentIDs[i_points] );
 //                     }
+            
+            std::cout << "Debug 13.15.1 \t";
                 }
                 else
                 {
@@ -1530,23 +1533,35 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
         m.getRPY ( LRF_roll, LRF_pitch, LRF_yaw );
         
         
-        unsigned int elementLowWidth = 0, elementHighWidth = 0, elementLowDepth = 0, elementHighDepth = 0;
+        unsigned int IDLowWidth = 0, IDHighWidth = 0, IDLowDepth = 0, IDHighDepth = 0;
+        unsigned int PointIDLowWidth = 0, PointIDHighWidth = 0, PointIDLowDepth = 0, PointIDHighDepth = 0;
         
         if( method == ed::tracking::LINE )
         {       
-                elementLowWidth = associatedPointsInfo[iList].laserIDs[0];
-                elementHighWidth = associatedPointsInfo[iList].laserIDs.back();
+                IDLowWidth = associatedPointsInfo[iList].laserIDs[0];
+                IDHighWidth = associatedPointsInfo[iList].laserIDs.back();
+                
+                PointIDLowWidth = 0;
+                PointIDHighWidth = associatedPointsInfo[iList].laserIDs.size() - 1;
         }
         else if ( method == ed::tracking::RECTANGLE )
         {
                 // For width-information
-                elementLowWidth = associatedPointsInfo[iList].laserIDs[0];
-                elementHighWidth = associatedPointsInfo[iList].laserIDs[0] + cornerIndex;
+                IDLowWidth = associatedPointsInfo[iList].laserIDs[0];
+                IDHighWidth = associatedPointsInfo[iList].laserIDs[0] + cornerIndex;
+                
+                PointIDLowWidth = 0;
+                PointIDHighWidth = cornerIndex;
                 
                 // For depth information
-                elementLowDepth = elementHighWidth; // cause corner belongs to both points. TODO what if the corner is occluded? Does this automatically lead to low confidences? -> TEST
-                elementHighDepth = associatedPointsInfo[iList].laserIDs.back();
+                IDLowDepth = IDHighWidth; // cause corner belongs to both points. TODO what if the corner is occluded? Does this automatically lead to low confidences? -> TEST
+                IDHighDepth = associatedPointsInfo[iList].laserIDs.back();
+                
+                PointIDLowDepth = cornerIndex;
+                PointIDHighDepth = associatedPointsInfo[iList].laserIDs.size() - 1;
         }
+        
+        std::cout << " IDLowWidth = " << IDLowWidth << " IDHighWidth = " << IDHighWidth << " IDLowDepth = " << IDLowDepth << " IDHighDepth = " << IDHighDepth << std::endl;
         
         for(unsigned int iConfidence = 0; iConfidence < 2; iConfidence++) // Determine for both with and depth
         {
@@ -1555,15 +1570,18 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                 if(iConfidence == 0)
                 {
                         determineWidthConfidence = true;
-                        elementLow = elementLowWidth;
-                        elementHigh = elementHighWidth;
+                        elementLow = IDLowWidth;
+                        elementHigh = IDHighWidth;
+                        
+                        std::cout << " iConfidence = " << iConfidence << " elementLow = " << elementLow << " elementHigh = " << elementHigh << std::endl;
                 } 
                 
                 if(iConfidence == 1)
                 {
                         determineDepthConfidence = true;
-                        elementLow = elementLowDepth; // cause corner belongs to both points. TODO what if the corner is occluded? Does this automatically lead to low confidences? -> TEST
-                        elementHigh = elementHighDepth;
+                        elementLow = IDLowDepth; // cause corner belongs to both points. TODO what if the corner is occluded? Does this automatically lead to low confidences? -> TEST
+                        elementHigh = IDHighDepth;
+                        std::cout << " iConfidence = " << iConfidence << " elementLow = " << elementLow << " elementHigh = " << elementHigh << std::endl;
                 }
                 
 //                 std::cout << "elementLow = " << elementLow << ", elementHigh = " << elementHigh << ", determineWidthConfidence = " << determineWidthConfidence << ", determineDepthConfidence = " << determineDepthConfidence<< std::endl;
@@ -1591,56 +1609,6 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                           ed::tracking::unwrap (&avgAngle, rectangle.get_yaw() + M_PI_2, M_PI);
                  }
                  
-//                  if(determineWidthConfidence)
-//                   {
-//                  std::cout << termcolor::magenta << "avgAngle = " << avgAngle << ", yaw = " <<rectangle.get_yaw() << " diff = " ;
-//                  std::cout << std::fabs(rectangle.get_yaw() - avgAngle) << " margin = " << ANGLE_MARGIN_FITTING <<  termcolor::reset << std::endl;           
-//                   }
-//                  
-//                  if(determineDepthConfidence)
-//                   {
-//                  std::cout << termcolor::magenta << "avgAngle = " << avgAngle << ", yaw = " <<rectangle.get_yaw()+M_PI_2 << " diff = " ;
-//                  std::cout << std::fabs(rectangle.get_yaw() +M_PI_2 - avgAngle) << " margin = " << ANGLE_MARGIN_FITTING <<  termcolor::reset << std::endl;           
-//                   }
-                
-//                  if(determineWidthConfidence)
-//                  {
-//                           if (std::fabs(rectangle.get_yaw() - avgAngle) < ANGLE_MARGIN_FITTING)
-//                           {
-//                                   measuredProperties[iList].confidenceRectangleWidth = false;
-//                           }      
-//                           else
-//                           {
-//                                   measuredProperties[iList].confidenceRectangleWidth = ed::tracking::determineSegmentConfidence ( scan, elementLow, elementHigh);
-//                           }
-//                  }
-//                  
-//                  if(determineDepthConfidence)
-//                  {
-//                           if (std::fabs(rectangle.get_yaw() + M_PI_2 - avgAngle) < ANGLE_MARGIN_FITTING)
-//                           {
-//                                   measuredProperties[iList].confidenceRectangleDepth = false;
-//                           }       
-//                           else
-//                           {
-//                                   measuredProperties[iList].confidenceRectangleDepth = ed::tracking::determineSegmentConfidence ( scan, elementLow, elementHigh);
-//                           }
-//                  }
-                 
-//                  bool check1 = std::fabs(rectangle.get_yaw() - avgAngle) < ANGLE_MARGIN_FITTING;
-//                   bool check2 = std::fabs(rectangle.get_yaw() + M_PI_2 - avgAngle) < ANGLE_MARGIN_FITTING;
-//                   bool check3 = (check1 && determineWidthConfidence);
-//                   bool check4 = check2 && determineWidthConfidence;
-//                   bool check5 = check3 || check4;
-//                  
-//                  std::cout << "Checks = " << check1;
-//                  std::cout << determineWidthConfidence ;
-//                  std::cout << check2;
-//                  std::cout << determineDepthConfidence;
-//                  std::cout <<  check3;
-//                  std::cout << (std::fabs(rectangle.get_yaw() + M_PI_2 - avgAngle) < ANGLE_MARGIN_FITTING && determineDepthConfidence) ;
-//                  std::cout << (std::fabs(rectangle.get_yaw() - avgAngle) < ANGLE_MARGIN_FITTING && determineWidthConfidence) || (std::fabs(rectangle.get_yaw() + M_PI_2 - avgAngle) < ANGLE_MARGIN_FITTING && determineDepthConfidence) <<std::endl;
-                 
                  if ( (std::fabs(rectangle.get_yaw() - avgAngle) < ANGLE_MARGIN_FITTING && determineWidthConfidence) || (std::fabs(rectangle.get_yaw() + M_PI_2 - avgAngle) < ANGLE_MARGIN_FITTING && determineDepthConfidence) )
                  {
                          // Make sure you have a good view on the relevant side. If you are measuring almost parallel, the distance between points might be larger than the criterion, meaning you 
@@ -1651,6 +1619,14 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                                  measuredProperties[iList].confidenceRectangleWidth = false;
                                  measuredProperties[iList].confidenceRectangleWidthLow = false;
                                  measuredProperties[iList].confidenceRectangleWidthHigh = ed::tracking::determineCornerConfidence ( scan, elementHigh, false);
+                                 
+                                 
+                                 if( measuredProperties[iList].confidenceRectangleWidthHigh )
+                                 {
+                                         measuredProperties[iList].measuredCorners.push_back( associatedPointsInfo[iList].points[PointIDHighWidth] );  
+                                 }
+                                 
+                                                 PointIDLowWidth = 0;
                          }
                                  
                          if (determineDepthConfidence)
@@ -1658,6 +1634,11 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                                  measuredProperties[iList].confidenceRectangleDepth = false;
                                  measuredProperties[iList].confidenceRectangleDepthLow = ed::tracking::determineCornerConfidence ( scan, elementLow, true); 
                                  measuredProperties[iList].confidenceRectangleDepthHigh = false;
+                                 
+                                 if( measuredProperties[iList].confidenceRectangleDepthLow )
+                                 {
+                                         measuredProperties[iList].measuredCorners.push_back( associatedPointsInfo[iList].points[PointIDLowDepth] );  
+                                 }
                          }
                                  
                  }
@@ -1669,6 +1650,29 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                                  measuredProperties[iList].confidenceRectangleWidthLow = ed::tracking::determineCornerConfidence ( scan, elementLow, true);
                                  measuredProperties[iList].confidenceRectangleWidthHigh = ed::tracking::determineCornerConfidence ( scan, elementHigh, false); 
                                  measuredProperties[iList].confidenceRectangleWidth = (measuredProperties[iList].confidenceRectangleWidthLow && measuredProperties[iList].confidenceRectangleWidthHigh );
+                                 
+                                 if( measuredProperties[iList].confidenceRectangleWidthLow )
+                                 {
+                                         measuredProperties[iList].measuredCorners.push_back( associatedPointsInfo[iList].points[PointIDLowWidth] );  
+                                         std::cout << "Point added 0 = " << associatedPointsInfo[iList].points[PointIDLowWidth] << std::endl;
+                                 }
+                                 
+                                 if(  measuredProperties[iList].confidenceRectangleWidthHigh )
+                                 {
+                                         measuredProperties[iList].measuredCorners.push_back( associatedPointsInfo[iList].points[PointIDHighWidth] );  
+                                         std::cout << "Point added 1 = " << associatedPointsInfo[iList].points[PointIDHighWidth] << std::endl;
+                                         
+                                         std::cout << "associatedPointsInfo[iList].points.size() = " << associatedPointsInfo[iList].points.size() << ". PointIDHighWidth = " << PointIDHighWidth << " Points = " << std::endl;
+                                         
+                                         for(unsigned int iPointsTest = 0; iPointsTest < associatedPointsInfo[iList].points.size(); iPointsTest++)
+                                         {
+                                                std::cout << associatedPointsInfo[iList].points[iPointsTest] << "\t";
+                                         }
+                                         
+                                         
+                                         
+                                 }
+                                 
                          }
                          
                           if (determineDepthConfidence)
@@ -1676,93 +1680,21 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                                  measuredProperties[iList].confidenceRectangleDepthLow = ed::tracking::determineCornerConfidence ( scan, elementLow, true) ;
                                  measuredProperties[iList].confidenceRectangleDepthHigh = ed::tracking::determineCornerConfidence ( scan, elementHigh, false) ; 
                                  measuredProperties[iList].confidenceRectangleDepth = (measuredProperties[iList].confidenceRectangleDepthLow && measuredProperties[iList].confidenceRectangleDepthHigh );
+                                 
+                                 if( measuredProperties[iList].confidenceRectangleDepthLow )
+                                 {
+                                         measuredProperties[iList].measuredCorners.push_back( associatedPointsInfo[iList].points[PointIDLowDepth] );  
+                                         std::cout << "Point added 3 = " << associatedPointsInfo[iList].points[PointIDLowDepth] << std::endl;
+                                 }
+                                 
+                                 if(  measuredProperties[iList].confidenceRectangleDepthHigh )
+                                 {
+                                         measuredProperties[iList].measuredCorners.push_back( associatedPointsInfo[iList].points[PointIDHighDepth] );  
+                                         std::cout << "Point added 4 = " << associatedPointsInfo[iList].points[PointIDHighDepth] << std::endl;
+                                 }
                           }
-                         
-//                          std::cout << "determineWidthConfidence = " << determineWidthConfidence << ", determineDepthConfidence = " << determineDepthConfidence << std::endl;
-//                          geo::Vector3 pLow = sensor_pose*lrf_model_.rayDirections()[ elementLow] * sensor_ranges[elementLow];
-//                          geo::Vector3 pHigh = sensor_pose*lrf_model_.rayDirections()[ elementHigh] * sensor_ranges[elementHigh];
-//                          std::cout << " Method = " << method << ", elementLow, elementHigh = " << elementLow << ", " << elementHigh << " Coordinates Low, High = " << pLow << ", " << pHigh << std::endl;
                   }    
         }
-
-
-//         if( method == ed::tracking::RECTANGLE )
-//         {
-//                 // For width-information
-//                 elementLow = associatedPointsInfo[iList].laserIDs[0];
-//                 elementHigh = associatedPointsInfo[iList].laserIDs[0] + cornerIndex;
-//                 
-//                  
-//                  std::cout << " LRF_yaw, lrf_model_.getAngleMin(),  lrf_model_.getAngleIncrement(), elementHigh, elementLow = " ;
-//                  std::cout << LRF_yaw << ", " << lrf_model_.getAngleMin() << ", " << lrf_model_.getAngleIncrement()<< " , " << elementHigh << ", " << elementLow << std::endl;
-//                  
-//                  float avgAngle = 0.0;
-//                  for(unsigned int iiAssPoints = elementLow; iiAssPoints < elementHigh; iiAssPoints++)
-//                  {
-//                          avgAngle +=  LRF_yaw + lrf_model_.getAngleMin() + lrf_model_.getAngleIncrement()*iiAssPoints;
-//                  }
-//                        
-//                  avgAngle /= (elementHigh - elementLow);
-//                  ed::tracking::unwrap (&avgAngle, rectangle.get_yaw(), M_PI);
-//                  
-// //                  std::cout << termcolor::magenta << "avgAngle = " << avgAngle << ", yaw = " <<rectangle.get_yaw() << " diff = " ;
-// //                  std::cout << std::fabs(rectangle.get_yaw() - avgAngle) << " margin = " << ANGLE_MARGIN_FITTING <<  termcolor::reset << std::endl;           
-// //                  std::cout << termcolor::magenta << "avgAngle = " << avgAngle << ", yaw = " <<rectangle.get_yaw() << termcolor::reset << std::endl;
-//                  
-//                  if (std::fabs(rectangle.get_yaw() - avgAngle) < ANGLE_MARGIN_FITTING)
-//                  {
-//                          std::cout << "Statement = true"  << std::endl;
-//                          measuredProperties[iList].confidenceRectangleWidth = false;
-//                  }
-//                  else
-//                  {
-//                          std::cout << "Statement = false"  << std::endl;
-//                          measuredProperties[iList].confidenceRectangleWidth = ed::tracking::determineSegmentConfidence ( scan, elementLow, elementHigh);
-//                          
-// //                          geo::Vector3 pLow = sensor_pose*lrf_model_.rayDirections()[ elementLow] * sensor_ranges[elementLow];
-// //                          geo::Vector3 pHigh = sensor_pose*lrf_model_.rayDirections()[ elementHigh] * sensor_ranges[elementHigh];
-// //                          std::cout << " Method = " << method << ", elementLow, elementHigh = " << elementLow << ", " << elementHigh << " Coordinates Low, High = " << pLow << ", " << pHigh << std::endl;
-//                  }
-//                 
-//                 // For depth information
-//                 elementLow = elementHigh; // cause corner belongs to both points. TODO what if the corner is occluded? Does this automatically lead to low confidences? -> TEST
-//                 elementHigh = associatedPointsInfo[iList].laserIDs.back();
-//                 
-//                  avgAngle = 0.0;
-//                  for(unsigned int iiAssPoints = elementLow; iiAssPoints < elementHigh; iiAssPoints++)
-//                  {
-//                          avgAngle +=  LRF_yaw + lrf_model_.getAngleMin() + lrf_model_.getAngleIncrement()*iiAssPoints;
-//                  }
-//                        
-//                  avgAngle /= (elementHigh - elementLow);
-//                  ed::tracking::unwrap (&avgAngle, rectangle.get_yaw() + M_PI_2, M_PI);
-//                  
-// //                  std::cout << termcolor::magenta << "avgAngle = " << avgAngle << ", yaw = " <<rectangle.get_yaw() << " diff = " ;
-// //                  std::cout << std::fabs(rectangle.get_yaw() - avgAngle) << " margin = " << ANGLE_MARGIN_FITTING <<  termcolor::reset << std::endl;           
-// //                  std::cout << termcolor::magenta << "avgAngle = " << avgAngle << ", yaw = " <<rectangle.get_yaw() << termcolor::reset << std::endl;
-//                  
-//                  if (std::fabs(rectangle.get_yaw() - avgAngle) < ANGLE_MARGIN_FITTING)
-//                  {
-//                          std::cout << "Statement = true"  << std::endl;
-//                          measuredProperties[iList].confidenceRectangleDepth = false;
-//                  }
-//                  else
-//                  {
-//                          std::cout << "For determining confidence of depth: " << std::endl;
-//                          measuredProperties[iList].confidenceRectangleDepth = ed::tracking::determineSegmentConfidence ( scan, elementLow, elementHigh);    
-//                  }
-// //                 pLow = sensor_pose*lrf_model_.rayDirections()[ elementLow] * sensor_ranges[elementLow];
-// //                 pHigh = sensor_pose*lrf_model_.rayDirections()[ elementHigh] * sensor_ranges[elementHigh];
-// //                 std::cout << " Method = " << method << ", elementLow, elementHigh = " << elementLow << ", " << elementHigh << " Coordinates Low, High = " << pLow << ", " << pHigh << std::endl;
-//         }
-
-
-//          measuredProperties[iList];
-//          
-//          if( iList < it_laserEntities.size() )
-//             {
-//                 const ed::EntityConstPtr& e = *it_laserEntities[ iList ];
-//             }
          
         ed::tracking::FeatureProbabilities prob;
         if ( prob.setMeasurementProbabilities ( error_rectangle2, error_circle2, 2*circle.get_radius() , nominal_corridor_width_ ) )
@@ -1874,7 +1806,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                 ed::tracking::Rectangle entityRectangle = entityProperties.getRectangle();
                 ed::tracking::Circle entityCircle = entityProperties.getCircle();
                 
-                                std::cout << "For entity " << termcolor::blue << e->id() << termcolor::reset << std::endl;
+                std::cout << "For entity " << termcolor::blue << e->id() << termcolor::reset << std::endl;
                 
                 float Q = 0.1; // Measurement noise covariance. TODO: let it depend on if an object is partially occluded. Now, objects are assumed to be completely visible
                 float R = 0.2; // Process noise covariance
@@ -1917,295 +1849,193 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
 //                 }
 //                 
                 
-                
-                bool checkCornerConfidence = true;
-                
-                if (!measuredProperties[iProperties].confidenceRectangleWidthLow &&
-                    !measuredProperties[iProperties].confidenceRectangleDepthHigh && (
-                        !measuredProperties[iProperties].confidenceRectangleWidthHigh ||
-                        !measuredProperties[iProperties].confidenceRectangleDepthLow )
-                )
-                { // cornerpoints give are an accurate source of the position of an object, so make use of this property!
-                        checkCornerConfidence = false;
-                        
-                        // TODO Neighrest neighbour association of cornerpoints -> still necessary? 
-                }
-                
-//                 std::cout << "measuredProperties = " << 
-//                 measuredProperties[iProperties].confidenceRectangleWidthLow <<
-//                 measuredProperties[iProperties].confidenceRectangleWidthHigh <<
-//                 measuredProperties[iProperties].confidenceRectangleDepthLow <<
-//                 measuredProperties[iProperties].confidenceRectangleDepthHigh << std::endl;
-//                 
-//                 std::cout << "checkCornerConfidence = " << 
-//                 checkCornerConfidence << std::endl;
-                
-                
-                if(!checkCornerConfidence)
+                if( !measuredProperties[iProperties].confidenceRectangleWidth && !measuredProperties[iProperties].confidenceRectangleDepth )
                 {
-                        // TODO DEBUG
-                        // Measuring one side, but not the corners, gives accurate position information in one direction, namely the lateral direction of the 
-                        // width is always measured, as that is the first part in the measured properties
-                        
-                        float largePositionCovariance = 25.0; // TODO small covariance when the entity described does not reflect a part which is detected
-                        float smallPositionCovariance = Q;
-                        Eigen::MatrixXf C = Eigen::MatrixXf::Zero( 2, 2 ); // Covariance Matrix in the entity-coordinates
-                        C.diagonal() << largePositionCovariance, largePositionCovariance;
-                        
-//                         float xCorrected, yCorrected;
-                        
-                        
-                        // TODO update dimension(s) if there is proof -> part of front detected, part of side detected -> gives minimal size dimensions
-                        
-                        std::vector<geo::Vec2f> centerpointsOfEdges = measuredProperty.getRectangle().determineCenterpointsOfEdges ( ); // first 2 belong to the width, 2nd 2 belong to the depth
-                        std::vector<geo::Vec2f> corners = measuredProperty.getRectangle().determineCorners ( 0.0 );
-                        
-                        ed::tracking::Rectangle rectangleCorrected = measuredProperty.getRectangle();
-                        
-                        float rot = 0.0;
-                        if( entityProperties.getRectangle().get_yaw() == entityProperties.getRectangle().get_yaw() )
+                        // if there is uncertainty about the positions based on the dimensional check, first check if there are relevant features (corners!) which can give you a better estimation
+                         bool checkCornerConfidence;
+                        if( measuredProperties[iProperties].measuredCorners.size() > 0 )
                         {
-                                if( measuredProperty.getRectangle().get_yaw() != measuredProperty.getRectangle().get_yaw() )
-                                {
-                                        rot = entityProperties.getRectangle().get_yaw();
-                                }
-                                else
-                                {
-                                        rot = measuredProperty.getRectangle().get_yaw();
-                                }
+                                checkCornerConfidence = true;
                         }
+                        else
+                        {
+                                checkCornerConfidence = false;
+                        }
+                
+                
+                        // TODO Do we need to store all these features of the rectangles?
                         
-                        float angle = entityProperties.getRectangle().get_yaw(); //std::cout << "angle = " << angle << std::endl;
-//                         ed::tracking::wrap2Interval(&angle, -M_PI_2, M_PI_2); std::cout << "angle = " << angle << std::endl;
-                        float ct = cos( angle );
-                        float st = sin( angle );
+        //                 if (!measuredProperties[iProperties].confidenceRectangleWidthLow &&
+        //                     !measuredProperties[iProperties].confidenceRectangleDepthHigh && (
+        //                         !measuredProperties[iProperties].confidenceRectangleWidthHigh ||
+        //                         !measuredProperties[iProperties].confidenceRectangleDepthLow )
+        //                 )
+        //                 { // cornerpoints give are an accurate source of the position of an object, so make use of this property!
+        //                         
+        //                         
+        //                         // TODO Neighrest neighbour association of cornerpoints -> still necessary? 
+        //                 }
                         
-//                         if( !measuredProperties[iProperties].confidenceRectangleWidth )
-//                         {
+                        std::cout << "measuredProperties = " << 
+                        measuredProperties[iProperties].confidenceRectangleWidthLow <<
+                        measuredProperties[iProperties].confidenceRectangleWidthHigh <<
+                        measuredProperties[iProperties].confidenceRectangleDepthLow <<
+                        measuredProperties[iProperties].confidenceRectangleDepthHigh << std::endl;
+        //                 
+        //                 std::cout << "checkCornerConfidence = " << 
+        //                 checkCornerConfidence << std::endl;
+
+                        
+
+                        if( checkCornerConfidence ) // we did not observe the entire entity, but apparently we have reliable features which can be used to update the position
+                        {
+                                // check which measured corners are reliable -> what are their corresponding coordinates?
+                                // determine delta's for each reliable corner
+                                // take the average delta
+                                
+                                std::cout << "Update based on features -> cornerpoints" << std::endl;
+                                
+                                std::vector<geo::Vec2f> cornersMeasured = measuredProperties[iProperties].measuredCorners; // are those properties determined in the same order for the model as well as the measurement
+                                std::vector<geo::Vec2f> cornersModelled = entityProperties.getRectangle().determineCorners ( 0.0 );
+                                
+                                std::cout << "CornersMeasured = " << std::endl;
+                                for( unsigned int iPrint = 0; iPrint < cornersMeasured.size(); iPrint++ )
+                                {
+                                        std::cout << cornersMeasured[iPrint] << "\t";
+                                }
+                                std::cout << "\n";
+                                
+                                std::cout << "cornersModelled = " << std::endl;
+                                for( unsigned int iPrint = 0; iPrint < cornersModelled.size(); iPrint++ )
+                                {
+                                        std::cout << cornersModelled[iPrint] << "\t";
+                                }
+                                std::cout << "\n";
+                                
+                                float deltaX = 0.0, deltaY = 0.0;
+                                for(unsigned int iMeasured = 0; iMeasured < cornersMeasured.size(); iMeasured++)
+                                {
+                                        // for each corner which is measured, find the closest corner modelled
+                                        float smallestDistance2 = std::numeric_limits<float>::infinity();
+                                        unsigned int closestElement;
+                                        
+                                        for(unsigned int iModelled = 0; iModelled < cornersModelled.size(); iModelled++)
+                                        {
+                                                // find the clostes corner modelled
+                                                float dist2 = pow( cornersMeasured[iMeasured].x - cornersModelled[iModelled].x, 2.0) + pow( cornersMeasured[iMeasured].y - cornersModelled[iModelled].y, 2.0);
+                                                
+                                                if( dist2 < smallestDistance2 )
+                                                {
+                                                        smallestDistance2 = dist2;
+                                                        closestElement = iModelled;
+                                                }
+                                        }
+                                        
+                                        std::cout << "smallestDistance2 = " << smallestDistance2 << std::endl;
+                                        std::cout << "cornersMeasured[iMeasured] = " << cornersMeasured[iMeasured] << " cornersModelled[closestElement] = " << cornersModelled[closestElement] << std::endl;
+                                        
+                                        deltaX += cornersMeasured[iMeasured].x - cornersModelled[closestElement].x;
+                                        deltaY += cornersMeasured[iMeasured].y - cornersModelled[closestElement].y;
+                                        
+                                        std::cout << "In loop: deltaX, deltaY = " << deltaX << ", " << deltaY << std::endl;
+                                }
+                                
+                                deltaX /= cornersMeasured.size();
+                                deltaY /= cornersMeasured.size();
+                                
+                                std::cout << "deltaX, deltaY = " << deltaX << ", " << deltaY << std::endl;
+                                
+                                ed::tracking::Rectangle updatedRectangle = measuredProperty.getRectangle(); // TODO correct? Should we take measured dimensions into account? TEST
+                                
+                                std::cout << "Measured Properties = " << updatedRectangle.get_x() << ", "  << updatedRectangle.get_y() << std::endl;
+                                std::cout << "Meas. Properties +D = " << updatedRectangle.get_x() + deltaX << ", "  << updatedRectangle.get_y() + deltaY << std::endl;
+                                
+                                float updatedX = updatedRectangle.get_x() + deltaX;
+                                float updatedY = updatedRectangle.get_y() + deltaY;
+                                
+                                std::cout << "Meas. Properties up = " << updatedX << ", "  << updatedY << std::endl;
+                                
+                                updatedRectangle.set_x( updatedX );
+                                updatedRectangle.set_y( updatedY );
+                                
+                                measuredProperty.setRectangle( updatedRectangle );
+                                
+                                std::cout << "Updated Properties = " << updatedRectangle.get_x() << ", "  << updatedRectangle.get_y() << std::endl;
+                                
+                                std::vector< geo::Vec2f> updatedRectangleCorners = updatedRectangle.determineCorners( 0.0 );
+                                
+                                std::cout << "updatedRectangleCorners = ";
+                                for(unsigned int iTestCorners = 0; iTestCorners < updatedRectangleCorners.size(); iTestCorners++)
+                                {
+                                        std::cout << updatedRectangleCorners[iTestCorners];
+                                }
+                                std::cout << "\n" ;
+                                
+                                
+                        }
+
+                        
+                        
+                        if( !checkCornerConfidence ) // No corner information obtained, but from one or 2 sides of the entity relevant position information is obtained. Set the corresponding covariances
+                        {
+                                // TODO DEBUG
+                                // Measuring one side, but not the corners, gives accurate position information in one direction, namely the lateral direction of the 
+                                // width is always measured, as that is the first part in the measured properties
+                                
+                                std::cout << "Update based on position of sides" << std::endl;
+                                
+                                float largePositionCovariance = 25.0; // TODO small covariance when the entity described does not reflect a part which is detected
+                                float smallPositionCovariance = Q;
+                                Eigen::MatrixXf C = Eigen::MatrixXf::Zero( 2, 2 ); // Covariance Matrix in the entity-coordinates
+                                C.diagonal() << largePositionCovariance, largePositionCovariance;
+                                
+        //                         float xCorrected, yCorrected;
+                                
+                        
+                                
+        //                         std::vector<geo::Vec2f> centerpointsOfEdges = measuredProperty.getRectangle().determineCenterpointsOfEdges ( ); // first 2 belong to the width, 2nd 2 belong to the depth
+        //                         std::vector<geo::Vec2f> corners = measuredProperty.getRectangle().determineCorners ( 0.0 );
+                                
+        //                         ed::tracking::Rectangle rectangleCorrected = measuredProperty.getRectangle();
+                                
+                                float rot = 0.0;
+                                if( entityProperties.getRectangle().get_yaw() == entityProperties.getRectangle().get_yaw() )
+                                {
+                                        if( measuredProperty.getRectangle().get_yaw() != measuredProperty.getRectangle().get_yaw() )
+                                        {
+                                                rot = entityProperties.getRectangle().get_yaw();
+                                        }
+                                        else
+                                        {
+                                                rot = measuredProperty.getRectangle().get_yaw();
+                                        }
+                                }
+                                
+                                float angle = entityProperties.getRectangle().get_yaw(); //std::cout << "angle = " << angle << std::endl;
+        //                         ed::tracking::wrap2Interval(&angle, -M_PI_2, M_PI_2); std::cout << "angle = " << angle << std::endl;
+                                float ct = cos( angle );
+                                float st = sin( angle );
+                                
                                 // We have certainty about the y-coordinate in the entity-frame
                                 C( 1, 1) = smallPositionCovariance; // TODO right dim set??
+                                        
+                                if( measuredProperties[iProperties].methodRectangle == ed::tracking::RECTANGLE )
+                                {
+                                        C( 0, 0) = smallPositionCovariance;
+                                }
                                 
-//                                 // correct coordinate as well with the modelled depth
-// //                                 // First:which line is the closest one to the sensor?
-//                                 float dist0Squared = std::pow( sensor_pose.getOrigin().getX() - centerpointsOfEdges[0].x, 2.0 ) + std::pow( sensor_pose.getOrigin().getY() - centerpointsOfEdges[0].y, 2.0 );
-//                                 float dist1Squared = std::pow( sensor_pose.getOrigin().getX() - centerpointsOfEdges[1].x, 2.0 ) + std::pow( sensor_pose.getOrigin().getY() - centerpointsOfEdges[1].y, 2.0 );
-//                         
-//                                 geo::Vec2f centerPointWidth;
-//                                 if (dist0Squared < dist1Squared ) 
-//                                 {
-//                                         centerPointWidth = centerpointsOfEdges[0];
-//                                 }
-//                                 else
-//                                 {
-//                                         centerPointWidth = centerpointsOfEdges[1];
-//                                 }
-//                                 
-//                                 // check sign -> correction should be from the robot (sensor) away, as we detect the edge of an object. As a result of that, the center should be from the robot away
-//                                 float length = 0.5*entityProperties.getRectangle().get_d();
-//                                 float xCorrectedPosLength = centerPointWidth.x + ct*0 - st*length;
-//                                 float yCorrectedPosLength = centerPointWidth.y + st*0 + ct*length;
-// 
-//                                 length = -0.5*entityProperties.getRectangle().get_d();
-//                                 float xCorrectedNegLength = centerPointWidth.x + ct*0 - st*length;
-//                                 float yCorrectedNegLength = centerPointWidth.y + st*0 + ct*length;
-//                                 
-//                                 dist0Squared = std::pow( sensor_pose.getOrigin().getX() - xCorrectedPosLength, 2.0 ) + std::pow( sensor_pose.getOrigin().getY() - yCorrectedPosLength, 2.0 );
-//                                 dist1Squared = std::pow( sensor_pose.getOrigin().getX() - xCorrectedNegLength, 2.0 ) + std::pow( sensor_pose.getOrigin().getY() - yCorrectedNegLength, 2.0 );
-//                                 
-//                                 if (dist0Squared > dist1Squared ) 
-//                                 {
-//                                         xCorrected = xCorrectedPosLength;
-//                                         yCorrected = yCorrectedPosLength;
-//                                 }
-//                                 else
-//                                 {
-//                                         xCorrected = xCorrectedNegLength;
-//                                         yCorrected = yCorrectedNegLength;
-//                                 }
-//                                 
-//                                 rectangleCorrected.set_d( entityProperties.getRectangle().get_d() ); // To prevent double compensation during the filtering phase
-//                                                                 
-// //                                 std::cout << "Correction in 1 direction: centerPointWidth = " << centerPointWidth << " length = " << length << "x,yCorrected = " << xCorrected << ", " << yCorrected << std::endl;
-//                                 std::cout << "Measured Properties = " << std::endl; 
-//                                 measuredProperty.rectangle_.printValues();
-//                         }
-                                
-//                                 std::cout << "Method = " << measuredProperties[iProperties].methodRectangle << std::endl;
+                                // Give certainties in terms of the world frame
+                                Eigen::MatrixXf Rot = Eigen::MatrixXf::Zero( 2, 2 );
+                                Rot << std::cos( rot ), -std::sin( rot ),
+                                std::sin( rot ),  std::cos( rot);
                         
-                        // if depth information is obtained, do such an analysis as well
-//                         if( !measuredProperties[iProperties].confidenceRectangleDepth && measuredProperties[iProperties].methodRectangle == ed::tracking::RECTANGLE )
-                        if( measuredProperties[iProperties].methodRectangle == ed::tracking::RECTANGLE )
-                        {
-                                C( 0, 0) = smallPositionCovariance;
-                                // TODO correct coordinate as well with the modelled width
-                                
-                                // First, project the point on the line which represents the depth-line. This line is represented by the points corners[0] and corners[1] or corners[2] and corners[3].                                
-//                                 float dist = fabs ( (corners[2].y - corners[1].y)*xCorrected - (corners[2].x - corners[1].x)*yCorrected + corners[2].x*corners[1].y - corners[2].y* corners[1].x) / sqrt ( pow( corners[2].y - corners[1].y , 2.0) + pow( corners[2].x - corners[1].x, 2.0) ); // distance of a point to a line, see https://en.wikipedia.org/wiki/Distance_from_a_point_to_a_line
-                              /*  
-                                
-                                geo::Vec2f centerDepth1 = centerpointsOfEdges[2]; // TODO filter out centers of depth dimension -> why not via centerpointsOfEdges?
-                                geo::Vec2f centerDepth2 = centerpointsOfEdges[3];
-                                
-                                dist0Squared = std::pow( sensor_pose.getOrigin().getX() - centerDepth1.x, 2.0 ) + std::pow( sensor_pose.getOrigin().getY() - centerDepth1.y, 2.0 );
-                                dist1Squared = std::pow( sensor_pose.getOrigin().getX() - centerDepth2.x, 2.0 ) + std::pow( sensor_pose.getOrigin().getY() - centerDepth2.y, 2.0 );
-                                
-                                
-                               
-        
-//         geo::Vec2f originCorner ( x_ + ct* length + st* 0, y_ + st* length + ct*0 );
-                                
-                                
-                                // which line is the closest to the sensor?
-                                geo::Vec2f centerPointDepth;
-                                if( dist0Squared < dist1Squared )
-                                {
-                                        centerPointDepth = centerpointsOfEdges[2];
-                                }
-                                else
-                                {
-                                        centerPointDepth = centerpointsOfEdges[3];
-                                }
-                                
-                                 
-                                float rotWidth = measuredProperty.getRectangle().get_yaw ( ) + M_PI_4;
-                                float ct = cos ( rotWidth );
-                                float st = sin ( rotWidth );
-                                float length = 0.5*measuredProperty.getRectangle().get_d();
-                                
-                                float x1, x2, y1, y2, x3 = xCorrected, y3 = yCorrected;
-                                 x1 = centerPointDepth.x + ct* length + st* 0;
-                                 x2 = centerPointDepth.x + ct*-length + st* 0;
-                                 
-                                 y1 = centerPointDepth.y + st* length + ct*0;
-                                 y2 = centerPointDepth.y + st*-length + ct*0;
-                                 
-                                 
-                                 // TODO Measured properties -> measured positions change as a result of a partial measurement. Measured position goes a bit more inward!
-                                 // Where to take the modelled and the measured dimensions? What is the center position of the width and the depth? Take the modelled (predicted) ones as an initial guess?!
-                                 // The directions seem to be ok, but as it is based on the measurement, the wrong positions are estimated
-                                 // associations are ok, as a width and depth dimension is measured
-                                 
-                                        std::cout << "depthCenter = " << centerPointDepth << std::endl;
-                                        std::cout << "Points in depth dim = " << x1 << ", " << y1 << ", " << x2 << ", " << y2 << std::endl;
-                                        
-//                                          x1 = corners[3].x; x2 = corners[0].x; 
-//                                         y1 = corners[3].y; y2 = corners[0].y;
-//                                         std::cout << "Depth: line-points = " << corners[3] << corners[0] << std::endl;
-                                        
-                                        
-                                        
-                                
-                                std::cout << "After width update: x,yCorrected = " << xCorrected << ", " << yCorrected << std::endl;
-                                
-                                float factor = ((y2-y1) * (x3-x1) - (x2-x1) * (y3-y1)) / (pow(y2-y1, 2.0) + pow(x2-x1, 2.0)); // https://stackoverflow.com/questions/1811549/perpendicular-on-a-line-from-a-given-point
-                                xCorrected = x3 - factor * (y2-y1); // Now, x, y corrected is on the edge in the depth dimension. The position still need to be corrected in the width dimension.
-                                yCorrected = y3 + factor * (x2-x1);
-                                
-                                std::cout << "Point on line along depth dimension = " << xCorrected << ", " << yCorrected << std::endl;
-                                
-                                length = 0.5*entityProperties.getRectangle().get_w();
-                                float xCorrectedPosLength = centerPointWidth.x + ct*length - st*0;
-                                float yCorrectedPosLength = centerPointWidth.y + st*length + ct*0;
-
-                                length = -0.5*entityProperties.getRectangle().get_w();
-                                float xCorrectedNegLength = centerPointWidth.x + ct*length - st*0;
-                                float yCorrectedNegLength = centerPointWidth.y + st*length + ct*0;
-                                
-                                dist0Squared = std::pow( sensor_pose.getOrigin().getX() - xCorrectedPosLength, 2.0 ) + std::pow( sensor_pose.getOrigin().getY() - yCorrectedPosLength, 2.0 );
-                                dist1Squared = std::pow( sensor_pose.getOrigin().getX() - xCorrectedNegLength, 2.0 ) + std::pow( sensor_pose.getOrigin().getY() - yCorrectedNegLength, 2.0 );
-                                
-                                if (dist0Squared > dist1Squared ) 
-                                {
-                                        xCorrected = xCorrectedPosLength;
-                                        yCorrected = yCorrectedPosLength;
-                                }
-                                else
-                                {
-                                        xCorrected = xCorrectedNegLength;
-                                        yCorrected = yCorrectedNegLength;
-                                }
-                                
-                                rectangleCorrected.set_w( entityProperties.getRectangle().get_w() ); // To prevent double compensation during the filtering phase
-                                
-                                std::cout << " Corners = " << corners[0] << ", " << corners[1] << " length = " << length << "x,yCorrected = " << xCorrected << ", " << yCorrected << std::endl;
-                                
-                                // Repositioning the entity based on the difference in dimensions is solved already! We have to give the corresponding covariances about it
-                                
-                                
-                                length = 0.5*measuredProperty.getRectangle().get_d();
-                                
-                                 x3 = xCorrected, y3 = yCorrected;
-                                 x1 = centerPointDepth.x + ct* length + st*0;
-                                 x2 = centerPointDepth.x + ct*-length + st*0;
-                                 
-                                 y1 = centerPointDepth.y + st* length + ct*0;
-                                 y2 = centerPointDepth.y + st*-length + ct*0;
-                                
-                                factor = ((y2-y1) * (x3-x1) - (x2-x1) * (y3-y1)) / (pow(y2-y1, 2.0) + pow(x2-x1, 2.0)); // https://stackoverflow.com/questions/1811549/perpendicular-on-a-line-from-a-given-point
-                                float xProjOnDepth = x3 - factor * (y2-y1); 
-                                float yProjOnDepth = y3 + factor * (x2-x1);
-                                float minimalWidth = 2*( sqrt( pow(xProjOnDepth, 2.0) + pow(yProjOnDepth, 2.0) ) );
-                                
-                                std::cout << "Initial Depth = " << measuredProperty.rectangle_.get_d( )  << " Initial Width = " << measuredProperty.rectangle_.get_w( ) << std::endl;
-                                
-                                if (measuredProperty.rectangle_.get_w( ) < minimalWidth )
-                                {
-                                        measuredProperty.rectangle_.set_w( minimalWidth );       
-                                }
-
-                                length = 0.5*measuredProperty.getRectangle().get_w();
-                                x1 = centerPointWidth.x + ct*0 + st* length;
-                                x2 = centerPointWidth.x + ct*0 + st* -length;
-                                 
-                                y1 = centerPointWidth.y + st*0 + ct*length;
-                                y2 = centerPointWidth.y + st*0 + ct*-length;
-                                
-                                factor = ((y2-y1) * (x3-x1) - (x2-x1) * (y3-y1)) / (pow(y2-y1, 2.0) + pow(x2-x1, 2.0)); // https://stackoverflow.com/questions/1811549/perpendicular-on-a-line-from-a-given-point
-                                float xProjOnWidth = x3 - factor * (y2-y1); 
-                                float yProjOnWidth = y3 + factor * (x2-x1);
-                                float minimalDepth = 2*( sqrt( pow(xProjOnWidth, 2.0) + pow(yProjOnWidth, 2.0) ) );
-                                
-                                if (measuredProperty.rectangle_.get_d( ) < minimalDepth )
-                                {
-                                        measuredProperty.rectangle_.set_d( minimalDepth );       
-                                }
-                                
-                                std::cout << "minimalDepth = " << minimalDepth << " minimalWidth = " << minimalWidth << std::endl;*/
+                                RmRectangle.block< 2, 2 >( 0, 0 ) = Rot*C*Rot.transpose();
                         }
-                        
-                        // Give certainties in terms of the world frame
-                        Eigen::MatrixXf Rot = Eigen::MatrixXf::Zero( 2, 2 );
-//                         std::cout << "rot = " << rot << std::endl;
-                        Rot << std::cos( rot ), -std::sin( rot ),
-                               std::sin( rot ),  std::cos( rot);
-                       
-                        RmRectangle.block< 2, 2 >( 0, 0 ) = Rot*C*Rot.transpose();
-                        
-//                         rectangleCorrected.set_x( xCorrected );
-//                         rectangleCorrected.set_y( yCorrected );
-//                         measuredProperty.setRectangle( rectangleCorrected );
-                        
-//                         std::cout << "Pos Covariance = \n" << RmRectangle.block< 2, 2 >( 0, 0 )   << " \n C = \n " << C << " Rot = " << Rot << std::endl;
-                        
                 }
-                
-//                 float rot;
-//                  geo::Vec2f point;
-//                 
-//                 float dist = fabs ( -beta_hat ( 1 ) * point.x+point.y - beta_hat ( 0 ) ) /sqrt ( beta_hat ( 1 ) *beta_hat ( 1 ) + 1 ); // distance of a point to a line, see https://en.wikipedia.org/wiki/Distance_from_a_point_to_a_line
-//                 
-                
-       /*         
-                measuredProperties[iProperties].confidenceRectangleWidth = false;
-        measuredProperties[iProperties].confidenceRectangleWidthLow = false;
-        measuredProperties[iProperties].confidenceRectangleWidthHigh = false;
-        measuredProperties[iProperties].confidenceRectangleDepth = false;
-        measuredProperties[iProperties].confidenceRectangleDepthLow = false;
-        measuredProperties[iProperties].confidenceRectangleDepthHigh = false;
-        measuredProperties[iProperties].methodRectangle = method;*/
                 
                 float modelledWidth, modelledDepth;
                 bool switchedDimensions = entityProperties.getRectangle().switchDimensions( measuredProperty.getRectangle().get_yaw() ); // switching happens during update, this is just to compare the correct values
+                
                 if ( !switchedDimensions)
                 {
                         modelledWidth = entityProperties.getRectangle().get_w();
@@ -2240,26 +2070,8 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                           {
                                   RmRectangle( 4, 4 ) = largeCovariance;
                           }
-                         
-//                         if( measuredProperties[iProperties].methodRectangle == ed::tracking::RECTANGLE )
-//                         {
-//                                 RmRectangle( 4, 4 ) = largeDimensionCovariance;
-//                         }
-//                         else
-//                         {
-//                                 RmRectangle( 4, 4 ) = largeCovariance;
-//                         }
                 } 
                 
-
-//                 std::cout << "For entity " << termcolor::blue << e->id() << termcolor::reset << " confidenceRectangleWidth, depth, circle = " <<
-//                 measuredProperties[iProperties].confidenceRectangleWidth << 
-//                 measuredProperties[iProperties].confidenceRectangleDepth << 
-//                 measuredProperties[iProperties].confidenceCircle << std::endl;
-                
-//                 std::cout << " QmRectangle = " << QmRectangle << std::endl;
-                
-//                 std::cout << "QmRectangle = " << QmRectangle << ", RmRectangle = " << RmRectangle << std::endl;
                 if( DEBUG )
                         std::cout << "Test 3 \t";
                
@@ -2270,15 +2082,6 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                 measuredProperty.getRectangle().get_yaw(),  
                 measuredProperty.getRectangle().get_w(), 
                 measuredProperty.getRectangle().get_d();
-               
-                
-//                 std::cout << "Entity Properties" << std::endl;
-//                 entityRectangle.printValues();
-                
-//                 std::cout << "Measured Properties" << std::endl;
-//                 measuredProperty.getRectangle().printValues();
-                
-//                 std::cout << "Deltas = " << deltaWidth << ", " << deltaDepth << ", " << deltaX << ", " << deltaY << ", " << thetaPred << std::endl;
                 
                 if (measuredProperty.getRectangle().get_yaw() != measuredProperty.getRectangle().get_yaw())
                 {
@@ -2287,24 +2090,20 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                         QmRectangle(2, 2) = largeCovariance;
                 }
                 
-//                 std::cout << "For entity " << termcolor::blue << e->id() << termcolor::reset << std::endl;
-//                 std::cout << "Measured Properties = " << std::endl; measuredProperty.printProperties();
-//                 std::cout << "Entity Property before = " << std::endl; entityProperties.printProperties();
-                
                 if( DEBUG )
                         std::cout << "Test 4 \t";
                 
                 
 //                 std::cout << "Before update: " << std::endl;
-                entityProperties.rectangle_.printValues();
+//                 entityProperties.rectangle_.printValues();
                 
                 entityProperties.updateRectangleFeatures(QmRectangle, RmRectangle, zmRectangle, dt);
              
 //                 std::cout << "After update: " << std::endl;
-                entityProperties.rectangle_.printValues();
+//                 entityProperties.rectangle_.printValues();
                 
 //                 std::cout << "Measurement: " << std::endl;
-                measuredProperty.rectangle_.printValues();
+//                 measuredProperty.rectangle_.printValues();
                 
                 // update circular properties
                 Eigen::MatrixXf QmCircle = Eigen::MatrixXf::Zero( 5, 5 );
