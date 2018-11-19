@@ -611,7 +611,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
 
     
 //     if( DEBUG )
-            std::cout << "Debug 2 \t";
+//             std::cout << "Debug 2 \t";
 
     // - - - - - - - - - - - - - - - - - -
     // Render world model as if seen by laser
@@ -638,7 +638,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
     // - - - - - - - - - - - - - - - - - -
     // Fit the doors
 //     if( DEBUG )
-            std::cout << "Debug 3 \t";
+//             std::cout << "Debug 3 \t";
     if (fit_entities_)
     {
 
@@ -687,7 +687,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
     }
     
 //     if( DEBUG )
-            std::cout << "Debug 4 \t";
+//             std::cout << "Debug 4 \t";
 
 //        // ############################## TEMP ############################
 // 
@@ -735,7 +735,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
     // Segment the remaining points into clusters
 
 //     if( DEBUG )
-            std::cout << "Debug 5 \t";
+//             std::cout << "Debug 5 \t";
     
     std::vector<ScanSegment> segments;
 
@@ -847,7 +847,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
     }
     
 //     if( DEBUG )
-//             std::cout << "Debug 8 \t";
+            std::cout << "Debug 8 \t";
     
     // Try to associate remaining laser points to specific entities
     std::vector<ed::WorldModel::const_iterator> it_laserEntities;
@@ -890,7 +890,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
             if ( featureProperties.getFeatureProbabilities().get_pCircle() > featureProperties.getFeatureProbabilities().get_pRectangle() )
             {
                 ed::tracking::Circle circle = featureProperties.getCircle();
-//                 circle.predictAndUpdatePos(dt);
+                circle.predictAndUpdatePos(dt);
                 
                 currentProperty.entity_min.x = circle.get_x() - ( 0.5*ASSOCIATION_DISTANCE + circle.get_radius() );
                 currentProperty.entity_max.x = circle.get_x() + ( 0.5*ASSOCIATION_DISTANCE + circle.get_radius() );
@@ -900,7 +900,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
             else
             {
                 ed::tracking::Rectangle rectangle = featureProperties.getRectangle();
-//                 rectangle.predictAndUpdatePos(dt);
+                rectangle.predictAndUpdatePos(dt);
                 
                 std::vector<geo::Vec2f> corners = rectangle.determineCorners ( ASSOCIATION_DISTANCE );
                 currentProperty.entity_min = corners[0];
@@ -929,7 +929,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
 //     }
     
 //     if( DEBUG )
-//             std::cout << "Debug 9 \t";
+            std::cout << "Debug 9 \t";
     
     
 //      std::vector< std::vector< geo::Vec2f > > associatedPointsList ( it_laserEntities.size() );
@@ -1000,7 +1000,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
 //         seg_max.y << std::endl;
 
 // if( DEBUG )
-//         std::cout << "Debug 11 \t";
+        std::cout << "Debug 11 \t";
     
         // After the properties of each segment are determined, check which clusters and entities might associate
         std::vector< int > possibleSegmentEntityAssociations;
@@ -1014,7 +1014,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
 //                 EntityPropertiesForAssociation[jj].entity_max.y << std::endl;
            
 //    if( DEBUG )
-//            std::cout << "Debug 12 \t";
+           std::cout << "Debug 12 \t";
             // check if 1 of the extrema of the segment might be related to the exploded entity
             bool check1 =  seg_min.x > EntityPropertiesForAssociation[jj].entity_min.x && seg_min.x < EntityPropertiesForAssociation[jj].entity_max.x ;
             bool check2 =  seg_max.x > EntityPropertiesForAssociation[jj].entity_min.x && seg_max.x < EntityPropertiesForAssociation[jj].entity_max.x ;
@@ -1030,7 +1030,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
         }
 
 //     if( DEBUG )
-//             std::cout << "Debug 13 \t";
+            std::cout << "Debug 13 \t";
         // If a cluster could be associated to a (set of) entities, determine for each point to which entitiy it belongs based on a shortest distance criterion. 
         // If the distance is too large, initiate a new entity
 //         std::vector<geo::Vec2f> pointsNotAssociated;
@@ -1039,7 +1039,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
         std::vector<unsigned int> IDs ( points.size() ); // IDs of the entity which is closest to that point
 
 //             if( DEBUG )
-//             std::cout << "Debug 13.1 \t";
+            std::cout << "Debug 13.1 \t";
         
         for ( unsigned int i_points = 0; i_points < points.size(); ++i_points )  // Determine closest object and distance to this object. If distance too large, relate to new object
         {
@@ -1050,11 +1050,13 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
             unsigned int id_shortestEntity = std::numeric_limits< unsigned int >::max();
 //                 if( DEBUG )
 //             std::cout << "Debug 13.3 \t";
+            
+            std::cout << "possibleSegmentEntityAssociations.size() = " << possibleSegmentEntityAssociations.size() << "\t";
 
             for ( unsigned int jj = 0; jj < possibleSegmentEntityAssociations.size(); ++jj )  // relevant entities only
             {
                         if( DEBUG )
-            std::cout << "Debug 13.4 \t";
+            std::cout << "jj = " << jj << " \t";
                 const ed::EntityConstPtr& e = *it_laserEntities[ possibleSegmentEntityAssociations[jj] ];
                 ed::tracking::FeatureProperties featureProperties = e->property ( featureProperties_ );
                 float dist;
@@ -1066,7 +1068,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                             if( DEBUG )
             std::cout << "Debug 13.6 \t";
                     ed::tracking::Circle circle = featureProperties.getCircle();  
-//                     circle.predictAndUpdatePos( dt );
+                    circle.predictAndUpdatePos( dt ); // TODO Do this update once at initialisation
                     dist = std::abs ( std::sqrt ( std::pow ( p.x - circle.get_x(), 2.0 ) + std::pow ( p.y - circle.get_y(), 2.0 ) ) - circle.get_radius() ); // Distance of a point to a circle, see https://www.varsitytutors.com/hotmath/hotmath_help/topics/shortest-distance-between-a-point-and-a-circle
                 }
                 else     // entity is considered to be a rectangle. Check if point is inside the rectangle
@@ -1074,7 +1076,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                             if( DEBUG )
             std::cout << "Debug 13.7 \t";
                     ed::tracking::Rectangle rectangle = featureProperties.getRectangle();
-//                     rectangle.predictAndUpdatePos( dt );
+                    rectangle.predictAndUpdatePos( dt );// TODO Do this update once at initialisation
 
                     std::vector<geo::Vec2f> corners = rectangle.determineCorners ( 0.0 );
 
@@ -1171,6 +1173,8 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
             std::cout << "Debug 13.11.6 \t";
             IDs[i_points] = id_shortestEntity;
         }
+        
+        std::cout << "End of loop debug 13.12.0 " << std::endl;
         
 //         std::cout << "Shortest Distances = " ;
 //         for(unsigned int i_points = 0; i_points < distances.size(); i_points++)
@@ -1371,6 +1375,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                         
 //                         std::cout << termcolor::magenta << "AssociatedPointsInfo extended" << termcolor::reset << std::endl;
                 }
+                std::cout << "Debug 13.16.-1 \t";
             }
             
             firstElement = iDistances;
@@ -1474,7 +1479,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
        
       
         
-       if( DEBUG )
+//        if( DEBUG )
                std::cout << "Debug 15 \t";
        
         std::vector<unsigned int> cornerIndices;
@@ -1492,7 +1497,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
              const unsigned int& index = *it_in;
         }
         
-        if( DEBUG )
+//         if( DEBUG )
                 std::cout << "Debug 16 \t";
 
         ed::tracking::Circle circle;   
@@ -1561,8 +1566,9 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                 PointIDHighDepth = associatedPointsInfo[iList].laserIDs.size() - 1;
         }
         
-        std::cout << " IDLowWidth = " << IDLowWidth << " IDHighWidth = " << IDHighWidth << " IDLowDepth = " << IDLowDepth << " IDHighDepth = " << IDHighDepth << std::endl;
+//         std::cout << " IDLowWidth = " << IDLowWidth << " IDHighWidth = " << IDHighWidth << " IDLowDepth = " << IDLowDepth << " IDHighDepth = " << IDHighDepth << std::endl;
         
+                        std::cout << "Debug 16.0 \t";
         for(unsigned int iConfidence = 0; iConfidence < 2; iConfidence++) // Determine for both with and depth
         {
                 bool determineWidthConfidence = false, determineDepthConfidence = false; 
@@ -1573,7 +1579,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                         elementLow = IDLowWidth;
                         elementHigh = IDHighWidth;
                         
-                        std::cout << " iConfidence = " << iConfidence << " elementLow = " << elementLow << " elementHigh = " << elementHigh << std::endl;
+//                         std::cout << " iConfidence = " << iConfidence << " elementLow = " << elementLow << " elementHigh = " << elementHigh << std::endl;
                 } 
                 
                 if(iConfidence == 1)
@@ -1581,7 +1587,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                         determineDepthConfidence = true;
                         elementLow = IDLowDepth; // cause corner belongs to both points. TODO what if the corner is occluded? Does this automatically lead to low confidences? -> TEST
                         elementHigh = IDHighDepth;
-                        std::cout << " iConfidence = " << iConfidence << " elementLow = " << elementLow << " elementHigh = " << elementHigh << std::endl;
+//                         std::cout << " iConfidence = " << iConfidence << " elementLow = " << elementLow << " elementHigh = " << elementHigh << std::endl;
                 }
                 
 //                 std::cout << "elementLow = " << elementLow << ", elementHigh = " << elementHigh << ", determineWidthConfidence = " << determineWidthConfidence << ", determineDepthConfidence = " << determineDepthConfidence<< std::endl;
@@ -1654,16 +1660,15 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                                  if( measuredProperties[iList].confidenceRectangleWidthLow )
                                  {
                                          measuredProperties[iList].measuredCorners.push_back( associatedPointsInfo[iList].points[PointIDLowWidth] );  
-                                         std::cout << "Point added 0 = " << associatedPointsInfo[iList].points[PointIDLowWidth] << std::endl;
+//                                          std::cout << "Point added 0 = " << associatedPointsInfo[iList].points[PointIDLowWidth] << std::endl;
                                  }
                                  
                                  if(  measuredProperties[iList].confidenceRectangleWidthHigh )
                                  {
                                          measuredProperties[iList].measuredCorners.push_back( associatedPointsInfo[iList].points[PointIDHighWidth] );  
-                                         std::cout << "Point added 1 = " << associatedPointsInfo[iList].points[PointIDHighWidth] << std::endl;
+//                                          std::cout << "Point added 1 = " << associatedPointsInfo[iList].points[PointIDHighWidth] << std::endl;
                                          
                                          std::cout << "associatedPointsInfo[iList].points.size() = " << associatedPointsInfo[iList].points.size() << ". PointIDHighWidth = " << PointIDHighWidth << " Points = " << std::endl;
-                                         
                                          for(unsigned int iPointsTest = 0; iPointsTest < associatedPointsInfo[iList].points.size(); iPointsTest++)
                                          {
                                                 std::cout << associatedPointsInfo[iList].points[iPointsTest] << "\t";
@@ -1684,17 +1689,19 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                                  if( measuredProperties[iList].confidenceRectangleDepthLow )
                                  {
                                          measuredProperties[iList].measuredCorners.push_back( associatedPointsInfo[iList].points[PointIDLowDepth] );  
-                                         std::cout << "Point added 3 = " << associatedPointsInfo[iList].points[PointIDLowDepth] << std::endl;
+//                                          std::cout << "Point added 3 = " << associatedPointsInfo[iList].points[PointIDLowDepth] << std::endl;
                                  }
                                  
                                  if(  measuredProperties[iList].confidenceRectangleDepthHigh )
                                  {
                                          measuredProperties[iList].measuredCorners.push_back( associatedPointsInfo[iList].points[PointIDHighDepth] );  
-                                         std::cout << "Point added 4 = " << associatedPointsInfo[iList].points[PointIDHighDepth] << std::endl;
+//                                          std::cout << "Point added 4 = " << associatedPointsInfo[iList].points[PointIDHighDepth] << std::endl;
                                  }
                           }
                   }    
         }
+        
+                    std::cout << "Debug 16.1 \t";
          
         ed::tracking::FeatureProbabilities prob;
         if ( prob.setMeasurementProbabilities ( error_rectangle2, error_circle2, 2*circle.get_radius() , nominal_corridor_width_ ) )
@@ -1708,7 +1715,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
             if ( rectangle.get_x() != rectangle.get_x() )
             {
                 ROS_WARN ( "Rectangle: invalid properties set" );
-//                 rectangle.printValues();
+//                 rectangle.printProperties();
 //                 std::cout << "Prob = " << prob.get_pCircle() << ", " << prob.get_pRectangle() << std::endl;
 //                 std::cout << "Method = " << method << std::endl;
 //                 std::cout << "Errors = " << error_rectangle2 << ", " << error_circle2 << std::endl;
@@ -1733,7 +1740,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
     
 //    PointMarkers_pub_.publish( markerArrayPoints );
        
-   if( DEBUG )
+//    if( DEBUG )
             std::cout << "Debug 17 \t";
     
     unsigned int marker_ID = 0; // To Do: After tracking, the right ID's should be created. The ID's are used to have multiple markers.
@@ -1742,7 +1749,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
     ed::UUID id;
 //     std::vector<ed::WorldModel::const_iterator> it_laserEntities; 
 
-    if( DEBUG )
+//     if( DEBUG )
             std::cout << "Debug 18 \t";
     
 //     visualization_msgs::MarkerArray markers;
@@ -1764,7 +1771,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
 //         markers.markers.push_back( getMarker(measuredProperty, ID++) ); // TEMP
 
         
-//         measuredProperty.getRectangle().printValues();
+//         measuredProperty.getRectangle().printProperties();
 //         measuredProperty.getCircle().printProperties();
 //         std::cout << "prob = " << measuredProperty.getFeatureProbabilities().get_pCircle() << ", " << measuredProperty.getFeatureProbabilities().get_pRectangle() << std::endl;
 
@@ -1806,7 +1813,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                 ed::tracking::Rectangle entityRectangle = entityProperties.getRectangle();
                 ed::tracking::Circle entityCircle = entityProperties.getCircle();
                 
-                std::cout << "For entity " << termcolor::blue << e->id() << termcolor::reset << std::endl;
+                std::cout << "\nFor entity " << termcolor::blue << e->id() << termcolor::reset << std::endl;
                 
                 float Q = 0.1; // Measurement noise covariance. TODO: let it depend on if an object is partially occluded. Now, objects are assumed to be completely visible
                 float R = 0.2; // Process noise covariance
@@ -1893,24 +1900,24 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                                 // determine delta's for each reliable corner
                                 // take the average delta
                                 
-                                std::cout << "Update based on features -> cornerpoints" << std::endl;
+//                                 std::cout << "Update based on features -> cornerpoints" << std::endl;
                                 
                                 std::vector<geo::Vec2f> cornersMeasured = measuredProperties[iProperties].measuredCorners; // are those properties determined in the same order for the model as well as the measurement
                                 std::vector<geo::Vec2f> cornersModelled = entityProperties.getRectangle().determineCorners ( 0.0 );
                                 
-                                std::cout << "CornersMeasured = " << std::endl;
-                                for( unsigned int iPrint = 0; iPrint < cornersMeasured.size(); iPrint++ )
-                                {
-                                        std::cout << cornersMeasured[iPrint] << "\t";
-                                }
-                                std::cout << "\n";
+//                                 std::cout << "CornersMeasured = " << std::endl;
+//                                 for( unsigned int iPrint = 0; iPrint < cornersMeasured.size(); iPrint++ )
+//                                 {
+//                                         std::cout << cornersMeasured[iPrint] << "\t";
+//                                 }
+//                                 std::cout << "\n";
                                 
-                                std::cout << "cornersModelled = " << std::endl;
-                                for( unsigned int iPrint = 0; iPrint < cornersModelled.size(); iPrint++ )
-                                {
-                                        std::cout << cornersModelled[iPrint] << "\t";
-                                }
-                                std::cout << "\n";
+//                                 std::cout << "cornersModelled = " << std::endl;
+//                                 for( unsigned int iPrint = 0; iPrint < cornersModelled.size(); iPrint++ )
+//                                 {
+//                                         std::cout << cornersModelled[iPrint] << "\t";
+//                                 }
+//                                 std::cout << "\n";
                                 
                                 float deltaX = 0.0, deltaY = 0.0;
                                 for(unsigned int iMeasured = 0; iMeasured < cornersMeasured.size(); iMeasured++)
@@ -1931,45 +1938,45 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                                                 }
                                         }
                                         
-                                        std::cout << "smallestDistance2 = " << smallestDistance2 << std::endl;
-                                        std::cout << "cornersMeasured[iMeasured] = " << cornersMeasured[iMeasured] << " cornersModelled[closestElement] = " << cornersModelled[closestElement] << std::endl;
+//                                         std::cout << "smallestDistance2 = " << smallestDistance2 << std::endl;
+//                                         std::cout << "cornersMeasured[iMeasured] = " << cornersMeasured[iMeasured] << " cornersModelled[closestElement] = " << cornersModelled[closestElement] << std::endl;
                                         
                                         deltaX += cornersMeasured[iMeasured].x - cornersModelled[closestElement].x;
                                         deltaY += cornersMeasured[iMeasured].y - cornersModelled[closestElement].y;
                                         
-                                        std::cout << "In loop: deltaX, deltaY = " << deltaX << ", " << deltaY << std::endl;
+//                                         std::cout << "In loop: deltaX, deltaY = " << deltaX << ", " << deltaY << std::endl;
                                 }
                                 
                                 deltaX /= cornersMeasured.size();
                                 deltaY /= cornersMeasured.size();
                                 
-                                std::cout << "deltaX, deltaY = " << deltaX << ", " << deltaY << std::endl;
+//                                 std::cout << "deltaX, deltaY = " << deltaX << ", " << deltaY << std::endl;
                                 
                                 ed::tracking::Rectangle updatedRectangle = measuredProperty.getRectangle(); // TODO correct? Should we take measured dimensions into account? TEST
                                 
-                                std::cout << "Measured Properties = " << updatedRectangle.get_x() << ", "  << updatedRectangle.get_y() << std::endl;
-                                std::cout << "Meas. Properties +D = " << updatedRectangle.get_x() + deltaX << ", "  << updatedRectangle.get_y() + deltaY << std::endl;
+//                                 std::cout << "Measured Properties = " << updatedRectangle.get_x() << ", "  << updatedRectangle.get_y() << std::endl;
+//                                 std::cout << "Meas. Properties +D = " << updatedRectangle.get_x() + deltaX << ", "  << updatedRectangle.get_y() + deltaY << std::endl;
                                 
                                 float updatedX = updatedRectangle.get_x() + deltaX;
                                 float updatedY = updatedRectangle.get_y() + deltaY;
                                 
-                                std::cout << "Meas. Properties up = " << updatedX << ", "  << updatedY << std::endl;
+//                                 std::cout << "Meas. Properties up = " << updatedX << ", "  << updatedY << std::endl;
                                 
                                 updatedRectangle.set_x( updatedX );
                                 updatedRectangle.set_y( updatedY );
                                 
                                 measuredProperty.setRectangle( updatedRectangle );
                                 
-                                std::cout << "Updated Properties = " << updatedRectangle.get_x() << ", "  << updatedRectangle.get_y() << std::endl;
+//                                 std::cout << "Updated Properties = " << updatedRectangle.get_x() << ", "  << updatedRectangle.get_y() << std::endl;
                                 
                                 std::vector< geo::Vec2f> updatedRectangleCorners = updatedRectangle.determineCorners( 0.0 );
                                 
-                                std::cout << "updatedRectangleCorners = ";
-                                for(unsigned int iTestCorners = 0; iTestCorners < updatedRectangleCorners.size(); iTestCorners++)
-                                {
-                                        std::cout << updatedRectangleCorners[iTestCorners];
-                                }
-                                std::cout << "\n" ;
+//                                 std::cout << "updatedRectangleCorners = ";
+//                                 for(unsigned int iTestCorners = 0; iTestCorners < updatedRectangleCorners.size(); iTestCorners++)
+//                                 {
+//                                         std::cout << updatedRectangleCorners[iTestCorners];
+//                                 }
+//                                 std::cout << "\n" ;
                                 
                                 
                         }
@@ -1982,7 +1989,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                                 // Measuring one side, but not the corners, gives accurate position information in one direction, namely the lateral direction of the 
                                 // width is always measured, as that is the first part in the measured properties
                                 
-                                std::cout << "Update based on position of sides" << std::endl;
+//                                 std::cout << "Update based on position of sides" << std::endl;
                                 
                                 float largePositionCovariance = 25.0; // TODO small covariance when the entity described does not reflect a part which is detected
                                 float smallPositionCovariance = Q;
@@ -2094,16 +2101,17 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                         std::cout << "Test 4 \t";
                 
                 
-//                 std::cout << "Before update: " << std::endl;
-//                 entityProperties.rectangle_.printValues();
+                 std::cout << "Before update: " << std::endl;
+                 entityProperties.rectangle_.printProperties();
+                std::cout << " \n Measurement: \t" ;
+                measuredProperty.rectangle_.printProperties();
                 
-                entityProperties.updateRectangleFeatures(QmRectangle, RmRectangle, zmRectangle, dt);
+                entityProperties.updateRectangleFeatures(QmRectangle, RmRectangle, zmRectangle, dt, sensor_pose);
              
-//                 std::cout << "After update: " << std::endl;
-//                 entityProperties.rectangle_.printValues();
+                std::cout << "\nAfter update: \t";
+                entityProperties.rectangle_.printProperties();
                 
-//                 std::cout << "Measurement: " << std::endl;
-//                 measuredProperty.rectangle_.printValues();
+
                 
                 // update circular properties
                 Eigen::MatrixXf QmCircle = Eigen::MatrixXf::Zero( 5, 5 );
