@@ -26,12 +26,13 @@
 #include <iterator>
 
 #define DEBUG false // TEMP
-
+// 
 namespace
 {
 
 typedef std::vector<unsigned int> ScanSegment;
 
+ros::Time tLatestPoseInit( 0.0 );
 // struct ScanSegmentInfo
 // {
 //     ScanSegment segmentRanges;
@@ -163,6 +164,28 @@ void pubPoints ( visualization_msgs::MarkerArray *markerArray, std::vector<geo::
     }
     
     markerArray->markers.push_back ( marker );
+}
+
+void renderWorld(const geo::Pose3D& sensor_pose, std::vector<double>& model_ranges, const ed::WorldModel& world, geo::LaserRangeFinder lrf_model)
+{
+     geo::Pose3D sensor_pose_inv = sensor_pose.inverse();
+
+    
+    for(ed::WorldModel::const_iterator it = world.begin(); it != world.end(); ++it)
+    {
+        const ed::EntityConstPtr& e = *it;
+     
+        if (e->shape() && e->has_pose() && !(e->hasType("left_door") || e->hasType("door_left") || e->hasType("right_door") || e->hasType("door_right" ) || e->hasFlag("non-localizable")))
+        {
+     //  std::cout << "Shape after = " << e->shape() << std::endl;
+            // Set render options
+            geo::LaserRangeFinder::RenderOptions opt;
+            opt.setMesh(e->shape()->getMesh(), sensor_pose_inv * e->pose());
+
+            geo::LaserRangeFinder::RenderResult res(model_ranges);
+            lrf_model.render(opt, res);
+        }        
+    }       
 }
  
 // ----------------------------------------------------------------------------------------------------
@@ -461,7 +484,7 @@ bool isInside(std::vector<T> Points, T& p)
     }
 
 //     if( DEBUG )
-            std::cout << "Debug 7 \t";
+//             std::cout << "Debug 7 \t";
     int gap_size = 0;
     std::vector<float> gapRanges;
 
@@ -507,6 +530,7 @@ bool isInside(std::vector<T> Points, T& p)
                     geo::Vec2 bb = seg_max - seg_min;
                     if ( ( bb .x > minClusterSize || bb.y > minClusterSize ) && bb.x < maxClusterSize && bb.y < maxClusterSize )
                     {
+//                             std::cout << "current_segment.size() = " << current_segment.size();
                         segments.push_back ( current_segment );
                         
 //                         std::cout << "New segment added. Ranges = "<< std::endl;
@@ -545,6 +569,7 @@ bool isInside(std::vector<T> Points, T& p)
         }
     }
     
+    std::cout << "In determineSegments: segmenst.size() = " << segments.size();
     return segments;
 }
 
@@ -576,8 +601,7 @@ void LaserPluginTracking::initialize(ed::InitData& init)
     config.value("min_cluster_size", min_cluster_size_);
     config.value("max_cluster_size", max_cluster_size_);
     config.value("max_gap_size", max_gap_size_);
-    config.value("nominal_corridor_width", nominal_corridor_width_);
-    
+    config.value("nominal_corridor_width", nominal_corridor_width_);    
 
     int i_fit_entities = 0;
     config.value("fit_entities", i_fit_entities, tue::OPTIONAL);
@@ -600,6 +624,13 @@ void LaserPluginTracking::initialize(ed::InitData& init)
 //     ObjectMarkers_pub_ = nh.advertise<visualization_msgs::MarkerArray> ( "ed/gui/objectMarkers2", 3 ); // TEMP
 //     PointMarkers_pub_ = nh.advertise<visualization_msgs::MarkerArray> ( "ed/gui/pointMarkers", 3 ); // TEMP
 //     processedLaserPoints_pub_ = nh.advertise<sensor_msgs::LaserScan> ( "processedLaserScan", 3 ); // TEMP
+    pose_updated_pub_ = nh.advertise<geometry_msgs::PoseStamped> ( "PoseTest", 3 ); // TEMP
+    points_measured_pub_ = nh.advertise<visualization_msgs::Marker> ( "MeasuredPoints", 3 ); // TEMP;
+    points_modelled_pub_ = nh.advertise<visualization_msgs::Marker> ( "ModelledPoints", 3 ); // TEMP;
+
+//     initializedPose_sub_ = nh.subscribe<geometry_msgs::PoseWithCovarianceStamped>("initPose", bufferSize, &LaserPluginTracking::PoseWithCovarianceStampedInitCallback, this);
+    improvedRobotPos_pub_= nh.advertise<geometry_msgs::PoseWithCovarianceStamped> ( "initialpose", 3 );
+//     amclPose_sub_ = nh.subscribe<geometry_msgs::PoseWithCovarianceStamped>("amcl_pose", bufferSize, &LaserPluginTracking::PoseWithCovarianceStampedCallback, this);
 
     tf_listener_ = new tf::TransformListener;
     
@@ -615,6 +646,28 @@ void LaserPluginTracking::initialize(ed::InitData& init)
 
 void LaserPluginTracking::process(const ed::WorldModel& world, ed::UpdateRequest& req)
 {
+//         std::cout << termcolor::red << "pose_buffer_init_.size() before = " << pose_buffer_init_.size() << termcolor::reset << std::endl; 
+  /*      TODO 
+    if( !pose_buffer_init_.empty() )
+    {
+            geometry_msgs::PoseWithCovarianceStamped::ConstPtr robotPose = pose_buffer_init_.front();
+            geometry_msgs::PoseWithCovarianceStamped updatedPose;
+            
+            updatedPose.header = robotPose->header;
+            updatedPose.pose = robotPose->pose;
+            
+            improvedRobotPos_pub_.publish(updatedPose);
+//             pose_buffer_init_.empty();
+            tLatestPoseInit = ros::Time::now();
+    }
+    
+    if( ros::Time::now() - tLatestPoseInit < DELAY_AFTER_INIT )
+    {           
+            pose_buffer_.empty();
+    }
+    */
+//     std::cout << termcolor::red << "pose_buffer_init_.size() after = " << pose_buffer_init_.size()  << termcolor::reset << std::endl;
+    
     cb_queue_.callAvailable();
     
 //     std::cout << " Process started with buffer size of" << scan_buffer_.size() << std::endl;
@@ -672,7 +725,7 @@ void LaserPluginTracking::process(const ed::WorldModel& world, ed::UpdateRequest
 // ----------------------------------------------------------------------------------------------------
 
 void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs::LaserScan::ConstPtr& scan,
-                         const geo::Pose3D& sensor_pose, ed::UpdateRequest& req)
+                         geo::Pose3D& sensor_pose, ed::UpdateRequest& req)
 {
     if( DEBUG )
             std::cout << "Debug 1 \t";
@@ -737,24 +790,28 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
     // - - - - - - - - - - - - - - - - - -
     // Render world model as if seen by laser
 
-    geo::Pose3D sensor_pose_inv = sensor_pose.inverse();
+    
+//     geo::Pose3D sensor_pose_inv = sensor_pose.inverse();
+// 
+//     std::vector<double> model_ranges(num_beams, 0);
+//     for(ed::WorldModel::const_iterator it = world.begin(); it != world.end(); ++it)
+//     {
+//         const ed::EntityConstPtr& e = *it;
+// 	
+//         if (e->shape() && e->has_pose() && !(e->hasType("left_door") || e->hasType("door_left") || e->hasType("right_door") || e->hasType("door_right" ) || e->hasFlag("non-localizable")))
+//         {
+// 	//  std::cout << "Shape after = " << e->shape() << std::endl;
+//             // Set render options
+//             geo::LaserRangeFinder::RenderOptions opt;
+//             opt.setMesh(e->shape()->getMesh(), sensor_pose_inv * e->pose());
+// 
+//             geo::LaserRangeFinder::RenderResult res(model_ranges);
+//             lrf_model_.render(opt, res);
+//         }        
+//     }
 
-    std::vector<double> model_ranges(num_beams, 0);
-    for(ed::WorldModel::const_iterator it = world.begin(); it != world.end(); ++it)
-    {
-        const ed::EntityConstPtr& e = *it;
-	
-        if (e->shape() && e->has_pose() && !(e->hasType("left_door") || e->hasType("door_left") || e->hasType("right_door") || e->hasType("door_right" ) || e->hasFlag("non-localizable")))
-        {
-	//  std::cout << "Shape after = " << e->shape() << std::endl;
-            // Set render options
-            geo::LaserRangeFinder::RenderOptions opt;
-            opt.setMesh(e->shape()->getMesh(), sensor_pose_inv * e->pose());
-
-            geo::LaserRangeFinder::RenderResult res(model_ranges);
-            lrf_model_.render(opt, res);
-        }        
-    }
+std::vector<double> model_ranges(num_beams, 0);
+renderWorld(sensor_pose, model_ranges, world, lrf_model_);
 
     // - - - - - - - - - - - - - - - - - -
     // Fit the doors
@@ -770,6 +827,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
             if (!e->shape() || !e->has_pose())
                 continue;
 
+            geo::Pose3D sensor_pose_inv = sensor_pose.inverse();
             geo::Pose3D e_pose_SENSOR = sensor_pose_inv * e->pose();
 
             // If not in sensor view, continue
@@ -845,7 +903,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                 || (std::abs(rm - rs) < world_association_distance_))
         {
                 modelRangesAssociatedRanges2StaticWorld[i] = model_ranges[i];
-                sensor_ranges[i] = 0;
+//                 sensor_ranges[i] = 0;
         }
     }   
     
@@ -862,17 +920,258 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
     // Segment the remaining points into clusters
 
 //     if( DEBUG )
-//             std::cout << "Debug 5 \t";
+            std::cout << "Debug 5 \t";
     
-    std::vector<ScanSegment> segments = determineSegments(sensor_ranges, max_gap_size_, min_segment_size_pixels_, segment_depth_threshold_, lrf_model_, min_cluster_size_, max_cluster_size_ );    
+//     std::vector<ScanSegment> segments = determineSegments(sensor_ranges, max_gap_size_, min_segment_size_pixels_, segment_depth_threshold_, lrf_model_, min_cluster_size_, max_cluster_size_ );    
+
     std::vector<ScanSegment> staticSegments = determineSegments(modelRangesAssociatedRanges2StaticWorld, max_gap_size_, min_segment_size_pixels_, segment_depth_threshold_, lrf_model_, min_cluster_size_, max_cluster_size_ );    
-    
     std::cout << "staticSegments.size() = " << staticSegments.size() << std::endl;
     
-//     for(unsigned int iSegment = 0; iSegment < staticSegments.size(); iSegment++)
-//     {
-//             TODO
-//     }
+    for(unsigned int iSegment = 0; iSegment < staticSegments.size(); iSegment++)
+    {
+//             std::cout << "Bla";
+           ScanSegment staticSegment = staticSegments[iSegment];
+//            std::cout << "After Bla";
+//            std::cout << "For iSegment = " << iSegment << " staticSegment read. ";
+           
+//            std::cout << "Static Segment size = " << staticSegment.size() << std::endl;
+           
+           if( staticSegment.size() < MIN_POINTS_STRAIGHT_LINE )
+           {
+                   continue;
+           }
+           
+           float mean, standardDeviation;
+           ed::tracking::determineIAV(modelRangesAssociatedRanges2StaticWorld, &mean, &standardDeviation, lrf_model_, staticSegment[0], staticSegment.back() );
+           
+            tf::Quaternion q ( sensor_pose.getQuaternion().x, sensor_pose.getQuaternion().y, sensor_pose.getQuaternion().z, sensor_pose.getQuaternion().w );
+            tf::Matrix3x3 matrix ( q );
+            double rollSensor, pitchSensor, yawSensor;
+            matrix.getRPY ( rollSensor, pitchSensor, yawSensor );
+            
+//             std::cout << "Mean IAV = " << mean  << " abs diff = " << std::abs( mean - M_PI ) << "standardDeviation = " << standardDeviation << std::endl;
+            
+           
+           if( std::abs( mean - M_PI ) < MAX_DEVIATION_IAV_STRAIGHT_LINE )
+           {
+            // straight line detected. Take a subset (2 middle quarters) of this line and do a fit for line as well as the corresponding fit for the ranges expected in the WM
+            unsigned int segmentLength = staticSegment.size();       
+            unsigned int startElement = segmentLength / 5;
+            unsigned int finalElement = segmentLength * 4/5;
+                   
+            std::vector<geo::Vec2f> measuredPoints(finalElement - startElement), modelledPoints(finalElement - startElement);
+            unsigned int counter = 0;
+            
+//             std::cout << "startElement = " << startElement << " finalElement = " << finalElement << " segmentLength = " << segmentLength  << std::endl;
+//             std::cout << "staticSegment[startElement] = " << staticSegment[startElement] << " staticSegment[finalElement] = " << staticSegment[finalElement] << std::endl;
+            
+            for(unsigned int iLineFit = startElement; iLineFit < finalElement; iLineFit ++)       
+            {
+//                     std::cout << "staticSegment.size() = " << staticSegment.size() << " iLineFit = " << iLineFit <<  std::endl;
+                    unsigned int element = staticSegment[iLineFit];
+                    float angle = yawSensor + lrf_model_.getAngleMin() + lrf_model_.getAngleIncrement()*element;
+                    measuredPoints[counter].x = sensor_pose.getOrigin().getX() + modelRangesAssociatedRanges2StaticWorld[element]*cos( angle );
+                    measuredPoints[counter].y = sensor_pose.getOrigin().getY() + modelRangesAssociatedRanges2StaticWorld[element]*sin( angle );
+                    
+                    modelledPoints[counter].x = sensor_pose.getOrigin().getX() + model_ranges[element]*cos( angle );
+                    modelledPoints[counter].y = sensor_pose.getOrigin().getY() + model_ranges[element]*sin( angle );
+                    
+//                     std::cout << "modelledPoints[counter] = " << modelledPoints[counter] << " measuredPoints[counter] = " << measuredPoints[counter] << "counter = " << counter << std::endl;
+//                     std::cout << "sensor_ranges[element] = " << model_ranges[element] << " counter = " << counter << std::endl;
+                    counter++;
+                    
+            }
+
+//             std::cout << "Angle low = " << lrf_model_.getAngleMin() + lrf_model_.getAngleIncrement()*staticSegment[startElement];
+//             std::cout << "Angle High = " << lrf_model_.getAngleMin() + lrf_model_.getAngleIncrement()*staticSegment[finalElement] << std::endl;
+            
+            visualization_msgs::Marker pointsMeasured, pointsModelled;
+//             points.markers.size() = measuredPoints.size() + modelledPoints.size();
+            
+//             std::cout << "Measured points = " ;
+            
+                    pointsModelled.header.frame_id = "/map";
+                    pointsModelled.header.stamp = scan->header.stamp;
+                    pointsModelled.ns = "modelledPoints";
+                    pointsModelled.id = 1;
+                    pointsModelled.type = visualization_msgs::Marker::POINTS;
+                    pointsModelled.action = visualization_msgs::Marker::ADD;
+//                     pointsModelled.pose.orientation = tf::createQuaternionMsgFromRollPitchYaw ( rollSensor, pitchSensor, yawSensor );
+                    pointsModelled.scale.x = 0.1;
+                    pointsModelled.scale.y = 0.1;
+                    pointsModelled.scale.z = 0.1;
+                    pointsModelled.color.r = 0.0;
+                    pointsModelled.color.g = 0.0;
+                    pointsModelled.color.b = 1.0;
+                    pointsModelled.color.a = 1.0; 
+                    pointsModelled.lifetime = ros::Duration( 0.2 );
+                    
+            for(int iPoints = 0; iPoints < modelledPoints.size(); iPoints++)
+            {
+                    geometry_msgs::Point p;
+                    
+                    p.x = modelledPoints[iPoints].x;
+                    p.y = modelledPoints[iPoints].y;
+                    p.z = sensor_pose.getOrigin().getZ();
+                    
+//                     std::cout << "Modelled: p = " << p.x << ", " << p.y << ", " << p.z << std::endl;
+                    
+                    pointsModelled.points.push_back(p);
+            }
+            points_modelled_pub_.publish( pointsModelled );
+
+            
+                    pointsMeasured.header.frame_id = "/map";
+                    pointsMeasured.header.stamp = scan->header.stamp;
+                    pointsMeasured.ns = "measuredPoints";
+                    pointsMeasured.id = 1;
+                    pointsMeasured.type = visualization_msgs::Marker::POINTS;
+                    pointsMeasured.action = visualization_msgs::Marker::ADD;
+//                     pointsMeasured.pose.orientation = tf::createQuaternionMsgFromRollPitchYaw ( rollSensor, pitchSensor, yawSensor );
+                    pointsMeasured.scale.x = 0.1;
+                    pointsMeasured.scale.y = 0.1;
+                    pointsMeasured.scale.z = 0.1;
+                    pointsMeasured.color.r = 0.0;
+                    pointsMeasured.color.g = 1.0;
+                    pointsMeasured.color.b = 0.0;
+                    pointsMeasured.color.a = 1.0; 
+                    pointsMeasured.lifetime = ros::Duration( 0.2 );
+                    
+            for(int iPoints = 0; iPoints < measuredPoints.size(); iPoints++)
+            {
+                    geometry_msgs::Point p;
+                    
+                    p.x = measuredPoints[iPoints].x;
+                    p.y = measuredPoints[iPoints].y;
+                    p.z = sensor_pose.getOrigin().getZ();
+                    
+//                     std::cout << "Measured p = " << p.x << ", " << p.y << ", " << p.z << std::endl;
+                    
+                    pointsMeasured.points.push_back(p);
+            }
+            points_measured_pub_.publish( pointsMeasured );
+            
+            
+            Eigen::VectorXf lineFitParamsMeasured( 2 ), lineFitParamsModdelled( 2 );
+            std::vector<geo::Vec2f>::iterator it_start = measuredPoints.begin();
+            std::vector<geo::Vec2f>::iterator it_end = measuredPoints.end();
+            float fitErrorMeasured =  ed::tracking::fitLine ( measuredPoints, lineFitParamsMeasured, &it_start , &it_end );
+            
+            it_start = modelledPoints.begin();
+            it_end = modelledPoints.end();
+            float fitErrorModelled =  ed::tracking::fitLine ( modelledPoints, lineFitParamsModdelled, &it_start , &it_end );
+    
+            double measuredAngle = atan2 ( lineFitParamsMeasured ( 1 ), 1 );
+            double modelledAngle = atan2 ( lineFitParamsModdelled ( 1 ), 1 );
+            
+
+            
+//             std::cout << termcolor::cyan << "Yaw before = " << yawSensor << " diff = " << measuredAngle - modelledAngle  << "Measured Angle = " << measuredAngle << " Modelled Angle = " << modelledAngle  << " Yaw new =  " << yawSensor - (measuredAngle - modelledAngle) << termcolor::reset << std::endl;
+            
+            ed::tracking::unwrap(&modelledAngle, measuredAngle, 2*M_PI);
+            float diffAngle = measuredAngle - modelledAngle;
+            
+            if(diffAngle < MAX_DEVIATION_IAV_STRAIGHT_LINE )
+            {
+                    yawSensor += diffAngle;
+                    ed::tracking::wrap2Interval(&yawSensor, (double) 0.0, (double) 2*M_PI);
+//             std::cout << "sensor_pose before = " << sensor_pose << std::endl;
+            
+                    sensor_pose.setRPY(rollSensor, pitchSensor, yawSensor );  // TODO not in loop below?
+//             std::cout << "sensor_pose after = " << sensor_pose << std::endl;
+                    
+//                     std::cout << termcolor::red  << "pose_buffer_init_.size() = " << pose_buffer_init_.size() << termcolor::reset << std::endl;
+                    // TODO
+                    /*if( pose_buffer_init_.empty() )
+                    {
+                            std::cout << "Ros time = " << ros::Time::now() << " tLatestPoseInit = " << tLatestPoseInit << " diff = " <<  ros::Time::now() - tLatestPoseInit << std::endl;
+                        if( !pose_buffer_.empty() && ros::Time::now() - tLatestPoseInit > DELAY_AFTER_INIT)
+                        {
+                                
+                                geometry_msgs::PoseWithCovarianceStamped::ConstPtr robotPose = pose_buffer_.front();
+                                geometry_msgs::PoseWithCovarianceStamped updatedPose;
+                                
+                                updatedPose.header = robotPose->header;
+                                updatedPose.pose = robotPose->pose;
+                                
+                                // assumption: orientation robot and sensor similar
+                                updatedPose.pose.pose.orientation.x = sensor_pose.getQuaternion().getX();
+                                updatedPose.pose.pose.orientation.y = sensor_pose.getQuaternion().getY();
+                                updatedPose.pose.pose.orientation.z = sensor_pose.getQuaternion().getZ();
+                                updatedPose.pose.pose.orientation.w = sensor_pose.getQuaternion().getW();
+                                improvedRobotPos_pub_.publish(updatedPose); 
+                        }
+                    } 
+            */
+                    geometry_msgs::PoseStamped updatedSensorPose;
+                    updatedSensorPose.header = scan->header;
+                    updatedSensorPose.header.frame_id = "map";
+                    updatedSensorPose.pose.position.x = sensor_pose.getOrigin().getX();
+                    updatedSensorPose.pose.position.y = sensor_pose.getOrigin().getY();
+                    updatedSensorPose.pose.position.z = sensor_pose.getOrigin().getZ();
+                    updatedSensorPose.pose.orientation.x = sensor_pose.getQuaternion().getX();
+                    updatedSensorPose.pose.orientation.y = sensor_pose.getQuaternion().getY();
+                    updatedSensorPose.pose.orientation.z = sensor_pose.getQuaternion().getZ();
+                    updatedSensorPose.pose.orientation.w = sensor_pose.getQuaternion().getW();
+            
+                    pose_updated_pub_.publish( updatedSensorPose );
+                    
+            }
+            else
+            {
+                    ROS_WARN("Unable to do a proper angle correction.");
+            }
+                    
+           
+            
+            break;
+            
+           }
+            
+            
+    }
+    
+//     std::cout << " Eng of staticSegments loop." << std::endl;
+    
+//     float MD_roll, MD_pitch, MD_yaw;
+    
+    
+//     geo::Pose3D poseWP = e.get()->pose();
+//             geo::Quaternion rotationWP = poseWP.getQuaternion();
+
+//             tf::Quaternion q ( rotationWP.getX(), rotationWP.getY(), rotationWP.getZ(), rotationWP.getW() );
+    
+//      tf::Quaternion q ( rotationWP.getX(), rotationWP.getY(), rotationWP.getZ(), rotationWP.getW() );
+//             tf::Matrix3x3 matrix ( q );
+//             double WP_roll, WP_pitch, WP_yaw;
+//             matrix.getRPY ( WP_roll, WP_pitch, WP_yaw );
+    
+//             sensorRotation.setRPY ( MD_roll, MD_pitch, MD_yaw );
+            
+//             mobidikPose.setBasis ( rotation );
+//     sensor_pose.getBasis().getRotation();
+    
+//     sensor_pose.setRPY( sensorRotation );
+
+renderWorld(sensor_pose, model_ranges, world, lrf_model_);
+    
+    for(unsigned int i = 0; i < num_beams; ++i)
+    {
+        float rs = sensor_ranges[i];
+        float rm = model_ranges[i];
+//         model_rangesOut.push_back(rm);
+        
+//         std::cout << "Sensor ranges = " << sensor_ranges[i] << ", model_ranges = " << model_ranges[i]<< std::endl;
+
+        if (rs <= 0
+                || (rm > 0 && rs > rm)  // If the sensor point is behind the world model, skip it
+                || (std::abs(rm - rs) < world_association_distance_))
+        {
+//                 modelRangesAssociatedRanges2StaticWorld[i] = model_ranges[i];
+                sensor_ranges[i] = 0;
+        }
+    }   
+     std::vector<ScanSegment> segments = determineSegments(sensor_ranges, max_gap_size_, min_segment_size_pixels_, segment_depth_threshold_, lrf_model_, min_cluster_size_, max_cluster_size_ );    
     
     
     
@@ -1160,7 +1459,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
 //                 EntityPropertiesForAssociation[jj].entity_max.y << std::endl;
            
 //    if( DEBUG )
-           std::cout << "Debug 12 \t";
+//            std::cout << "Debug 12 \t";
             // check if 1 of the extrema of the segment might be related to the exploded entity
             bool check1 =  seg_min.x > EntityPropertiesForAssociation[jj].entity_min.x && seg_min.x < EntityPropertiesForAssociation[jj].entity_max.x ;
             bool check2 =  seg_max.x > EntityPropertiesForAssociation[jj].entity_min.x && seg_max.x < EntityPropertiesForAssociation[jj].entity_max.x ;
@@ -1176,7 +1475,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
         }
 
 //     if( DEBUG )
-            std::cout << "Debug 13 \t";
+//             std::cout << "Debug 13 \t";
         // If a cluster could be associated to a (set of) entities, determine for each point to which entitiy it belongs based on a shortest distance criterion. 
         // If the distance is too large, initiate a new entity
 //         std::vector<geo::Vec2f> pointsNotAssociated;
@@ -1190,7 +1489,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
         for ( unsigned int i_points = 0; i_points < points.size(); ++i_points )  // Determine closest object and distance to this object. If distance too large, relate to new object
         {
 //                     if( DEBUG )
-            std::cout << "Debug 13.2, size = " << possibleSegmentEntityAssociations.size() << " \t";
+//             std::cout << "Debug 13.2, size = " << possibleSegmentEntityAssociations.size() << " \t";
             geo::Vec2f p = points[i_points];
             float shortestDistance = std::numeric_limits< float >::max();
             unsigned int id_shortestEntity = std::numeric_limits< unsigned int >::max();
@@ -1202,16 +1501,16 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
             for ( unsigned int jj = 0; jj < possibleSegmentEntityAssociations.size(); ++jj )  // relevant entities only
             {
 //                         if( DEBUG )
-            std::cout << "jj = " << jj << " \t";
+//             std::cout << "jj = " << jj << " \t";
                 const ed::EntityConstPtr& e = *it_laserEntities[ possibleSegmentEntityAssociations[jj] ];
                 ed::tracking::FeatureProperties featureProperties = e->property ( featureProperties_ );
                 float dist;
                 float dt = scan->header.stamp.toSec() - e->lastUpdateTimestamp();
-//                     if( DEBUG )
+                    if( DEBUG )
             std::cout << "Debug 13.5 \t";
                 if ( featureProperties.getFeatureProbabilities().get_pCircle() > featureProperties.getFeatureProbabilities().get_pRectangle() )  // entity is considered to be a circle
                 {
-//                             if( DEBUG )
+                            if( DEBUG )
             std::cout << "Debug 13.6 \t";
                     ed::tracking::Circle circle = featureProperties.getCircle();  
                     circle.predictAndUpdatePos( dt ); // TODO Do this update once at initialisation
@@ -1243,7 +1542,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
 
                     float minDistance = std::numeric_limits< float >::infinity();
 //     if( DEBUG )
-            std::cout << "Debug 13.8 \t";
+//             std::cout << "Debug 13.8 \t";
                     if ( OP_OC1 > 0 && OC1_OC1B > OP_OC1 && OP_OC3 > 0 && OC3_OC3 > OP_OC3 )   // point is inside the rectangle
                     {
                                 if( DEBUG )
@@ -1253,7 +1552,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                         std::vector<geo::Vec2f> p2Check = corners; // place last element at begin
                         p2Check.insert ( p2Check.begin(), p2Check.back() );
                         p2Check.erase ( p2Check.end() );
-//    if( DEBUG )
+   if( DEBUG )
             std::cout << "Debug 13.10 \t";
                         for ( unsigned int ii_dist = 0; ii_dist < p1Check.size(); ii_dist++ )
                         {
@@ -1754,11 +2053,11 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                  
                  if(determineWidthConfidence)
                  {
-                         ed::tracking::unwrap (&avgAngle, rectangle.get_yaw(), M_PI);
+                         ed::tracking::unwrap (&avgAngle, rectangle.get_yaw(), (float) M_PI);
                  }
                  else if (determineDepthConfidence)
                  {
-                          ed::tracking::unwrap (&avgAngle, rectangle.get_yaw() + M_PI_2, M_PI);
+                          ed::tracking::unwrap (&avgAngle, rectangle.get_yaw() + (float) M_PI_2, (float) M_PI);
                  }
                  
                  if ( (std::fabs(rectangle.get_yaw() - avgAngle) < ANGLE_MARGIN_FITTING && determineWidthConfidence) || (std::fabs(rectangle.get_yaw() + M_PI_2 - avgAngle) < ANGLE_MARGIN_FITTING && determineDepthConfidence) )
@@ -1814,11 +2113,11 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                                          measuredProperties[iList].measuredCorners.push_back( associatedPointsInfo[iList].points[PointIDHighWidth] );  
 //                                          std::cout << "Point added 1 = " << associatedPointsInfo[iList].points[PointIDHighWidth] << std::endl;
                                          
-                                         std::cout << "associatedPointsInfo[iList].points.size() = " << associatedPointsInfo[iList].points.size() << ". PointIDHighWidth = " << PointIDHighWidth << " Points = " << std::endl;
-                                         for(unsigned int iPointsTest = 0; iPointsTest < associatedPointsInfo[iList].points.size(); iPointsTest++)
-                                         {
-                                                std::cout << associatedPointsInfo[iList].points[iPointsTest] << "\t";
-                                         }
+//                                          std::cout << "associatedPointsInfo[iList].points.size() = " << associatedPointsInfo[iList].points.size() << ". PointIDHighWidth = " << PointIDHighWidth << " Points = " << std::endl;
+//                                          for(unsigned int iPointsTest = 0; iPointsTest < associatedPointsInfo[iList].points.size(); iPointsTest++)
+//                                          {
+//                                                 std::cout << associatedPointsInfo[iList].points[iPointsTest] << "\t";
+//                                          }
                                          
                                          
                                          
@@ -2246,17 +2545,17 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                 if( DEBUG )
                         std::cout << "Test 4 \t";
                 
-                
+         /*       
                  std::cout << "Before update: " << std::endl;
                  entityProperties.rectangle_.printProperties();
                 std::cout << " \n Measurement: \t" ;
                 measuredProperty.rectangle_.printProperties();
-                
+           */     
                 entityProperties.updateRectangleFeatures(QmRectangle, RmRectangle, zmRectangle, dt, sensor_pose);
-             
+             /*
                 std::cout << "\nAfter update: \t";
                 entityProperties.rectangle_.printProperties();
-                
+               */ 
 
                 
                 // update circular properties
@@ -2414,6 +2713,19 @@ void LaserPluginTracking::scanCallback(const sensor_msgs::LaserScan::ConstPtr& m
 
     scan_buffer_.push(msg);
 }
+
+void LaserPluginTracking::PoseWithCovarianceStampedCallback(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr& msg)
+{
+
+    pose_buffer_.push(msg);
+}
+
+void LaserPluginTracking::PoseWithCovarianceStampedInitCallback(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr& msg)
+{
+
+    pose_buffer_init_.push(msg);
+}
+
 
 
 ED_REGISTER_PLUGIN(LaserPluginTracking)
