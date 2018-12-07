@@ -26,11 +26,14 @@
 #include <iterator>
 
 #define DEBUG false // TEMP
+#define DEBUG_SF false // TEMP
 // 
 namespace
 {
 
 typedef std::vector<unsigned int> ScanSegment;
+
+bool sortBySegmentSize(const ScanSegment &lhs, const ScanSegment &rhs) { return lhs.size() > rhs.size(); }
 
 ros::Time tLatestPoseInit( 0.0 );
 // struct ScanSegmentInfo
@@ -569,7 +572,7 @@ bool isInside(std::vector<T> Points, T& p)
         }
     }
     
-    std::cout << "In determineSegments: segmenst.size() = " << segments.size();
+//     std::cout << "In determineSegments: segmenst.size() = " << segments.size();
     return segments;
 }
 
@@ -627,9 +630,13 @@ void LaserPluginTracking::initialize(ed::InitData& init)
     pose_updated_pub_ = nh.advertise<geometry_msgs::PoseStamped> ( "PoseTest", 3 ); // TEMP
     points_measured_pub_ = nh.advertise<visualization_msgs::Marker> ( "MeasuredPoints", 3 ); // TEMP;
     points_modelled_pub_ = nh.advertise<visualization_msgs::Marker> ( "ModelledPoints", 3 ); // TEMP;
-
+    points_modelled_all_pub_ = nh.advertise<visualization_msgs::Marker> ( "ModelledPointsAll", 3 ); // TEMP;
+    points_measured_all_pub_ = nh.advertise<visualization_msgs::Marker> ( "MeasuredPointsAll", 3 ); // TEMP;
+    cornerPointModelled_pub_ = nh.advertise<visualization_msgs::Marker> ( "cornerPointModelled", 3 ); // TEMP
+    cornerPointMeasured_pub_ = nh.advertise<visualization_msgs::Marker> ( "cornerPointMeasured", 3 ); // TEMP
+    
 //     initializedPose_sub_ = nh.subscribe<geometry_msgs::PoseWithCovarianceStamped>("initPose", bufferSize, &LaserPluginTracking::PoseWithCovarianceStampedInitCallback, this);
-    improvedRobotPos_pub_= nh.advertise<geometry_msgs::PoseWithCovarianceStamped> ( "initialpose", 3 );
+//     improvedRobotPos_pub_= nh.advertise<geometry_msgs::PoseWithCovarianceStamped> ( "initialpose", 3 );
 //     amclPose_sub_ = nh.subscribe<geometry_msgs::PoseWithCovarianceStamped>("amcl_pose", bufferSize, &LaserPluginTracking::PoseWithCovarianceStampedCallback, this);
 
     tf_listener_ = new tf::TransformListener;
@@ -647,7 +654,8 @@ void LaserPluginTracking::initialize(ed::InitData& init)
 void LaserPluginTracking::process(const ed::WorldModel& world, ed::UpdateRequest& req)
 {
 //         std::cout << termcolor::red << "pose_buffer_init_.size() before = " << pose_buffer_init_.size() << termcolor::reset << std::endl; 
-  /*      TODO 
+  //      Do not pub improved localisation on AMCL-topic -> gives problems with time-synchronisation!
+        /*
     if( !pose_buffer_init_.empty() )
     {
             geometry_msgs::PoseWithCovarianceStamped::ConstPtr robotPose = pose_buffer_init_.front();
@@ -739,7 +747,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
 // 
 //          std::cout << "Start of plugin at t = " << now.tv_sec << "." << now.tv_usec << std::endl;
          
-          std::cout << "Start of plugin" << std::endl;
+          std::cout << termcolor::on_yellow << "Start of plugin" << termcolor::reset << std::endl;
 
 
     // - - - - - - - - - - - - - - - - - -
@@ -919,20 +927,40 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
     // - - - - - - - - - - - - - - - - - -
     // Segment the remaining points into clusters
 
-//     if( DEBUG )
+    if( DEBUG )
             std::cout << "Debug 5 \t";
     
 //     std::vector<ScanSegment> segments = determineSegments(sensor_ranges, max_gap_size_, min_segment_size_pixels_, segment_depth_threshold_, lrf_model_, min_cluster_size_, max_cluster_size_ );    
 
     std::vector<ScanSegment> staticSegments = determineSegments(modelRangesAssociatedRanges2StaticWorld, max_gap_size_, min_segment_size_pixels_, segment_depth_threshold_, lrf_model_, min_cluster_size_, max_cluster_size_ );    
-    std::cout << "staticSegments.size() = " << staticSegments.size() << std::endl;
+//     std::cout << "staticSegments.size() = " << staticSegments.size() << std::endl;
+    std::sort(staticSegments.begin(), staticSegments.end(), sortBySegmentSize);
+    std::cout << "Size of staticSegments = ";
+    for (unsigned int iSegmentTest = 0; iSegmentTest < staticSegments.size(); iSegmentTest++)
+    {
+            std::cout << staticSegments[iSegmentTest].size() << "\t";
+    }
+    std::cout << "\n";
+//     
+    
+    std::cout << "cornerPointMeasured init" << std::endl;
+    geo::Vec2f cornerPointMeasured, cornerPointModelled;
+    
+    bool cornerPointsFound = false, angleCorrectionFound = false;
+    unsigned int elementOfCorner;
+    float diffAngle;
+    
+    tf::Quaternion q ( sensor_pose.getQuaternion().x, sensor_pose.getQuaternion().y, sensor_pose.getQuaternion().z, sensor_pose.getQuaternion().w );
+    tf::Matrix3x3 matrix ( q );
+    double rollSensor, pitchSensor, yawSensor;
+    matrix.getRPY ( rollSensor, pitchSensor, yawSensor );
     
     for(unsigned int iSegment = 0; iSegment < staticSegments.size(); iSegment++)
     {
 //             std::cout << "Bla";
            ScanSegment staticSegment = staticSegments[iSegment];
 //            std::cout << "After Bla";
-//            std::cout << "For iSegment = " << iSegment << " staticSegment read. ";
+           std::cout << "For iSegment = " << iSegment << " staticSegment read. Size = " << staticSegment.size() << std::endl;
            
 //            std::cout << "Static Segment size = " << staticSegment.size() << std::endl;
            
@@ -941,195 +969,409 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
                    continue;
            }
            
-           float mean, standardDeviation;
-           ed::tracking::determineIAV(modelRangesAssociatedRanges2StaticWorld, &mean, &standardDeviation, lrf_model_, staticSegment[0], staticSegment.back() );
            
-            tf::Quaternion q ( sensor_pose.getQuaternion().x, sensor_pose.getQuaternion().y, sensor_pose.getQuaternion().z, sensor_pose.getQuaternion().w );
-            tf::Matrix3x3 matrix ( q );
-            double rollSensor, pitchSensor, yawSensor;
-            matrix.getRPY ( rollSensor, pitchSensor, yawSensor );
+           std::vector< geo::Vec2f> points(  staticSegment.size() ), modelledPoints(  staticSegment.size() ) ;
+           std::cout << "Point info ";
+           std::cout << "staticSegment.size() = " << staticSegment.size();
+           
+           
+           
+           for( unsigned int iSeg2Point = 0; iSeg2Point < staticSegment.size(); iSeg2Point++)
+           {
+
+                   unsigned int j = staticSegment[iSeg2Point];
+                   geo::Vector3 p_sensor = lrf_model_.rayDirections() [j] * sensor_ranges[j];
+                   geo::Vector3 p_model = lrf_model_.rayDirections() [j] * modelRangesAssociatedRanges2StaticWorld[j];
+                   
+//                    std::cout << "j = " << j << ", p_sensor = " << p_sensor << ", p_model = " << p_model << "\t";
+                   
+                   // Transform to world frame
+                   geo::Vector3 p = sensor_pose * p_sensor;
+                   geo::Vector3 p_modelled = sensor_pose * p_model;
+                   
+//                    std::cout << "p = " << j << ", p_modelled = " << p_modelled << "\t";
+                   
+                   
+                   // Add to cv array
+                   points[iSeg2Point] = geo::Vec2f ( p.x, p.y );
+                   modelledPoints[iSeg2Point] = geo::Vec2f ( p_modelled.x, p_modelled.y );   
+                   
+                  
+                  
+           }
+
             
+                
+
+           
+                
+           
+           
+                      std::cout << " modelledPoints.size() = " << modelledPoints.size() << std::endl;
+           
+           
+           std::vector < unsigned int > possibleCorners, possibleCornersModel;
+           
+           std::vector<geo::Vec2f>::iterator it_start = points.begin();
+           std::vector<geo::Vec2f>::iterator it_end = points.end();
+           std::cout << "\nFor measured points: ";
+           bool cornerFound = ed::tracking::findPossibleCorner ( points, &possibleCorners, &it_start, &it_end );
+           
+           
+           
+           
+           
+           
+           
+           std::cout << "cornerPointsFound  = " << cornerPointsFound << " cornerFound = " << cornerFound << std::endl;
+           
+           if (!cornerPointsFound && cornerFound)
+           {
+                it_start = modelledPoints.begin();
+                it_end = modelledPoints.end();
+                std::cout << "For modelled points: ";
+                bool cornerFoundModel = ed::tracking::findPossibleCorner ( modelledPoints, &possibleCornersModel, &it_start, &it_end );
+                
+                 std::cout << "cornerFoundModel  = " << cornerFoundModel << std::endl;
+                 
+                if(cornerFound && cornerFoundModel)
+                {
+                        std::cout << "CornerModelFound" << std::endl;
+                        
+                        std::cout << "cornerPointMeasured assigned "<< std::endl;
+                        cornerPointsFound = true;
+                        elementOfCorner = staticSegment[0] + possibleCornersModel[0];
+                        cornerPointMeasured = points[ possibleCorners[0] ];
+                        cornerPointModelled = modelledPoints[ possibleCornersModel[0] ];
+                        
+                        std::cout << "cornerPointMeasured = " << cornerPointMeasured << " cornerPointModelled = " << cornerPointModelled << std::endl;
+
+                   std::cout << " AngleStart = " << yawSensor + lrf_model_.getAngleMin() + lrf_model_.getAngleIncrement()*staticSegment[0] << " staticSegment[0] = " << staticSegment[0];
+std::cout << "yawSensor = " << yawSensor << " lrf_model_.getAngleMin() = " << lrf_model_.getAngleMin()  << " lrf_model_.getAngleIncrement() = " << lrf_model_.getAngleIncrement() << std::endl;
+                   
+                        visualization_msgs::Marker pointsModelledAll;
+                        pointsModelledAll.header.frame_id = "/map";
+                        pointsModelledAll.header.stamp = scan->header.stamp;
+                        pointsModelledAll.ns = "modelledPoints";
+                        pointsModelledAll.id = 1;
+                        pointsModelledAll.type = visualization_msgs::Marker::POINTS;
+                        pointsModelledAll.action = visualization_msgs::Marker::ADD;
+                        pointsModelledAll.pose.orientation = tf::createQuaternionMsgFromRollPitchYaw ( 0.0, 0.0, 0.0 );
+                        pointsModelledAll.scale.x = 0.03;
+                        pointsModelledAll.scale.y = 0.03;
+                        pointsModelledAll.scale.z = 0.03;
+                        pointsModelledAll.color.r = 0.0;
+                        pointsModelledAll.color.g = 0.0;
+                        pointsModelledAll.color.b = 1.0;
+                        pointsModelledAll.color.a = 1.0; 
+                        pointsModelledAll.lifetime = ros::Duration( 0.2 );
+                             
+                        visualization_msgs::Marker pointsAll;
+                        pointsAll.header.frame_id = "/map";
+                        pointsAll.header.stamp = scan->header.stamp;
+                        pointsAll.ns = "modelledPoints";
+                        pointsAll.id = 1;
+                        pointsAll.type = visualization_msgs::Marker::POINTS;
+                        pointsAll.action = visualization_msgs::Marker::ADD;
+                        pointsAll.pose.orientation = tf::createQuaternionMsgFromRollPitchYaw ( 0.0, 0.0, 0.0 );
+                        pointsAll.scale.x = 0.03;
+                        pointsAll.scale.y = 0.03;
+                        pointsAll.scale.z = 0.03;
+                        pointsAll.color.r = 0.0;
+                        pointsAll.color.g = 0.0;
+                        pointsAll.color.b = 1.0;
+                        pointsAll.color.a = 1.0; 
+                        pointsAll.lifetime = ros::Duration( 0.2 );
+           
+                        for( unsigned int iSeg2Point = 0; iSeg2Point < staticSegment.size(); iSeg2Point++)
+                        {
+                //             std::cout << "Points = " << points[iSeg2Point] << modelledPoints[iSeg2Point] << "\t";
+                                unsigned int element = staticSegment[iSeg2Point];
+                                float angle = yawSensor + lrf_model_.getAngleMin() + lrf_model_.getAngleIncrement()*element;
+                                
+                                modelledPoints[iSeg2Point].x = sensor_pose.getOrigin().getX() + modelRangesAssociatedRanges2StaticWorld[element]*cos( angle );
+                                modelledPoints[iSeg2Point].y = sensor_pose.getOrigin().getY() + modelRangesAssociatedRanges2StaticWorld[element]*sin( angle );
+                                 
+                                geometry_msgs::Point point2Pub;
+                                point2Pub.x = sensor_pose.getOrigin().getX() + sensor_ranges[element]*cos( angle );
+                                point2Pub.y = sensor_pose.getOrigin().getY() + sensor_ranges[element]*sin( angle );
+                                point2Pub.z = sensor_pose.getOrigin().getZ();        
+                                pointsAll.points.push_back(point2Pub);
+                        
+                                geometry_msgs::Point p;
+                                p.x = modelledPoints[iSeg2Point].x;
+                                p.y = modelledPoints[iSeg2Point].y;
+                                p.z = sensor_pose.getOrigin().getZ();
+                                                
+                                pointsModelledAll.points.push_back(p);
+                                        
+                                        
+                                        
+                        }
+                        
+                        points_measured_all_pub_.publish(pointsAll);
+                        points_modelled_all_pub_.publish(pointsModelledAll);
+                        // TODO Hier gebleven
+                }
+           }       
+
+//            float mean, standardDeviation;
+//            ed::tracking::determineIAV(modelRangesAssociatedRanges2StaticWorld, &mean, &standardDeviation, lrf_model_, staticSegment[0], staticSegment.back() );
 //             std::cout << "Mean IAV = " << mean  << " abs diff = " << std::abs( mean - M_PI ) << "standardDeviation = " << standardDeviation << std::endl;
             
            
-           if( std::abs( mean - M_PI ) < MAX_DEVIATION_IAV_STRAIGHT_LINE )
+//            if( std::abs( mean - M_PI ) < MAX_DEVIATION_IAV_STRAIGHT_LINE )
+           if( !cornerFound && ! angleCorrectionFound) // beause we want to correct based on a straight line.
            {
-            // straight line detected. Take a subset (2 middle quarters) of this line and do a fit for line as well as the corresponding fit for the ranges expected in the WM
-            unsigned int segmentLength = staticSegment.size();       
-            unsigned int startElement = segmentLength / 5;
-            unsigned int finalElement = segmentLength * 4/5;
-                   
-            std::vector<geo::Vec2f> measuredPoints(finalElement - startElement), modelledPoints(finalElement - startElement);
-            unsigned int counter = 0;
-            
-//             std::cout << "startElement = " << startElement << " finalElement = " << finalElement << " segmentLength = " << segmentLength  << std::endl;
-//             std::cout << "staticSegment[startElement] = " << staticSegment[startElement] << " staticSegment[finalElement] = " << staticSegment[finalElement] << std::endl;
-            
-            for(unsigned int iLineFit = startElement; iLineFit < finalElement; iLineFit ++)       
-            {
-//                     std::cout << "staticSegment.size() = " << staticSegment.size() << " iLineFit = " << iLineFit <<  std::endl;
-                    unsigned int element = staticSegment[iLineFit];
-                    float angle = yawSensor + lrf_model_.getAngleMin() + lrf_model_.getAngleIncrement()*element;
-                    measuredPoints[counter].x = sensor_pose.getOrigin().getX() + modelRangesAssociatedRanges2StaticWorld[element]*cos( angle );
-                    measuredPoints[counter].y = sensor_pose.getOrigin().getY() + modelRangesAssociatedRanges2StaticWorld[element]*sin( angle );
-                    
-                    modelledPoints[counter].x = sensor_pose.getOrigin().getX() + model_ranges[element]*cos( angle );
-                    modelledPoints[counter].y = sensor_pose.getOrigin().getY() + model_ranges[element]*sin( angle );
-                    
-//                     std::cout << "modelledPoints[counter] = " << modelledPoints[counter] << " measuredPoints[counter] = " << measuredPoints[counter] << "counter = " << counter << std::endl;
-//                     std::cout << "sensor_ranges[element] = " << model_ranges[element] << " counter = " << counter << std::endl;
-                    counter++;
-                    
-            }
+                // straight line detected. Take a subset (2 middle quarters) of this line and do a fit for line as well as the corresponding fit for the ranges expected in the WM
+                unsigned int segmentLength = staticSegment.size();       
+                unsigned int startElement = segmentLength / 5;
+                unsigned int finalElement = segmentLength * 4/5;
+                        
+                std::vector<geo::Vec2f> measuredPoints(finalElement - startElement), modelledPoints(finalElement - startElement);
+                unsigned int counter = 0;
+                
+        //             std::cout << "startElement = " << startElement << " finalElement = " << finalElement << " segmentLength = " << segmentLength  << std::endl;
+        //             std::cout << "staticSegment[startElement] = " << staticSegment[startElement] << " staticSegment[finalElement] = " << staticSegment[finalElement] << std::endl;
+                
+                for(unsigned int iLineFit = startElement; iLineFit < finalElement; iLineFit ++)       
+                {
+        //                     std::cout << "staticSegment.size() = " << staticSegment.size() << " iLineFit = " << iLineFit <<  std::endl;
+                        unsigned int element = staticSegment[iLineFit];
+                        float angle = yawSensor + lrf_model_.getAngleMin() + lrf_model_.getAngleIncrement()*element;
+                        measuredPoints[counter].x = sensor_pose.getOrigin().getX() + sensor_ranges[element]*cos( angle );
+                        measuredPoints[counter].y = sensor_pose.getOrigin().getY() + sensor_ranges[element]*sin( angle );
+                        
+                        modelledPoints[counter].x = sensor_pose.getOrigin().getX() + modelRangesAssociatedRanges2StaticWorld[element]*cos( angle );
+                        modelledPoints[counter].y = sensor_pose.getOrigin().getY() + modelRangesAssociatedRanges2StaticWorld[element]*sin( angle );
+                        
+        //                     std::cout << "modelledPoints[counter] = " << modelledPoints[counter] << " measuredPoints[counter] = " << measuredPoints[counter] << "counter = " << counter << std::endl;
+        //                     std::cout << "sensor_ranges[element] = " << model_ranges[element] << " counter = " << counter << std::endl;
+                        counter++;
+                        
+                }
 
-//             std::cout << "Angle low = " << lrf_model_.getAngleMin() + lrf_model_.getAngleIncrement()*staticSegment[startElement];
-//             std::cout << "Angle High = " << lrf_model_.getAngleMin() + lrf_model_.getAngleIncrement()*staticSegment[finalElement] << std::endl;
-            
-            visualization_msgs::Marker pointsMeasured, pointsModelled;
-//             points.markers.size() = measuredPoints.size() + modelledPoints.size();
-            
-//             std::cout << "Measured points = " ;
-            
-                    pointsModelled.header.frame_id = "/map";
-                    pointsModelled.header.stamp = scan->header.stamp;
-                    pointsModelled.ns = "modelledPoints";
-                    pointsModelled.id = 1;
-                    pointsModelled.type = visualization_msgs::Marker::POINTS;
-                    pointsModelled.action = visualization_msgs::Marker::ADD;
-//                     pointsModelled.pose.orientation = tf::createQuaternionMsgFromRollPitchYaw ( rollSensor, pitchSensor, yawSensor );
-                    pointsModelled.scale.x = 0.1;
-                    pointsModelled.scale.y = 0.1;
-                    pointsModelled.scale.z = 0.1;
-                    pointsModelled.color.r = 0.0;
-                    pointsModelled.color.g = 0.0;
-                    pointsModelled.color.b = 1.0;
-                    pointsModelled.color.a = 1.0; 
-                    pointsModelled.lifetime = ros::Duration( 0.2 );
-                    
-            for(int iPoints = 0; iPoints < modelledPoints.size(); iPoints++)
-            {
-                    geometry_msgs::Point p;
-                    
-                    p.x = modelledPoints[iPoints].x;
-                    p.y = modelledPoints[iPoints].y;
-                    p.z = sensor_pose.getOrigin().getZ();
-                    
-//                     std::cout << "Modelled: p = " << p.x << ", " << p.y << ", " << p.z << std::endl;
-                    
-                    pointsModelled.points.push_back(p);
-            }
-            points_modelled_pub_.publish( pointsModelled );
+        //             std::cout << "Angle low = " << lrf_model_.getAngleMin() + lrf_model_.getAngleIncrement()*staticSegment[startElement];
+        //             std::cout << "Angle High = " << lrf_model_.getAngleMin() + lrf_model_.getAngleIncrement()*staticSegment[finalElement] << std::endl;
+                
+                visualization_msgs::Marker pointsMeasured, pointsModelled;
+        //             points.markers.size() = measuredPoints.size() + modelledPoints.size();
+                
+        //             std::cout << "Measured points = " ;
+                
+                        pointsModelled.header.frame_id = "/map";
+                        pointsModelled.header.stamp = scan->header.stamp;
+                        pointsModelled.ns = "modelledPoints";
+                        pointsModelled.id = 1;
+                        pointsModelled.type = visualization_msgs::Marker::POINTS;
+                        pointsModelled.action = visualization_msgs::Marker::ADD;
+        //                     pointsModelled.pose.orientation = tf::createQuaternionMsgFromRollPitchYaw ( rollSensor, pitchSensor, yawSensor );
+                        pointsModelled.scale.x = 0.1;
+                        pointsModelled.scale.y = 0.1;
+                        pointsModelled.scale.z = 0.1;
+                        pointsModelled.color.r = 0.0;
+                        pointsModelled.color.g = 0.0;
+                        pointsModelled.color.b = 1.0;
+                        pointsModelled.color.a = 1.0; 
+                        pointsModelled.lifetime = ros::Duration( 0.2 );
+                        
+                for(int iPoints = 0; iPoints < modelledPoints.size(); iPoints++)
+                {
+                        geometry_msgs::Point p;
+                        
+                        p.x = modelledPoints[iPoints].x;
+                        p.y = modelledPoints[iPoints].y;
+                        p.z = sensor_pose.getOrigin().getZ();
+                        
+        //                     std::cout << "Modelled: p = " << p.x << ", " << p.y << ", " << p.z << std::endl;
+                        
+                        pointsModelled.points.push_back(p);
+                }
+                points_modelled_pub_.publish( pointsModelled );
 
-            
-                    pointsMeasured.header.frame_id = "/map";
-                    pointsMeasured.header.stamp = scan->header.stamp;
-                    pointsMeasured.ns = "measuredPoints";
-                    pointsMeasured.id = 1;
-                    pointsMeasured.type = visualization_msgs::Marker::POINTS;
-                    pointsMeasured.action = visualization_msgs::Marker::ADD;
-//                     pointsMeasured.pose.orientation = tf::createQuaternionMsgFromRollPitchYaw ( rollSensor, pitchSensor, yawSensor );
-                    pointsMeasured.scale.x = 0.1;
-                    pointsMeasured.scale.y = 0.1;
-                    pointsMeasured.scale.z = 0.1;
-                    pointsMeasured.color.r = 0.0;
-                    pointsMeasured.color.g = 1.0;
-                    pointsMeasured.color.b = 0.0;
-                    pointsMeasured.color.a = 1.0; 
-                    pointsMeasured.lifetime = ros::Duration( 0.2 );
-                    
-            for(int iPoints = 0; iPoints < measuredPoints.size(); iPoints++)
-            {
-                    geometry_msgs::Point p;
-                    
-                    p.x = measuredPoints[iPoints].x;
-                    p.y = measuredPoints[iPoints].y;
-                    p.z = sensor_pose.getOrigin().getZ();
-                    
-//                     std::cout << "Measured p = " << p.x << ", " << p.y << ", " << p.z << std::endl;
-                    
-                    pointsMeasured.points.push_back(p);
-            }
-            points_measured_pub_.publish( pointsMeasured );
-            
-            
-            Eigen::VectorXf lineFitParamsMeasured( 2 ), lineFitParamsModdelled( 2 );
-            std::vector<geo::Vec2f>::iterator it_start = measuredPoints.begin();
-            std::vector<geo::Vec2f>::iterator it_end = measuredPoints.end();
-            float fitErrorMeasured =  ed::tracking::fitLine ( measuredPoints, lineFitParamsMeasured, &it_start , &it_end );
-            
-            it_start = modelledPoints.begin();
-            it_end = modelledPoints.end();
-            float fitErrorModelled =  ed::tracking::fitLine ( modelledPoints, lineFitParamsModdelled, &it_start , &it_end );
-    
-            double measuredAngle = atan2 ( lineFitParamsMeasured ( 1 ), 1 );
-            double modelledAngle = atan2 ( lineFitParamsModdelled ( 1 ), 1 );
-            
+                
+                        pointsMeasured.header.frame_id = "/map";
+                        pointsMeasured.header.stamp = scan->header.stamp;
+                        pointsMeasured.ns = "measuredPoints";
+                        pointsMeasured.id = 1;
+                        pointsMeasured.type = visualization_msgs::Marker::POINTS;
+                        pointsMeasured.action = visualization_msgs::Marker::ADD;
+        //                     pointsMeasured.pose.orientation = tf::createQuaternionMsgFromRollPitchYaw ( rollSensor, pitchSensor, yawSensor );
+                        pointsMeasured.scale.x = 0.1;
+                        pointsMeasured.scale.y = 0.1;
+                        pointsMeasured.scale.z = 0.1;
+                        pointsMeasured.color.r = 0.0;
+                        pointsMeasured.color.g = 1.0;
+                        pointsMeasured.color.b = 0.0;
+                        pointsMeasured.color.a = 1.0; 
+                        pointsMeasured.lifetime = ros::Duration( 0.2 );
+                        
+                for(int iPoints = 0; iPoints < measuredPoints.size(); iPoints++)
+                {
+                        geometry_msgs::Point p;
+                        
+                        p.x = measuredPoints[iPoints].x;
+                        p.y = measuredPoints[iPoints].y;
+                        p.z = sensor_pose.getOrigin().getZ();
+                        
+        //                     std::cout << "Measured p = " << p.x << ", " << p.y << ", " << p.z << std::endl;
+                        
+                        pointsMeasured.points.push_back(p);
+                }
+                points_measured_pub_.publish( pointsMeasured );
+                
+                
+                Eigen::VectorXf lineFitParamsMeasured( 2 ), lineFitParamsModdelled( 2 );
+                std::vector<geo::Vec2f>::iterator it_start = measuredPoints.begin();
+                std::vector<geo::Vec2f>::iterator it_end = measuredPoints.end();
+                float fitErrorMeasured =  ed::tracking::fitLine ( measuredPoints, lineFitParamsMeasured, &it_start , &it_end );
+                
+                it_start = modelledPoints.begin();
+                it_end = modelledPoints.end();
+                float fitErrorModelled =  ed::tracking::fitLine ( modelledPoints, lineFitParamsModdelled, &it_start , &it_end );
+        
+                double measuredAngle = atan2 ( lineFitParamsMeasured ( 1 ), 1 );
+                double modelledAngle = atan2 ( lineFitParamsModdelled ( 1 ), 1 );
+                
 
-            
-//             std::cout << termcolor::cyan << "Yaw before = " << yawSensor << " diff = " << measuredAngle - modelledAngle  << "Measured Angle = " << measuredAngle << " Modelled Angle = " << modelledAngle  << " Yaw new =  " << yawSensor - (measuredAngle - modelledAngle) << termcolor::reset << std::endl;
-            
-            ed::tracking::unwrap(&modelledAngle, measuredAngle, 2*M_PI);
-            float diffAngle = measuredAngle - modelledAngle;
-            
-            if(diffAngle < MAX_DEVIATION_IAV_STRAIGHT_LINE )
-            {
-                    yawSensor += diffAngle;
-                    ed::tracking::wrap2Interval(&yawSensor, (double) 0.0, (double) 2*M_PI);
-//             std::cout << "sensor_pose before = " << sensor_pose << std::endl;
-            
-                    sensor_pose.setRPY(rollSensor, pitchSensor, yawSensor );  // TODO not in loop below?
-//             std::cout << "sensor_pose after = " << sensor_pose << std::endl;
-                    
-//                     std::cout << termcolor::red  << "pose_buffer_init_.size() = " << pose_buffer_init_.size() << termcolor::reset << std::endl;
-                    // TODO
-                    /*if( pose_buffer_init_.empty() )
-                    {
-                            std::cout << "Ros time = " << ros::Time::now() << " tLatestPoseInit = " << tLatestPoseInit << " diff = " <<  ros::Time::now() - tLatestPoseInit << std::endl;
-                        if( !pose_buffer_.empty() && ros::Time::now() - tLatestPoseInit > DELAY_AFTER_INIT)
-                        {
-                                
-                                geometry_msgs::PoseWithCovarianceStamped::ConstPtr robotPose = pose_buffer_.front();
-                                geometry_msgs::PoseWithCovarianceStamped updatedPose;
-                                
-                                updatedPose.header = robotPose->header;
-                                updatedPose.pose = robotPose->pose;
-                                
-                                // assumption: orientation robot and sensor similar
-                                updatedPose.pose.pose.orientation.x = sensor_pose.getQuaternion().getX();
-                                updatedPose.pose.pose.orientation.y = sensor_pose.getQuaternion().getY();
-                                updatedPose.pose.pose.orientation.z = sensor_pose.getQuaternion().getZ();
-                                updatedPose.pose.pose.orientation.w = sensor_pose.getQuaternion().getW();
-                                improvedRobotPos_pub_.publish(updatedPose); 
-                        }
-                    } 
-            */
-                    geometry_msgs::PoseStamped updatedSensorPose;
-                    updatedSensorPose.header = scan->header;
-                    updatedSensorPose.header.frame_id = "map";
-                    updatedSensorPose.pose.position.x = sensor_pose.getOrigin().getX();
-                    updatedSensorPose.pose.position.y = sensor_pose.getOrigin().getY();
-                    updatedSensorPose.pose.position.z = sensor_pose.getOrigin().getZ();
-                    updatedSensorPose.pose.orientation.x = sensor_pose.getQuaternion().getX();
-                    updatedSensorPose.pose.orientation.y = sensor_pose.getQuaternion().getY();
-                    updatedSensorPose.pose.orientation.z = sensor_pose.getQuaternion().getZ();
-                    updatedSensorPose.pose.orientation.w = sensor_pose.getQuaternion().getW();
-            
-                    pose_updated_pub_.publish( updatedSensorPose );
-                    
-            }
-            else
-            {
-                    ROS_WARN("Unable to do a proper angle correction.");
-            }
-                    
+                
+                
+                
+                ed::tracking::unwrap(&modelledAngle, measuredAngle, 2*M_PI);
+                diffAngle = measuredAngle - modelledAngle;
+                std::cout << "Diffangle = " << diffAngle << std::endl;
+                
+                if(diffAngle < MAX_DEVIATION_ANGLE_CORRECTION ) // Only correct if localization partially leads to problems
+                {
+                        angleCorrectionFound = true;
+                }
+                
+           }
            
-            
-            break;
-            
+           if( cornerPointsFound && angleCorrectionFound )        
+           {
+                   break;
            }
             
-            
+           
     }
+           
+           
+           if( angleCorrectionFound )
+           {                     
+                   
+            
+               std::cout << termcolor::cyan << "Yaw before = " << yawSensor << " diff = " << diffAngle ; // << "Measured Angle = " << measuredAngle << " Modelled Angle = " << modelledAngle  << " Yaw new =  " << yawSensor - (measuredAngle - modelledAngle) << termcolor::reset << std::endl;
+                        yawSensor -= diffAngle;
+                        std::cout << " yaw new = " << yawSensor << termcolor::reset << std::endl;
+                        ed::tracking::wrap2Interval(&yawSensor, (double) 0.0, (double) 2*M_PI);
+        //             std::cout << "sensor_pose before = " << sensor_pose << std::endl;
+                
+                        sensor_pose.setRPY(rollSensor, pitchSensor, yawSensor );
+                        
+                        // Rotation updated, so this influences the delta in x,y. Recompute the cornerPointModelled
+                        geo::Vector3 p_model = lrf_model_.rayDirections() [elementOfCorner] * modelRangesAssociatedRanges2StaticWorld[elementOfCorner];
+                        geo::Vector3 p_modelled = sensor_pose * p_model;
+                        std::cout << " cornerPointModelled before correction = " << cornerPointModelled << std::endl;
+                        cornerPointModelled = geo::Vec2f ( p_modelled.x, p_modelled.y );
+        //             std::cout << "sensor_pose after = " << sensor_pose << std::endl;
+                        
+        //                     std::cout << termcolor::red  << "pose_buffer_init_.size() = " << pose_buffer_init_.size() << termcolor::reset << std::endl;
+                        // TODO
+                        /*
+                        if( pose_buffer_init_.empty() )
+                        {
+                                std::cout << "Ros time = " << ros::Time::now() << " tLatestPoseInit = " << tLatestPoseInit << " diff = " <<  ros::Time::now() - tLatestPoseInit << std::endl;
+                                if( !pose_buffer_.empty() && ros::Time::now() - tLatestPoseInit > DELAY_AFTER_INIT)
+                                {
+                                        
+                                        geometry_msgs::PoseWithCovarianceStamped::ConstPtr robotPose = pose_buffer_.front();
+                                        geometry_msgs::PoseWithCovarianceStamped updatedPose;
+                                        
+                                        updatedPose.header = robotPose->header;
+                                        updatedPose.pose = robotPose->pose;
+                                        
+                                        // assumption: orientation robot and sensor similar
+                                        updatedPose.pose.pose.orientation.x = sensor_pose.getQuaternion().getX();
+                                        updatedPose.pose.pose.orientation.y = sensor_pose.getQuaternion().getY();
+                                        updatedPose.pose.pose.orientation.z = sensor_pose.getQuaternion().getZ();
+                                        updatedPose.pose.pose.orientation.w = sensor_pose.getQuaternion().getW();
+                                        improvedRobotPos_pub_.publish(updatedPose); 
+                                }
+                        } 
+                
+                        
+                        */
+           }
+            
+            if( cornerPointsFound )
+            {
+             std::cout << "Diff init " << std::endl;       
+                    geo::Vec2f diff = cornerPointMeasured - cornerPointModelled;
+                    visualization_msgs::Marker cornerPointMeasuredMarker, cornerPointModelledMarker;
+                    
+                        cornerPointMeasuredMarker.header.frame_id = "/map";
+                        cornerPointMeasuredMarker.header.stamp = scan->header.stamp;
+                        cornerPointMeasuredMarker.ns = "measuredPoints";
+                        cornerPointMeasuredMarker.id = 1;
+                        cornerPointMeasuredMarker.type = visualization_msgs::Marker::POINTS;
+                        cornerPointMeasuredMarker.action = visualization_msgs::Marker::ADD;
+        //                     pointsMeasured.pose.orientation = tf::createQuaternionMsgFromRollPitchYaw ( rollSensor, pitchSensor, yawSensor );
+                        cornerPointMeasuredMarker.scale.x = 0.1;
+                        cornerPointMeasuredMarker.scale.y = 0.1;
+                        cornerPointMeasuredMarker.scale.z = 0.1;
+                        cornerPointMeasuredMarker.color.r = 1.0;
+                        cornerPointMeasuredMarker.color.g = 1.0;
+                        cornerPointMeasuredMarker.color.b = 0.0;
+                        cornerPointMeasuredMarker.color.a = 1.0; 
+                        cornerPointMeasuredMarker.lifetime = ros::Duration( 0.2 );
+                        
+                        cornerPointModelledMarker = cornerPointMeasuredMarker;
+                        
+                        geometry_msgs::Point pos;
+                        pos.x = cornerPointMeasured.x;
+                        pos.y = cornerPointMeasured.y;
+                        pos.z = sensor_pose.getOrigin().getZ();                        
+                        cornerPointMeasuredMarker.points.push_back(pos);
+                        cornerPointMeasured_pub_.publish(cornerPointMeasuredMarker); 
+                        
+                        
+                        cornerPointModelledMarker.color.r = 1.0;
+                        cornerPointModelledMarker.color.g = 0.0;
+                        cornerPointModelledMarker.color.b = 1.0;
+                        cornerPointModelledMarker.color.a = 1.0; 
+                        
+                        pos.x = cornerPointModelled.x;
+                        pos.y = cornerPointModelled.y;
+                        pos.z = sensor_pose.getOrigin().getZ();                        
+                        cornerPointModelledMarker.points.push_back(pos);
+                        
+                        cornerPointModelled_pub_.publish(cornerPointModelledMarker); 
+    
+                    
+                    std::cout << termcolor::magenta << "x,y diff = " << diff << " cornerPointMeasured = " << cornerPointMeasured << ", " << cornerPointModelled << termcolor::reset << std::endl;
+                    
+                    geo::Vec3T< geo::real > updatedPos(sensor_pose.getOrigin().getX() - diff.x, sensor_pose.getOrigin().getY() - diff.y, sensor_pose.getOrigin().getZ() );
+                    sensor_pose.setOrigin( updatedPos );
+                    
+            }
+            
+            // TEMP TO TEST
+                geometry_msgs::PoseStamped updatedSensorPose;
+                        updatedSensorPose.header = scan->header;
+                        updatedSensorPose.header.frame_id = "map";
+                        updatedSensorPose.pose.position.x = sensor_pose.getOrigin().getX();
+                        updatedSensorPose.pose.position.y = sensor_pose.getOrigin().getY();
+                        updatedSensorPose.pose.position.z = sensor_pose.getOrigin().getZ();
+                        updatedSensorPose.pose.orientation.x = sensor_pose.getQuaternion().getX();
+                        updatedSensorPose.pose.orientation.y = sensor_pose.getQuaternion().getY();
+                        updatedSensorPose.pose.orientation.z = sensor_pose.getQuaternion().getZ();
+                        updatedSensorPose.pose.orientation.w = sensor_pose.getQuaternion().getW();
+                
+                        pose_updated_pub_.publish( updatedSensorPose );
+            
+            
+    
     
 //     std::cout << " Eng of staticSegments loop." << std::endl;
     
@@ -1291,7 +1533,7 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
 //         }
 //     }
     
-//     if( DEBUG )
+    if( DEBUG )
             std::cout << "Debug 8 \t";
     
     // Try to associate remaining laser points to specific entities
@@ -1373,7 +1615,7 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
 //             EntityPropertiesForAssociation[iTest].entity_max.y  << ", " << std::endl;
 //     }
     
-//     if( DEBUG )
+    if( DEBUG )
             std::cout << "Debug 9 \t";
     
     
@@ -1444,7 +1686,7 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
 //         seg_max.x << ", " << 
 //         seg_max.y << std::endl;
 
-// if( DEBUG )
+if( DEBUG )
         std::cout << "Debug 11 \t";
     
         // After the properties of each segment are determined, check which clusters and entities might associate
@@ -1483,7 +1725,7 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
         std::vector<float> distances ( points.size() );
         std::vector<unsigned int> IDs ( points.size() ); // IDs of the entity which is closest to that point
 
-//             if( DEBUG )
+            if( DEBUG_SF )
             std::cout << "Debug 13.1 \t";
         
         for ( unsigned int i_points = 0; i_points < points.size(); ++i_points )  // Determine closest object and distance to this object. If distance too large, relate to new object
@@ -1619,6 +1861,7 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
             IDs[i_points] = id_shortestEntity;
         }
         
+         if ( DEBUG_SF )
         std::cout << "End of loop debug 13.12.0 " << std::endl;
         
 //         std::cout << "Shortest Distances = " ;
@@ -1661,10 +1904,10 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
 
             if ( length >= min_segment_size_pixels_ )
             {
-// //                         if( DEBUG )
+                        if( DEBUG_SF )
             std::cout << "Debug 13.14 \t";
                 float minDistance = distances[firstElement];
-//                 if( DEBUG )
+                if( DEBUG_SF )
                 std::cout << "Debug 13.14.0 \t";
                 for ( unsigned int iiDistances = 1; iiDistances < iDistances; iiDistances++ )
                 {
@@ -1674,7 +1917,7 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
                     }
                 }
                 
-//                 if( DEBUG )
+                if( DEBUG_SF )
                 std::cout << "Debug 13.14.1 \t";
                 
 //                 std::cout << "Debug 13.15 \t";
@@ -1690,7 +1933,7 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
                          if( DEBUG )
                          std::cout << "Debug 13.17 \t";
                         geo::Vec2f firstPointCurrentSegment = points[firstElement];
-//                         if( DEBUG )
+                        if( DEBUG_SF )
                         std::cout << "Debug 13.18 \t";
                         float interSegmentDistance = std::sqrt( std::pow(lastPointPreviousSegment.x-firstPointCurrentSegment.x, 2.0) + std::pow(lastPointPreviousSegment.y-firstPointCurrentSegment.y, 2.0) );
 
@@ -1742,7 +1985,7 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
 //                          std::cout << "Debug 13.23 \t";
                      
                 }
-                
+            if ( DEBUG_SF )
             std::cout << "Debug 13.18.1 \t";
 //             std::cout << "2: associated, previousSegmentAssociated" << associated << previousSegmentAssociated << std::endl;
             
@@ -1773,20 +2016,24 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
                         }           
                 }
 
+                 if ( DEBUG_SF )
                 std::cout << "Debug 13.18.2 \t";
 //                 std::cout << "3: associated, previousSegmentAssociated" << associated << previousSegmentAssociated << std::endl;
                 if ( associated )  // add all points to associated entity
                 {
                         previousSegmentAssociated = true;
-//                             if( DEBUG )
+ 
+                        if ( DEBUG_SF )
+                        {
             std::cout << "Debug 13.15 \t";
                     const ed::EntityConstPtr& entityToTest = *it_laserEntities[ possibleSegmentEntityAssociations[IDtoCheck] ];
             std::cout << "iDistances = " << iDistances << " points.size() = " << points.size() << " segmentIDs.size() = " << segmentIDs.size() << std::endl;
             std::cout << "IDtoCheck = " << IDtoCheck << " firstElement = " << firstElement << " iDistances = " << iDistances << std::endl;
             std::cout << "associatedPointsInfo.size() = " << associatedPointsInfo.size() << ", possibleSegmentEntityAssociations.size() = " << possibleSegmentEntityAssociations.size() << std::endl;
             std::cout << "possibleSegmentEntityAssociations[IDtoCheck] = " << possibleSegmentEntityAssociations[IDtoCheck] << std::endl;
-            
+                        }
             append( associatedPointsInfo.at ( possibleSegmentEntityAssociations[IDtoCheck] ).points, points, firstElement, iDistances );
+             if ( DEBUG_SF )
             std::cout << "Debug 13.15.0 \t";
             append( associatedPointsInfo.at ( possibleSegmentEntityAssociations[IDtoCheck] ).laserIDs, segmentIDs, firstElement, iDistances );
             
@@ -1798,12 +2045,13 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
 //                         associatedPointsInfo.at ( possibleSegmentEntityAssociations[IDtoCheck] ).points.push_back ( points[i_points] );
 //                         associatedPointsInfo.at ( possibleSegmentEntityAssociations[IDtoCheck] ).laserIDs.push_back ( segmentIDs[i_points] );
 //                     }
-            
+             if ( DEBUG_SF )
             std::cout << "Debug 13.15.1 \t";
                 }
                 else
                 {
-//                             if( DEBUG )
+ 
+                        if ( DEBUG_SF )
             std::cout << "Debug 13.16 \t";
 //                     pointsNotAssociated.clear();
             
@@ -1820,6 +2068,7 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
                         
 //                         std::cout << termcolor::magenta << "AssociatedPointsInfo extended" << termcolor::reset << std::endl;
                 }
+                 if ( DEBUG_SF )
                 std::cout << "Debug 13.16.-1 \t";
             }
             
@@ -1880,7 +2129,7 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
  
     
     
-//     if( DEBUG )
+    if( DEBUG )
             std::cout << "Debug 14 \t";
     
     // TODO check at which point the segment should be splitted
@@ -1924,7 +2173,7 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
        
       
         
-//        if( DEBUG )
+ if ( DEBUG_SF )
                std::cout << "Debug 15 \t";
        
         std::vector<unsigned int> cornerIndices;
@@ -1932,6 +2181,7 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
         std::vector<geo::Vec2f>::iterator it_end = points.end();
         unsigned int cornerIndex = std::numeric_limits<unsigned int>::quiet_NaN();
           
+ std::cout << "while processing: " << std::endl;
         if( ed::tracking::findPossibleCorner ( points, &cornerIndices, &it_start, &it_end ) )
         {
                 cornerIndex = cornerIndices[0];
@@ -1942,7 +2192,7 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
              const unsigned int& index = *it_in;
         }
         
-//         if( DEBUG )
+ if ( DEBUG_SF )
                 std::cout << "Debug 16 \t";
 
         ed::tracking::Circle circle;   
@@ -2012,7 +2262,7 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
         }
         
 //         std::cout << " IDLowWidth = " << IDLowWidth << " IDHighWidth = " << IDHighWidth << " IDLowDepth = " << IDLowDepth << " IDHighDepth = " << IDHighDepth << std::endl;
-        
+         if ( DEBUG_SF )
                         std::cout << "Debug 16.0 \t";
         for(unsigned int iConfidence = 0; iConfidence < 2; iConfidence++) // Determine for both with and depth
         {
@@ -2145,7 +2395,7 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
                           }
                   }    
         }
-        
+         if ( DEBUG_SF )
                     std::cout << "Debug 16.1 \t";
          
         ed::tracking::FeatureProbabilities prob;
@@ -2185,7 +2435,7 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
     
 //    PointMarkers_pub_.publish( markerArrayPoints );
        
-//    if( DEBUG )
+   if( DEBUG )
             std::cout << "Debug 17 \t";
     
     unsigned int marker_ID = 0; // To Do: After tracking, the right ID's should be created. The ID's are used to have multiple markers.
@@ -2194,7 +2444,7 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
     ed::UUID id;
 //     std::vector<ed::WorldModel::const_iterator> it_laserEntities; 
 
-//     if( DEBUG )
+    if( DEBUG )
             std::cout << "Debug 18 \t";
     
 //     visualization_msgs::MarkerArray markers;
@@ -2258,7 +2508,7 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
                 ed::tracking::Rectangle entityRectangle = entityProperties.getRectangle();
                 ed::tracking::Circle entityCircle = entityProperties.getCircle();
                 
-                std::cout << "\nFor entity " << termcolor::blue << e->id() << termcolor::reset << std::endl;
+//                 std::cout << "\nFor entity " << termcolor::blue << e->id() << termcolor::reset << std::endl;
                 
                 float Q = 0.4; // Measurement noise covariance. TODO: let it depend on if an object is partially occluded. Now, objects are assumed to be completely visible
                 float R = 0.2; // Process noise covariance
@@ -2327,12 +2577,14 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
         //                         
         //                         // TODO Neighrest neighbour association of cornerpoints -> still necessary? 
         //                 }
-                        
+              
+              /*
                         std::cout << "measuredProperties = " << 
                         measuredProperties[iProperties].confidenceRectangleWidthLow <<
                         measuredProperties[iProperties].confidenceRectangleWidthHigh <<
                         measuredProperties[iProperties].confidenceRectangleDepthLow <<
                         measuredProperties[iProperties].confidenceRectangleDepthHigh << std::endl;
+                        */
         //                 
         //                 std::cout << "checkCornerConfidence = " << 
         //                 checkCornerConfidence << std::endl;
@@ -2702,7 +2954,7 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
 
 // - - - - - - - - - - - - - - - - -
 
-    std::cout << "Total took " << t_total.getElapsedTimeInMilliSec() << " ms. \n\n\n" << std::endl;
+//     std::cout << "Total took " << t_total.getElapsedTimeInMilliSec() << " ms. \n\n\n" << std::endl;
 }
 
 // ----------------------------------------------------------------------------------------------------
@@ -2714,6 +2966,7 @@ void LaserPluginTracking::scanCallback(const sensor_msgs::LaserScan::ConstPtr& m
     scan_buffer_.push(msg);
 }
 
+/*
 void LaserPluginTracking::PoseWithCovarianceStampedCallback(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr& msg)
 {
 
@@ -2725,7 +2978,7 @@ void LaserPluginTracking::PoseWithCovarianceStampedInitCallback(const geometry_m
 
     pose_buffer_init_.push(msg);
 }
-
+*/
 
 
 ED_REGISTER_PLUGIN(LaserPluginTracking)

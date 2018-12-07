@@ -37,6 +37,7 @@
 // #define EPSILON 1e-4                                 // [m]
 #define MIN_POINTS_STRAIGHT_LINE 30                     // [-]
 #define MAX_DEVIATION_IAV_STRAIGHT_LINE 10*M_PI/180     // [rad]
+#define MAX_DEVIATION_ANGLE_CORRECTION 20*M_PI/180      // [rad]
 
 #define DELAY_AFTER_INIT ros::Duration(1.0)             // [s]
 
@@ -79,7 +80,15 @@ private:
    
    ros::Publisher points_modelled_pub_; // ############################## TEMP ############################
    
+   ros::Publisher points_modelled_all_pub_; // ############################## TEMP ############################
+   
+   ros::Publisher points_measured_all_pub_; // ############################## TEMP ############################
+   
    ros::Publisher points_measured_pub_; // ############################## TEMP ############################
+   
+   ros::Publisher cornerPointModelled_pub_; // ############################## TEMP ############################
+   
+   ros::Publisher cornerPointMeasured_pub_; // ############################## TEMP ############################
    
    ros::Publisher improvedRobotPos_pub_;
    
