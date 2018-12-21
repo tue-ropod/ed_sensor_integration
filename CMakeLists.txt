@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 2.8.12)
 project(ed_sensor_integration)
 
 find_package(catkin REQUIRED COMPONENTS
@@ -44,6 +44,8 @@ catkin_package(
   CATKIN_DEPENDS geometry_msgs message_runtime
 )
 
+add_subdirectory(../../dlib-19.16 dlib_build)
+
 # ------------------------------------------------------------------------------------------------
 #                                           BUILD
 # ------------------------------------------------------------------------------------------------
@@ -51,6 +53,8 @@ catkin_package(
 include_directories(
   include
   ${catkin_INCLUDE_DIRS}
+ # /usr/local/include/munkres
+ # /usr/local/include/munkres/adapters
 )
 
 # ------------------------------------------------------------------------------------------------
@@ -99,17 +103,17 @@ add_dependencies(ed_kinect_plugin ${PROJECT_NAME}_gencpp ${${PROJECT_NAME}_EXPOR
 
 # ------------------------------------------------------------------------------------------------
 
-add_library(ed_laser_plugin
-    src/laser/plugin.cpp
-    src/laser/plugin.h
-)
-target_link_libraries(ed_laser_plugin ed_association ${catkin_LIBRARIES})
+#add_library(ed_laser_plugin
+#    src/laser/plugin.cpp
+#    src/laser/plugin.h
+#)
+#target_link_libraries(ed_laser_plugin ed_association ${catkin_LIBRARIES})
 
 add_library(ed_laser_plugin_tracking
     src/laser/plugin_tracking.cpp
     src/laser/plugin_tracking.h
 )
-target_link_libraries(ed_laser_plugin_tracking ed_association ${catkin_LIBRARIES})
+target_link_libraries(ed_laser_plugin_tracking ed_association ${catkin_LIBRARIES} dlib::dlib)
 
 # ------------------------------------------------------------------------------------------------
 

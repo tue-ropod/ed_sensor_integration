@@ -613,6 +613,10 @@ void LaserPluginTracking::initialize(ed::InitData& init)
     int i_check_door_status = 0;
     config.value("check_door_status", i_check_door_status, tue::OPTIONAL);
     check_door_status_ = (i_check_door_status != 0);
+    
+    int i_correct_x_yPos = 0;
+    config.value("correctXYpos", i_correct_x_yPos, tue::OPTIONAL);
+    correctXYpos_ = (i_correct_x_yPos != 0);
 
     if (config.hasError())
         return;
@@ -906,14 +910,13 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
         
 //         std::cout << "Sensor ranges = " << sensor_ranges[i] << ", model_ranges = " << model_ranges[i]<< std::endl;
 
-        if (rs <= 0
-                || (rm > 0 && rs > rm)  // If the sensor point is behind the world model, skip it
-                || (std::abs(rm - rs) < world_association_distance_))
+        if (   //    (rm > 0 && rs > rm)  // If the sensor point is behind the world model, skip it
+                (std::abs(rm - rs) < world_association_distance_))
         {
                 modelRangesAssociatedRanges2StaticWorld[i] = model_ranges[i];
 //                 sensor_ranges[i] = 0;
         }
-    }   
+    }
     
     // ############################## TEMP ############################
 //     std::cout << "Sensor ranges = " << std::endl;
@@ -930,9 +933,10 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
     if( DEBUG )
             std::cout << "Debug 5 \t";
     
-//     std::vector<ScanSegment> segments = determineSegments(sensor_ranges, max_gap_size_, min_segment_size_pixels_, segment_depth_threshold_, lrf_model_, min_cluster_size_, max_cluster_size_ );    
+//     std::vector<ScanSegment> segments = determineSegments(sensor_ranges, max_gap_sizemodelRangesAssociatedRanges2StaticWorld_, min_segment_size_pixels_, segment_depth_threshold_, lrf_model_, min_cluster_size_, max_cluster_size_ );    
 
-    std::vector<ScanSegment> staticSegments = determineSegments(modelRangesAssociatedRanges2StaticWorld, max_gap_size_, min_segment_size_pixels_, segment_depth_threshold_, lrf_model_, min_cluster_size_, max_cluster_size_ );    
+    float segmentDepthThresholdSmall = segment_depth_threshold_;
+    std::vector<ScanSegment> staticSegments = determineSegments(modelRangesAssociatedRanges2StaticWorld, max_gap_size_, min_segment_size_pixels_, segmentDepthThresholdSmall, lrf_model_, min_cluster_size_, max_cluster_size_ );    
 //     std::cout << "staticSegments.size() = " << staticSegments.size() << std::endl;
     std::sort(staticSegments.begin(), staticSegments.end(), sortBySegmentSize);
     std::cout << "Size of staticSegments = ";
@@ -945,10 +949,14 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
     
     std::cout << "cornerPointMeasured init" << std::endl;
     geo::Vec2f cornerPointMeasured, cornerPointModelled;
+    std::vector < unsigned int > possibleCorners, possibleCornersModel;
+    std::vector< geo::Vec2f> points, modelledPoints ;
+    geo::Vec2f xyDiff;
     
     bool cornerPointsFound = false, angleCorrectionFound = false;
-    unsigned int elementOfCorner;
+    int shift, measuredCornerElement;
     float diffAngle;
+    unsigned int sensorElementOfCornerModelled ;
     
     tf::Quaternion q ( sensor_pose.getQuaternion().x, sensor_pose.getQuaternion().y, sensor_pose.getQuaternion().z, sensor_pose.getQuaternion().w );
     tf::Matrix3x3 matrix ( q );
@@ -961,24 +969,20 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
            ScanSegment staticSegment = staticSegments[iSegment];
 //            std::cout << "After Bla";
            std::cout << "For iSegment = " << iSegment << " staticSegment read. Size = " << staticSegment.size() << std::endl;
-           
 //            std::cout << "Static Segment size = " << staticSegment.size() << std::endl;
            
            if( staticSegment.size() < MIN_POINTS_STRAIGHT_LINE )
            {
-                   continue;
+                   break;
            }
            
-           
-           std::vector< geo::Vec2f> points(  staticSegment.size() ), modelledPoints(  staticSegment.size() ) ;
+//            std::vector< geo::Vec2f> points(  staticSegment.size() ), modelledPoints(  staticSegment.size() ) ;
+           points.clear(); modelledPoints.clear() ;
            std::cout << "Point info ";
            std::cout << "staticSegment.size() = " << staticSegment.size();
            
-           
-           
            for( unsigned int iSeg2Point = 0; iSeg2Point < staticSegment.size(); iSeg2Point++)
            {
-
                    unsigned int j = staticSegment[iSeg2Point];
                    geo::Vector3 p_sensor = lrf_model_.rayDirections() [j] * sensor_ranges[j];
                    geo::Vector3 p_model = lrf_model_.rayDirections() [j] * modelRangesAssociatedRanges2StaticWorld[j];
@@ -989,65 +993,229 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
                    geo::Vector3 p = sensor_pose * p_sensor;
                    geo::Vector3 p_modelled = sensor_pose * p_model;
                    
-//                    std::cout << "p = " << j << ", p_modelled = " << p_modelled << "\t";
+                   if ( (p - p_modelled).length() > 0.2 )
+                   {
+                           std::cout << termcolor::yellow << "p = " << p << ", p_modelled = " << p_modelled << "j = " << j << "sensor_ranges = " << sensor_ranges[j];
+                           std::cout << "modelRangesAssociatedRanges2StaticWorld = " << modelRangesAssociatedRanges2StaticWorld[j] << "\t" << termcolor::reset;
+                   }
                    
                    
                    // Add to cv array
-                   points[iSeg2Point] = geo::Vec2f ( p.x, p.y );
-                   modelledPoints[iSeg2Point] = geo::Vec2f ( p_modelled.x, p_modelled.y );   
-                   
-                  
-                  
+//                    points[iSeg2Point] = geo::Vec2f ( p.x, p.y );
+//                    modelledPoints[iSeg2Point] = geo::Vec2f ( p_modelled.x, p_modelled.y );  
+                   points.push_back( geo::Vec2f ( p.x, p.y ) );
+                   modelledPoints.push_back( geo::Vec2f ( p_modelled.x, p_modelled.y ) );   
            }
-
-            
-                
-
-           
-                
            
            
-                      std::cout << " modelledPoints.size() = " << modelledPoints.size() << std::endl;
+           std::cout << "points[0, final] = " << points[0] << ", " << points.back() << ". modelledPoints[0, final] = " << modelledPoints[0] << ", " << modelledPoints.back() << std::endl;
+                      
+           std::cout << " modelledPoints.size() = " << modelledPoints.size() << std::endl;
            
            
-           std::vector < unsigned int > possibleCorners, possibleCornersModel;
+//            unsigned int segmentLength = staticSegment.size();       
+//            unsigned int startElement = segmentLength / SEGMENT_DIVISION_FOR_FITTING;
+//            unsigned int finalElement = segmentLength * (SEGMENT_DIVISION_FOR_FITTING - 1)/SEGMENT_DIVISION_FOR_FITTING;
            
-           std::vector<geo::Vec2f>::iterator it_start = points.begin();
-           std::vector<geo::Vec2f>::iterator it_end = points.end();
+           unsigned int segmentLength = staticSegment.size();       
+           unsigned int startElement = 0;// segmentLength / SEGMENT_DIVISION_FOR_FITTING;
+           unsigned int finalElement = segmentLength;// segmentLength * (SEGMENT_DIVISION_FOR_FITTING - 1)/SEGMENT_DIVISION_FOR_FITTING;
+//            
+//            std::vector<geo::Vec2f>::iterator it_start = std::next( points.begin(), startElement );
+ std::vector<geo::Vec2f>::iterator it_start = points.begin(); std::advance(it_start, startElement);
+//            std::vector<geo::Vec2f>::iterator it_end = std::next( points.begin(), finalElement );
+            std::vector<geo::Vec2f>::iterator it_end = points.begin(); std::advance( it_end, finalElement );
+           
            std::cout << "\nFor measured points: ";
-           bool cornerFound = ed::tracking::findPossibleCorner ( points, &possibleCorners, &it_start, &it_end );
+//            bool cornerFound = ed::tracking::findPossibleCorner ( points, &possibleCorners, &it_start, &it_end, MIN_DISTANCE_CORNER_DETECTION_LARGE );
+           possibleCorners.clear();
+           bool cornersFoundMeasured = ed::tracking::findPossibleCorners (points, &possibleCorners, MIN_DISTANCE_CORNER_DETECTION_LARGE  );
+          
            
+//            std::cout << "cornerPointsFound  = " << cornerPointsFound << " cornerFound = " << cornerFound << std::endl;
            
+           std::cout << "cornersFoundMeasured = " << cornersFoundMeasured << " @ ";
            
-           
-           
-           
-           
-           std::cout << "cornerPointsFound  = " << cornerPointsFound << " cornerFound = " << cornerFound << std::endl;
-           
-           if (!cornerPointsFound && cornerFound)
+           for( unsigned int ipossibleCorners = 0; ipossibleCorners < possibleCorners.size(); ipossibleCorners++)
            {
-                it_start = modelledPoints.begin();
-                it_end = modelledPoints.end();
+                   std::cout << possibleCorners[ipossibleCorners] << ", \t";
+           }
+           
+          
+           
+           std::cout << termcolor::red << "correctXYpos_ = " << correctXYpos_ << termcolor::reset << std::endl;
+           
+           if (!cornerPointsFound && cornersFoundMeasured && correctXYpos_)
+           {
+                it_start = modelledPoints.begin(); std::advance(it_start, startElement);
+//              std::next( modelledPoints.begin(), startElement );
+                it_end = modelledPoints.begin(); std::advance(it_end , finalElement );
                 std::cout << "For modelled points: ";
-                bool cornerFoundModel = ed::tracking::findPossibleCorner ( modelledPoints, &possibleCornersModel, &it_start, &it_end );
+//                 bool cornerFoundModel = ed::tracking::findPossibleCorner ( modelledPoints, &possibleCornersModel, &it_start, &it_end, MIN_DISTANCE_CORNER_DETECTION_LARGE );
                 
-                 std::cout << "cornerFoundModel  = " << cornerFoundModel << std::endl;
+                possibleCornersModel.clear();
+                bool cornersFoundModelled = ed::tracking::findPossibleCorners (modelledPoints, &possibleCornersModel, MIN_DISTANCE_CORNER_DETECTION_LARGE  );
+                std::cout << "cornersFoundMeasured = " << cornersFoundModelled << " @ ";
+           for( unsigned int ipossibleCorners = 0; ipossibleCorners < possibleCornersModel.size(); ipossibleCorners++)
+           {
+                   std::cout << possibleCornersModel[ipossibleCorners] << ", \t";
+           }
+                 std::cout << "cornerFoundModel  = " << cornersFoundModelled << std::endl;
                  
-                if(cornerFound && cornerFoundModel)
+                if(cornersFoundMeasured && cornersFoundModelled)
                 {
                         std::cout << "CornerModelFound" << std::endl;
-                        
                         std::cout << "cornerPointMeasured assigned "<< std::endl;
                         cornerPointsFound = true;
-                        elementOfCorner = staticSegment[0] + possibleCornersModel[0];
-                        cornerPointMeasured = points[ possibleCorners[0] ];
-                        cornerPointModelled = modelledPoints[ possibleCornersModel[0] ];
                         
-                        std::cout << "cornerPointMeasured = " << cornerPointMeasured << " cornerPointModelled = " << cornerPointModelled << std::endl;
+                        
+                        // do neighrest neighbour association of all corners
+                        // calc average diff
+                        // test correction
+                        
+                        measuredCornerElement = possibleCorners[0];
+                        
+                        
+                        // TEST
+                         // always make the matrix square!
+                      /*  dlib::matrix<int> cost(4, 4);
+                        cost =  5, 5, 3, 0,
+                                6, 7, 4, 0,
+                                7, 0, 5, 0,
+                                1, 2, 6, 0;
+                               
+                               std::cout << "Cost = " << cost << std::endl;
+                               std::cout << "Cost(00) = " << cost(0, 0) << std::endl;
+                               std::cout << "Cost = " << cost(0, 1) << std::endl;
+                               std::cout << "Cost = " << cost(2, 3) << std::endl;
+                               std::cout << "Cost = " << cost(3, 2) << std::endl;
+*/
+                      std::cout << "max sizes = " << possibleCorners.size() << possibleCornersModel.size() << std::endl;
+                      unsigned int size = std::max(possibleCorners.size(), possibleCornersModel.size());
+                      dlib::matrix<int> cost = dlib::ones_matrix<int> (size, size); // assignment can handly int's only, so convert to mm
+                      cost = 0;// makes it a zero-matrix over all elements
+//                       cost = std::numeric_limits< double >::infinity()*cost; 
+                      std::cout << "cost = " << cost << " size = " << size << std::endl;
+                      
+                      for (unsigned int iMeasuredCorners = 0; iMeasuredCorners < possibleCorners.size(); iMeasuredCorners++)
+                      { 
+//                               std::cout << " iMeasuredCorners = " << iMeasuredCorners;
+//                               std::cout << "possibleCorners[iMeasuredCorners] = " << possibleCorners[iMeasuredCorners] << std::endl;
+//                               std::cout << "lrf_model_.rayDirections() [ possibleCorners[iMeasuredCorners] ] = " << lrf_model_.rayDirections() [ possibleCorners[iMeasuredCorners] ];
+//                               std::cout << "sensor_ranges[ possibleCorners[iMeasuredCorners] ] = " << sensor_ranges[ possibleCorners[iMeasuredCorners] ];
+                              geo::Vector3 p_sensor = lrf_model_.rayDirections() [ possibleCorners[iMeasuredCorners] ] * sensor_ranges[ possibleCorners[iMeasuredCorners] ];
+//                       std::cout << "boe " << possibleCornersModel.size() << " p_sensor = " << p_sensor << std::endl;
+                      
+                              for (unsigned int iModelledCorners = 0; iModelledCorners < possibleCornersModel.size(); iModelledCorners++)
+                              {
+//                                       std::cout << termcolor::on_red << "TADAA" << termcolor::reset << std::endl;
+//                                       std::cout << " iModelledCorners = " << iModelledCorners;
+                                      geo::Vector3 p_model = lrf_model_.rayDirections() [ possibleCornersModel[iModelledCorners] ] * modelRangesAssociatedRanges2StaticWorld[ possibleCornersModel[iModelledCorners] ];
+//                       std::cout << " heu ";
+//                       std::cout << "p_sensor = " << p_sensor << " p_model = " << p_model << std::endl;
+                      
+                                      float dist = std::sqrt( std::pow(p_sensor.x - p_model.x, 2.0 ) +  std::pow(p_sensor.y - p_model.y, 2.0 ) );
+//                                       std::cout << "moeh dist = " << dist;
+                                     int ElementCost = (int) 1000 / dist;
+                                      
+                                      cost(iMeasuredCorners, iModelledCorners) = ElementCost; // assignment can handle int's only, so scale wisely
+//                                       std::cout << " ha cost = " << ElementCost;
+                              } 
+                      }
+                      
+                      
+                        std::cout << "cost = " << cost << " size = " << size << std::endl;
+                      
+                       // To find out the best assignment of people to jobs we just need to call this function.
+                        std::vector<long> assignment = dlib::max_cost_assignment(cost);
+
+                        // This prints optimal assignments:  [2, 0, 1] which indicates that we should assign
+                        // the person from the first row of the cost matrix to job 2, the middle row person to
+                        // job 0, and the bottom row person to job 1.
+                        
+                        std::cout << "assignment.size() = " << assignment.size() << std::endl;
+                        
+                        for (unsigned int i = 0; i < assignment.size(); i++)
+                                std::cout << assignment[i] << ", Element = " << i << assignment[i] << "Cost = " << cost(i, assignment[i]) << std::endl;
+// 
+                        // This prints optimal cost:  16.0
+                        // which is correct since our optimal assignment is 6+5+5.
+                        std::cout << "optimal cost: " << dlib::assignment_cost(cost, assignment) << std::endl;
+                        
+                        unsigned int counter = 0;
+                        xyDiff.x = 0.0;
+                        xyDiff.y = 0.0;
+                        for (unsigned int i = 0; i < assignment.size(); i++)
+                        {
+                                if( i < possibleCorners.size() && assignment[i] <  possibleCornersModel.size() )
+                                {
+                                        counter++;
+                                         geo::Vector3 p_sensor = lrf_model_.rayDirections() [ possibleCorners[i] ] * sensor_ranges[ possibleCorners[i] ];
+                                         geo::Vector3 p_model = lrf_model_.rayDirections() [ possibleCornersModel[assignment[i]] ] * modelRangesAssociatedRanges2StaticWorld[ possibleCornersModel[assignment[i]] ];
+                                         
+                                         geo::Vector3 diff = p_sensor - p_model;
+                                         xyDiff.x += diff.x;
+                                         xyDiff.y += diff.y; 
+                                }
+                        }
+                        xyDiff.x /= counter;
+                        xyDiff.y /= counter;
+                      
+                  /*      
+                        shift = ed::tracking::maxCrossCorrelation(sensor_ranges, staticSegment.begin(), staticSegment.end(), modelRangesAssociatedRanges2StaticWorld, staticSegment.begin(), staticSegment.end());
+                        
+                        int diffShift = 0; // in order to correct for the fact that the shift is such that the element is outside of the range allowed
+                        
+                        if ( shift < 0 && -shift > measuredCornerElement )
+                        {
+                                diffShift = -(measuredCornerElement + shift);
+                                std::cout << "diffshift option 1, measuredCornerElement - shift = " << measuredCornerElement + shift << std::endl;
+                        }
+                        else if( shift > 0 && measuredCornerElement + shift > modelledPoints.size() + 1 )
+                        {
+                                diffShift = -(measuredCornerElement + shift - modelledPoints.size() + 1 );
+                                std::cout << "diffshift option 2, measuredCornerElement + shift = " << measuredCornerElement + shift << std::endl;
+                        }
+                        
+//                         unsigned int lowerBoundShift = -measuredCornerElement;
+//                         unsigned int upperBoundShift = modelledPoints.size() - measuredCornerElement;
+//                         if( shift < lowerBoundShift)
+//                         {
+//                                 diffShift = lowerBoundShift;
+//                         }
+//                         else if( shift > upperBoundShift )
+//                         {
+//                                 diffShift = upperBoundShift;
+//                         }
+                        
+//                         TODO and TEST: elementOfCornerMeasured must be unsigned int, such that measuredCornerElement is vald!
+                         std::cout << " modelledPoints.size() = " << modelledPoints.size();
+                         std::cout << "measuredCornerElement = " << measuredCornerElement << " shift = " << shift << " diffShift = " << diffShift;
+                        std::cout << "measuredCornerElement = " << measuredCornerElement << std::endl;
+                        unsigned int elementOfCornerMeasured = measuredCornerElement + diffShift ;
+                        
+                          std::cout << " elementOfCornerMeasured = " << elementOfCornerMeasured;
+                        cornerPointMeasured = points[elementOfCornerMeasured];
+                        
+                        unsigned int staticSegmentElementOfCornerModelled = measuredCornerElement + shift + diffShift ;
+                         std::cout << " elementOfCornerModelled = " << staticSegmentElementOfCornerModelled;
+                        cornerPointModelled = modelledPoints[ staticSegmentElementOfCornerModelled ];
+                        
+                        sensorElementOfCornerModelled = staticSegment[0] + staticSegmentElementOfCornerModelled;
+                      
+                       
+                        std::cout << "StartPoints = " << modelledPoints[0] << ", " << points[0] << std::endl;
+                        std::cout << "CornerPoints = " << cornerPointModelled << ", " << cornerPointMeasured << std::endl;
+                        std::cout << "ElementsOfCorner = " << staticSegmentElementOfCornerModelled << ", " << elementOfCornerMeasured << std::endl;
+                     */   
+//                         geo::Vector3 p_model = lrf_model_.rayDirections() [elementOfCorner] * modelRangesAssociatedRanges2StaticWorld[elementOfCorner];
+                        
+//                         cornerPointModelled = modelledPoints[ elementOfCorner ];
+                        
+//                         std::cout << "cornerPointMeasured = " << cornerPointMeasured << " cornerPointModelled = " << cornerPointModelled << std::endl;
 
                    std::cout << " AngleStart = " << yawSensor + lrf_model_.getAngleMin() + lrf_model_.getAngleIncrement()*staticSegment[0] << " staticSegment[0] = " << staticSegment[0];
-std::cout << "yawSensor = " << yawSensor << " lrf_model_.getAngleMin() = " << lrf_model_.getAngleMin()  << " lrf_model_.getAngleIncrement() = " << lrf_model_.getAngleIncrement() << std::endl;
+                   std::cout << "yawSensor = " << yawSensor << " lrf_model_.getAngleMin() = " << lrf_model_.getAngleMin()  << " lrf_model_.getAngleIncrement() = " << lrf_model_.getAngleIncrement() << std::endl;
                    
                         visualization_msgs::Marker pointsModelledAll;
                         pointsModelledAll.header.frame_id = "/map";
@@ -1060,16 +1228,16 @@ std::cout << "yawSensor = " << yawSensor << " lrf_model_.getAngleMin() = " << lr
                         pointsModelledAll.scale.x = 0.03;
                         pointsModelledAll.scale.y = 0.03;
                         pointsModelledAll.scale.z = 0.03;
-                        pointsModelledAll.color.r = 0.0;
+                        pointsModelledAll.color.r = 1.0;
                         pointsModelledAll.color.g = 0.0;
                         pointsModelledAll.color.b = 1.0;
                         pointsModelledAll.color.a = 1.0; 
-                        pointsModelledAll.lifetime = ros::Duration( 0.2 );
+                        pointsModelledAll.lifetime = ros::Duration( TIMEOUT_TIME );
                              
                         visualization_msgs::Marker pointsAll;
                         pointsAll.header.frame_id = "/map";
                         pointsAll.header.stamp = scan->header.stamp;
-                        pointsAll.ns = "modelledPoints";
+                        pointsAll.ns = "measuredPoints";
                         pointsAll.id = 1;
                         pointsAll.type = visualization_msgs::Marker::POINTS;
                         pointsAll.action = visualization_msgs::Marker::ADD;
@@ -1077,11 +1245,11 @@ std::cout << "yawSensor = " << yawSensor << " lrf_model_.getAngleMin() = " << lr
                         pointsAll.scale.x = 0.03;
                         pointsAll.scale.y = 0.03;
                         pointsAll.scale.z = 0.03;
-                        pointsAll.color.r = 0.0;
-                        pointsAll.color.g = 0.0;
-                        pointsAll.color.b = 1.0;
+                        pointsAll.color.r = 1.0;
+                        pointsAll.color.g = 1.0;
+                        pointsAll.color.b = 0.0;
                         pointsAll.color.a = 1.0; 
-                        pointsAll.lifetime = ros::Duration( 0.2 );
+                        pointsAll.lifetime = ros::Duration( TIMEOUT_TIME );
            
                         for( unsigned int iSeg2Point = 0; iSeg2Point < staticSegment.size(); iSeg2Point++)
                         {
@@ -1103,15 +1271,66 @@ std::cout << "yawSensor = " << yawSensor << " lrf_model_.getAngleMin() = " << lr
                                 p.y = modelledPoints[iSeg2Point].y;
                                 p.z = sensor_pose.getOrigin().getZ();
                                                 
-                                pointsModelledAll.points.push_back(p);
-                                        
-                                        
-                                        
+                                pointsModelledAll.points.push_back(p);       
                         }
                         
                         points_measured_all_pub_.publish(pointsAll);
                         points_modelled_all_pub_.publish(pointsModelledAll);
-                        // TODO Hier gebleven
+                        
+                                        visualization_msgs::Marker cornerPointMeasuredMarker, cornerPointModelledMarker;
+                    
+                        cornerPointMeasuredMarker.header.frame_id = "/map";
+                        cornerPointMeasuredMarker.header.stamp = scan->header.stamp;
+                        cornerPointMeasuredMarker.ns = "measuredPoints";
+                        cornerPointMeasuredMarker.id = 1;
+                        cornerPointMeasuredMarker.type = visualization_msgs::Marker::POINTS;
+                        cornerPointMeasuredMarker.action = visualization_msgs::Marker::ADD;
+        //                     pointsMeasured.pose.orientation = tf::createQuaternionMsgFromRollPitchYaw ( rollSensor, pitchSensor, yawSensor );
+                        cornerPointMeasuredMarker.scale.x = 0.1;
+                        cornerPointMeasuredMarker.scale.y = 0.1;
+                        cornerPointMeasuredMarker.scale.z = 0.1;
+                        cornerPointMeasuredMarker.color.r = 1.0;
+                        cornerPointMeasuredMarker.color.g = 1.0;
+                        cornerPointMeasuredMarker.color.b = 0.0;
+                        cornerPointMeasuredMarker.color.a = 1.0; 
+                        cornerPointMeasuredMarker.lifetime = ros::Duration( TIMEOUT_TIME );
+                        
+                        cornerPointModelledMarker = cornerPointMeasuredMarker;
+                        
+                        for(unsigned ipossibleCorners = 0; ipossibleCorners < possibleCorners.size(); ipossibleCorners++)
+                        {
+                                geometry_msgs::Point pos;
+                                cornerPointMeasured = points[possibleCorners[ipossibleCorners]];
+                              
+                                pos.x = cornerPointMeasured.x;
+                                pos.y = cornerPointMeasured.y;
+                                pos.z = sensor_pose.getOrigin().getZ();                        
+                                cornerPointMeasuredMarker.points.push_back(pos);
+                        }      
+                        cornerPointMeasured_pub_.publish(cornerPointMeasuredMarker); 
+                        
+                        cornerPointModelledMarker.color.r = 1.0;
+                        cornerPointModelledMarker.color.g = 0.0;
+                        cornerPointModelledMarker.color.b = 1.0;
+                        cornerPointModelledMarker.color.a = 1.0;
+                        for(unsigned ipossibleCornersModel = 0; ipossibleCornersModel < possibleCornersModel.size(); ipossibleCornersModel++)
+                        {       
+                                cornerPointModelled = modelledPoints[possibleCornersModel[ipossibleCornersModel]];
+                                geometry_msgs::Point pos;
+                                pos.x = cornerPointModelled.x;
+                                pos.y = cornerPointModelled.y;
+                                pos.z = sensor_pose.getOrigin().getZ();   
+                        
+                                cornerPointModelledMarker.points.push_back(pos);
+                        }
+                        cornerPointModelled_pub_.publish(cornerPointModelledMarker); 
+                        
+                        
+
+//                         std::cout << "Shift = " << shift << std::endl;
+                        
+//            int maxCrossCorrelation(std::vector<float>& measuredRanges, std::vector<unsigned int>::iterator measuredRangesStartElement,  std::vector<unsigned int>::iterator measuredRangesFinalElement,
+//                         std::vector<float>& modelledRanges, std::vector<unsigned int>::iterator modelledRangesStartElement,  std::vector<unsigned int>::iterator modelledRangesFinalElement);
                 }
            }       
 
@@ -1121,13 +1340,17 @@ std::cout << "yawSensor = " << yawSensor << " lrf_model_.getAngleMin() = " << lr
             
            
 //            if( std::abs( mean - M_PI ) < MAX_DEVIATION_IAV_STRAIGHT_LINE )
-           if( !cornerFound && ! angleCorrectionFound) // beause we want to correct based on a straight line.
+           if( !cornersFoundMeasured && ! angleCorrectionFound) // beause we want to correct based on a straight line.
            {
                 // straight line detected. Take a subset (2 middle quarters) of this line and do a fit for line as well as the corresponding fit for the ranges expected in the WM
+//                 unsigned int segmentLength = staticSegment.size();       
+//                 unsigned int startElement = segmentLength / SEGMENT_DIVISION_FOR_FITTING;
+//                 unsigned int finalElement = segmentLength * (SEGMENT_DIVISION_FOR_FITTING - 1)/SEGMENT_DIVISION_FOR_FITTING;
+
                 unsigned int segmentLength = staticSegment.size();       
-                unsigned int startElement = segmentLength / 5;
-                unsigned int finalElement = segmentLength * 4/5;
-                        
+                unsigned int startElement = 0; //segmentLength / SEGMENT_DIVISION_FOR_FITTING;
+                unsigned int finalElement = segmentLength; //segmentLength * (SEGMENT_DIVISION_FOR_FITTING - 1)/SEGMENT_DIVISION_FOR_FITTING;
+
                 std::vector<geo::Vec2f> measuredPoints(finalElement - startElement), modelledPoints(finalElement - startElement);
                 unsigned int counter = 0;
                 
@@ -1173,7 +1396,7 @@ std::cout << "yawSensor = " << yawSensor << " lrf_model_.getAngleMin() = " << lr
                         pointsModelled.color.g = 0.0;
                         pointsModelled.color.b = 1.0;
                         pointsModelled.color.a = 1.0; 
-                        pointsModelled.lifetime = ros::Duration( 0.2 );
+                        pointsModelled.lifetime = ros::Duration( TIMEOUT_TIME );
                         
                 for(int iPoints = 0; iPoints < modelledPoints.size(); iPoints++)
                 {
@@ -1204,7 +1427,7 @@ std::cout << "yawSensor = " << yawSensor << " lrf_model_.getAngleMin() = " << lr
                         pointsMeasured.color.g = 1.0;
                         pointsMeasured.color.b = 0.0;
                         pointsMeasured.color.a = 1.0; 
-                        pointsMeasured.lifetime = ros::Duration( 0.2 );
+                        pointsMeasured.lifetime = ros::Duration( TIMEOUT_TIME );
                         
                 for(int iPoints = 0; iPoints < measuredPoints.size(); iPoints++)
                 {
@@ -1220,6 +1443,7 @@ std::cout << "yawSensor = " << yawSensor << " lrf_model_.getAngleMin() = " << lr
                 }
                 points_measured_pub_.publish( pointsMeasured );
                 
+
                 
                 Eigen::VectorXf lineFitParamsMeasured( 2 ), lineFitParamsModdelled( 2 );
                 std::vector<geo::Vec2f>::iterator it_start = measuredPoints.begin();
@@ -1244,6 +1468,10 @@ std::cout << "yawSensor = " << yawSensor << " lrf_model_.getAngleMin() = " << lr
                 if(diffAngle < MAX_DEVIATION_ANGLE_CORRECTION ) // Only correct if localization partially leads to problems
                 {
                         angleCorrectionFound = true;
+                }
+                else
+                {
+                        ROS_WARN("Big angle correction required. Localisation correct?");
                 }
                 
            }
@@ -1270,7 +1498,16 @@ std::cout << "yawSensor = " << yawSensor << " lrf_model_.getAngleMin() = " << lr
                         sensor_pose.setRPY(rollSensor, pitchSensor, yawSensor );
                         
                         // Rotation updated, so this influences the delta in x,y. Recompute the cornerPointModelled
-                        geo::Vector3 p_model = lrf_model_.rayDirections() [elementOfCorner] * modelRangesAssociatedRanges2StaticWorld[elementOfCorner];
+                        
+//                         unsigned int lowerBoundShift = -measuredCornerElement;
+//                         unsigned int upperBoundShift = modelRangesAssociatedRanges2StaticWorld.size() - measuredCornerElement;
+//                         unsigned int elementOfCorner = measuredCornerElement + shift;
+                        
+                        
+
+//                         std::cout << "measuredCornerElement = " << elementOfCornerModelled << " shift = " << shift << " elementOfCorner = " << elementOfCorner << std::endl;
+                        
+                        geo::Vector3 p_model = lrf_model_.rayDirections() [sensorElementOfCornerModelled] * modelRangesAssociatedRanges2StaticWorld[sensorElementOfCornerModelled];
                         geo::Vector3 p_modelled = sensor_pose * p_model;
                         std::cout << " cornerPointModelled before correction = " << cornerPointModelled << std::endl;
                         cornerPointModelled = geo::Vec2f ( p_modelled.x, p_modelled.y );
@@ -1304,50 +1541,11 @@ std::cout << "yawSensor = " << yawSensor << " lrf_model_.getAngleMin() = " << lr
                         */
            }
             
-            if( cornerPointsFound )
+            if( cornerPointsFound && correctXYpos_)
             {
              std::cout << "Diff init " << std::endl;       
-                    geo::Vec2f diff = cornerPointMeasured - cornerPointModelled;
-                    visualization_msgs::Marker cornerPointMeasuredMarker, cornerPointModelledMarker;
-                    
-                        cornerPointMeasuredMarker.header.frame_id = "/map";
-                        cornerPointMeasuredMarker.header.stamp = scan->header.stamp;
-                        cornerPointMeasuredMarker.ns = "measuredPoints";
-                        cornerPointMeasuredMarker.id = 1;
-                        cornerPointMeasuredMarker.type = visualization_msgs::Marker::POINTS;
-                        cornerPointMeasuredMarker.action = visualization_msgs::Marker::ADD;
-        //                     pointsMeasured.pose.orientation = tf::createQuaternionMsgFromRollPitchYaw ( rollSensor, pitchSensor, yawSensor );
-                        cornerPointMeasuredMarker.scale.x = 0.1;
-                        cornerPointMeasuredMarker.scale.y = 0.1;
-                        cornerPointMeasuredMarker.scale.z = 0.1;
-                        cornerPointMeasuredMarker.color.r = 1.0;
-                        cornerPointMeasuredMarker.color.g = 1.0;
-                        cornerPointMeasuredMarker.color.b = 0.0;
-                        cornerPointMeasuredMarker.color.a = 1.0; 
-                        cornerPointMeasuredMarker.lifetime = ros::Duration( 0.2 );
-                        
-                        cornerPointModelledMarker = cornerPointMeasuredMarker;
-                        
-                        geometry_msgs::Point pos;
-                        pos.x = cornerPointMeasured.x;
-                        pos.y = cornerPointMeasured.y;
-                        pos.z = sensor_pose.getOrigin().getZ();                        
-                        cornerPointMeasuredMarker.points.push_back(pos);
-                        cornerPointMeasured_pub_.publish(cornerPointMeasuredMarker); 
-                        
-                        
-                        cornerPointModelledMarker.color.r = 1.0;
-                        cornerPointModelledMarker.color.g = 0.0;
-                        cornerPointModelledMarker.color.b = 1.0;
-                        cornerPointModelledMarker.color.a = 1.0; 
-                        
-                        pos.x = cornerPointModelled.x;
-                        pos.y = cornerPointModelled.y;
-                        pos.z = sensor_pose.getOrigin().getZ();                        
-                        cornerPointModelledMarker.points.push_back(pos);
-                        
-                        cornerPointModelled_pub_.publish(cornerPointModelledMarker); 
-    
+//                     geo::Vec2f diff = cornerPointMeasured - cornerPointModelled;
+             geo::Vec2f diff = xyDiff;
                     
                     std::cout << termcolor::magenta << "x,y diff = " << diff << " cornerPointMeasured = " << cornerPointMeasured << ", " << cornerPointModelled << termcolor::reset << std::endl;
                     
@@ -2182,7 +2380,7 @@ if( DEBUG )
         unsigned int cornerIndex = std::numeric_limits<unsigned int>::quiet_NaN();
           
  std::cout << "while processing: " << std::endl;
-        if( ed::tracking::findPossibleCorner ( points, &cornerIndices, &it_start, &it_end ) )
+        if( ed::tracking::findPossibleCorner ( points, &cornerIndices, &it_start, &it_end, MIN_DISTANCE_CORNER_DETECTION ) )
         {
                 cornerIndex = cornerIndices[0];
         }

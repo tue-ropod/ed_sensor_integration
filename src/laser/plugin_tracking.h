@@ -35,12 +35,25 @@
 #define ANGLE_MARGIN_FITTING 25*M_PI/180                // [rad]
 // #define POINTS_TO_CHECK_CONFIDENCE 3                 // [-]
 // #define EPSILON 1e-4                                 // [m]
-#define MIN_POINTS_STRAIGHT_LINE 30                     // [-]
+#define MIN_POINTS_STRAIGHT_LINE 10                     // [-]
 #define MAX_DEVIATION_IAV_STRAIGHT_LINE 10*M_PI/180     // [rad]
 #define MAX_DEVIATION_ANGLE_CORRECTION 20*M_PI/180      // [rad]
+#define SEGMENT_DIVISION_FOR_FITTING 5                 // [-]
+#define MIN_DISTANCE_CORNER_DETECTION   0.05            // [m]
+#define MIN_DISTANCE_CORNER_DETECTION_LARGE   2*MIN_DISTANCE_CORNER_DETECTION       // [m]
 
 #define DELAY_AFTER_INIT ros::Duration(1.0)             // [s]
 
+#include <iostream>
+#include <cstdlib>
+#include <ctime>
+
+//#include <munkres.h>
+//#include <adapters/boostmatrixadapter.h>
+
+//include <dlib19.16/optimization/max_cost_assignment.h>
+
+#include "../../../../dlib-19.16/dlib/optimization/max_cost_assignment.h" // TODO temp, improvement of lib-inclusion needed, see http://dlib.net/
 
 #define INF 10000
 
@@ -127,6 +140,7 @@ private:
     bool fit_entities_;
     bool check_door_status_;
     float nominal_corridor_width_;
+    bool correctXYpos_;
 
     int max_gap_size_;
     std::map<ed::UUID,geo::Pose3D> pose_cache;

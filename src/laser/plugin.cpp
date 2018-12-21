@@ -28,7 +28,7 @@
 #include "ed/featureProperties_info.h"
 
 namespace
-{
+// {
 
 typedef std::vector<unsigned int> ScanSegment;
 
