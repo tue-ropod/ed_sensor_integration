@@ -962,10 +962,12 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
     tf::Matrix3x3 matrix ( q );
     double rollSensor, pitchSensor, yawSensor;
     matrix.getRPY ( rollSensor, pitchSensor, yawSensor );
-    
+     std::cout << "cornerPointMeasured init 2" << std::endl;
+     std::cout << "staticSegments.size() = " << staticSegments.size() << std::endl;
+     
     for(unsigned int iSegment = 0; iSegment < staticSegments.size(); iSegment++)
     {
-//             std::cout << "Bla";
+            std::cout << "Bla";
            ScanSegment staticSegment = staticSegments[iSegment];
 //            std::cout << "After Bla";
            std::cout << "For iSegment = " << iSegment << " staticSegment read. Size = " << staticSegment.size() << std::endl;
@@ -1022,7 +1024,7 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
            unsigned int finalElement = segmentLength;// segmentLength * (SEGMENT_DIVISION_FOR_FITTING - 1)/SEGMENT_DIVISION_FOR_FITTING;
 //            
 //            std::vector<geo::Vec2f>::iterator it_start = std::next( points.begin(), startElement );
- std::vector<geo::Vec2f>::iterator it_start = points.begin(); std::advance(it_start, startElement);
+           std::vector<geo::Vec2f>::iterator it_start = points.begin(); std::advance(it_start, startElement);
 //            std::vector<geo::Vec2f>::iterator it_end = std::next( points.begin(), finalElement );
             std::vector<geo::Vec2f>::iterator it_end = points.begin(); std::advance( it_end, finalElement );
            
@@ -1090,7 +1092,7 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
                                std::cout << "Cost = " << cost(2, 3) << std::endl;
                                std::cout << "Cost = " << cost(3, 2) << std::endl;
 */
-                      std::cout << "max sizes = " << possibleCorners.size() << possibleCornersModel.size() << std::endl;
+                      std::cout << "max sizes = " << possibleCorners.size() << ", " << possibleCornersModel.size() << std::endl;
                       unsigned int size = std::max(possibleCorners.size(), possibleCornersModel.size());
                       dlib::matrix<int> cost = dlib::ones_matrix<int> (size, size); // assignment can handly int's only, so convert to mm
                       cost = 0;// makes it a zero-matrix over all elements
@@ -1115,7 +1117,7 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
 //                       std::cout << "p_sensor = " << p_sensor << " p_model = " << p_model << std::endl;
                       
                                       float dist = std::sqrt( std::pow(p_sensor.x - p_model.x, 2.0 ) +  std::pow(p_sensor.y - p_model.y, 2.0 ) );
-//                                       std::cout << "moeh dist = " << dist;
+                                      std::cout << "moeh dist = " << dist;
                                      int ElementCost = (int) 1000 / dist;
                                       
                                       cost(iMeasuredCorners, iModelledCorners) = ElementCost; // assignment can handle int's only, so scale wisely
@@ -1160,6 +1162,13 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
                         }
                         xyDiff.x /= counter;
                         xyDiff.y /= counter;
+                        
+                        if ( std::pow(xyDiff.x, 2.0) + std::pow(xyDiff.x, 2.0) >  MAX_DISTANCE_POS_CORRECTION2 )
+                        {
+                                ROS_WARN("Large pos correction. No correction made. xyDiff.x = %f, xyDiff.y = %f", xyDiff.x, xyDiff.y);
+                                xyDiff.x = 0.0;
+                                xyDiff.y = 0.0;       
+                        }
                       
                   /*      
                         shift = ed::tracking::maxCrossCorrelation(sensor_ranges, staticSegment.begin(), staticSegment.end(), modelRangesAssociatedRanges2StaticWorld, staticSegment.begin(), staticSegment.end());
@@ -1484,7 +1493,7 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
            
     }
            
-           
+           std::cout << "angleCorrectionFound = " << angleCorrectionFound << std::endl;
            if( angleCorrectionFound )
            {                     
                    
@@ -1541,6 +1550,8 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
                         */
            }
             
+            std::cout << "cornerPointsFound && correctXYpos_ = " << cornerPointsFound << correctXYpos_ << std::endl;
+            
             if( cornerPointsFound && correctXYpos_)
             {
              std::cout << "Diff init " << std::endl;       
@@ -1593,6 +1604,8 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
     
 //     sensor_pose.setRPY( sensorRotation );
 
+                        std::cout << "Going to render world" << std::endl;
+                        
 renderWorld(sensor_pose, model_ranges, world, lrf_model_);
     
     for(unsigned int i = 0; i < num_beams; ++i)
@@ -1731,7 +1744,7 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
 //         }
 //     }
     
-    if( DEBUG )
+//     if( DEBUG )
             std::cout << "Debug 8 \t";
     
     // Try to associate remaining laser points to specific entities
@@ -1813,7 +1826,7 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
 //             EntityPropertiesForAssociation[iTest].entity_max.y  << ", " << std::endl;
 //     }
     
-    if( DEBUG )
+//     if( DEBUG )
             std::cout << "Debug 9 \t";
     
     
@@ -1884,7 +1897,7 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
 //         seg_max.x << ", " << 
 //         seg_max.y << std::endl;
 
-if( DEBUG )
+// if( DEBUG )
         std::cout << "Debug 11 \t";
     
         // After the properties of each segment are determined, check which clusters and entities might associate
@@ -1923,7 +1936,7 @@ if( DEBUG )
         std::vector<float> distances ( points.size() );
         std::vector<unsigned int> IDs ( points.size() ); // IDs of the entity which is closest to that point
 
-            if( DEBUG_SF )
+//             if( DEBUG_SF )
             std::cout << "Debug 13.1 \t";
         
         for ( unsigned int i_points = 0; i_points < points.size(); ++i_points )  // Determine closest object and distance to this object. If distance too large, relate to new object
@@ -2214,7 +2227,7 @@ if( DEBUG )
                         }           
                 }
 
-                 if ( DEBUG_SF )
+//                  if ( DEBUG_SF )
                 std::cout << "Debug 13.18.2 \t";
 //                 std::cout << "3: associated, previousSegmentAssociated" << associated << previousSegmentAssociated << std::endl;
                 if ( associated )  // add all points to associated entity
@@ -2276,7 +2289,7 @@ if( DEBUG )
 
     }
     
-    
+    std::cout << " Test zoveel " << std::endl;
      // ############################## TEMP ############################
     
 //     unsigned int IDPoints = 0;

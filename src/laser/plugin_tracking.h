@@ -41,6 +41,7 @@
 #define SEGMENT_DIVISION_FOR_FITTING 5                 // [-]
 #define MIN_DISTANCE_CORNER_DETECTION   0.05            // [m]
 #define MIN_DISTANCE_CORNER_DETECTION_LARGE   2*MIN_DISTANCE_CORNER_DETECTION       // [m]
+#define MAX_DISTANCE_POS_CORRECTION2 std::pow(0.3, 2.0) // [m]
 
 #define DELAY_AFTER_INIT ros::Duration(1.0)             // [s]
 
