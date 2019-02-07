@@ -1744,13 +1744,14 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
 //         }
 //     }
     
-//     if( DEBUG )
+     if( DEBUG )
             std::cout << "Debug 8 \t";
     
     // Try to associate remaining laser points to specific entities
     std::vector<ed::WorldModel::const_iterator> it_laserEntities;
     std::vector< EntityProperty > EntityPropertiesForAssociation;
 
+std::cout << "Debug 8.1 \t";
     // Check which entities might associate for tracking based on their latest location in order to prevent to check all the entities 
     for ( ed::WorldModel::const_iterator e_it = world.begin(); e_it != world.end(); ++e_it )
     {
@@ -1758,8 +1759,12 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
 //                      std::cout << "Going to check entity with id = " << e->id() << std::endl;
         std::string laserID = "-laserTracking";
 
+std::cout << "Debug 8.2 \t";
         if ( e->id().str().length() < laserID.length() )
         {
+
+
+std::cout << "Debug 8.3 \t";
             continue;
         }
         if ( e->id().str().substr ( e->id().str().length() - laserID.size() ) == laserID )  // entity described by laser before
@@ -1778,15 +1783,36 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
             }
             */
 
+
+std::cout << "Debug 8.4 \t";
             it_laserEntities.push_back ( e_it );
 
-            ed::tracking::FeatureProperties featureProperties = e->property ( featureProperties_ );
+std::cout << "Debug 8.4.1 \t";
+std::cout << "e id = " << e->id() << std::endl;
+            ed::tracking::FeatureProperties featureProperties;
+std::cout << "bla " << featureProperties_.idx << std::endl;
+
+	if( !e->property( featureProperties_) )
+	{
+
+std::cout << termcolor::cyan << "HEU" << termcolor::reset << std::endl;
+ROS_WARN( "NO SEGFAULT NOW! :)"  );
+		continue;
+	}
+
+
+featureProperties = e->property ( featureProperties_ );
+std::cout << "Debug 8.4.2 \t";
             EntityProperty currentProperty;
+std::cout << "Debug 8.4.3 \t";
             float dt = scan->header.stamp.toSec() - e->lastUpdateTimestamp();
 
+std::cout << "Debug 8.5 \t";
             // For the entities which already exist in the WM, determine the relevant properties in order to determine which entities _might_ associate to which clusters
             if ( featureProperties.getFeatureProbabilities().get_pCircle() > featureProperties.getFeatureProbabilities().get_pRectangle() )
             {
+
+std::cout << "Debug 8.6 \t";
                 ed::tracking::Circle circle = featureProperties.getCircle();
                 circle.predictAndUpdatePos(dt);
                 
@@ -1794,9 +1820,11 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
                 currentProperty.entity_max.x = circle.get_x() + ( 0.5*ASSOCIATION_DISTANCE + circle.get_radius() );
                 currentProperty.entity_min.y = circle.get_y() - ( 0.5*ASSOCIATION_DISTANCE + circle.get_radius() );
                 currentProperty.entity_max.y = circle.get_y() + ( 0.5*ASSOCIATION_DISTANCE + circle.get_radius() );
+std::cout << "Debug 8.7 \t";
             }
             else
             {
+std::cout << "Debug 8.8 \t";
                 ed::tracking::Rectangle rectangle = featureProperties.getRectangle();
                 rectangle.predictAndUpdatePos(dt);
                 
@@ -1804,15 +1832,19 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
                 currentProperty.entity_min = corners[0];
                 currentProperty.entity_max = corners[0];
 
+std::cout << "Debug 8.9 \t";
                 for ( unsigned int i_corner = 1; i_corner < corners.size(); i_corner++ )
                 {
+std::cout << "Debug 8.10 \t";
                     currentProperty.entity_min.x = std::min ( corners[i_corner].x, currentProperty.entity_min.x );
                     currentProperty.entity_min.y = std::min ( corners[i_corner].y, currentProperty.entity_min.y );
                     currentProperty.entity_max.x = std::max ( corners[i_corner].x, currentProperty.entity_max.x );
                     currentProperty.entity_max.y = std::max ( corners[i_corner].y, currentProperty.entity_max.y );
+std::cout << "Debug 8.11 \t";
                 }
             }
             EntityPropertiesForAssociation.push_back ( currentProperty );
+std::cout << "Debug 8.12 \t";
         }
     }
     
@@ -1949,18 +1981,34 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
 //                 if( DEBUG )
 //             std::cout << "Debug 13.3 \t";
             
-//             std::cout << "possibleSegmentEntityAssociations.size() = " << possibleSegmentEntityAssociations.size() << "\t";
+             std::cout << "possibleSegmentEntityAssociations.size() = " << possibleSegmentEntityAssociations.size() << "\t";
 
             for ( unsigned int jj = 0; jj < possibleSegmentEntityAssociations.size(); ++jj )  // relevant entities only
             {
 //                         if( DEBUG )
-//             std::cout << "jj = " << jj << " \t";
+             std::cout << "jj = " << jj << " \t";
                 const ed::EntityConstPtr& e = *it_laserEntities[ possibleSegmentEntityAssociations[jj] ];
+
+//if( !e-> property ( featureProperties_) )
+//{
+//	continue;
+//}
+
                 ed::tracking::FeatureProperties featureProperties = e->property ( featureProperties_ );
                 float dist;
                 float dt = scan->header.stamp.toSec() - e->lastUpdateTimestamp();
                     if( DEBUG )
             std::cout << "Debug 13.5 \t";
+
+featureProperties.printProperties();
+
+std::cout << "entity id = " << e->id() << std::endl;
+std::cout << "hoi" << std::endl;
+std::cout << "test1 = " << featureProperties.getFeatureProbabilities().get_pCircle() << std::endl;
+std::cout << "test2 = " << featureProperties.getFeatureProbabilities().get_pRectangle() << std::endl;
+bool test = featureProperties.getFeatureProbabilities().get_pCircle() > featureProperties.getFeatureProbabilities().get_pRectangle();
+std::cout << "bool test = " << test  << std::endl;
+std::cout << "Debug 13.5.1 \t";
                 if ( featureProperties.getFeatureProbabilities().get_pCircle() > featureProperties.getFeatureProbabilities().get_pRectangle() )  // entity is considered to be a circle
                 {
                             if( DEBUG )
@@ -1994,8 +2042,8 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
                     float OC3_OC3  = OC3.dot ( OC3 );
 
                     float minDistance = std::numeric_limits< float >::infinity();
-//     if( DEBUG )
-//             std::cout << "Debug 13.8 \t";
+     if( DEBUG )
+             std::cout << "Debug 13.8 \t";
                     if ( OP_OC1 > 0 && OC1_OC1B > OP_OC1 && OP_OC3 > 0 && OC3_OC3 > OP_OC3 )   // point is inside the rectangle
                     {
                                 if( DEBUG )
