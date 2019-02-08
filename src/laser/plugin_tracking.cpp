@@ -939,15 +939,15 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
     std::vector<ScanSegment> staticSegments = determineSegments(modelRangesAssociatedRanges2StaticWorld, max_gap_size_, min_segment_size_pixels_, segmentDepthThresholdSmall, lrf_model_, min_cluster_size_, max_cluster_size_ );    
 //     std::cout << "staticSegments.size() = " << staticSegments.size() << std::endl;
     std::sort(staticSegments.begin(), staticSegments.end(), sortBySegmentSize);
-    std::cout << "Size of staticSegments = ";
-    for (unsigned int iSegmentTest = 0; iSegmentTest < staticSegments.size(); iSegmentTest++)
-    {
-            std::cout << staticSegments[iSegmentTest].size() << "\t";
-    }
-    std::cout << "\n";
+//     std::cout << "Size of staticSegments = ";
+//     for (unsigned int iSegmentTest = 0; iSegmentTest < staticSegments.size(); iSegmentTest++)
+//     {
+//             std::cout << staticSegments[iSegmentTest].size() << "\t";
+//     }
+//     std::cout << "\n";
 //     
     
-    std::cout << "cornerPointMeasured init" << std::endl;
+//     std::cout << "cornerPointMeasured init" << std::endl;
     geo::Vec2f cornerPointMeasured, cornerPointModelled;
     std::vector < unsigned int > possibleCorners, possibleCornersModel;
     std::vector< geo::Vec2f> points, modelledPoints ;
@@ -962,15 +962,15 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
     tf::Matrix3x3 matrix ( q );
     double rollSensor, pitchSensor, yawSensor;
     matrix.getRPY ( rollSensor, pitchSensor, yawSensor );
-     std::cout << "cornerPointMeasured init 2" << std::endl;
-     std::cout << "staticSegments.size() = " << staticSegments.size() << std::endl;
+//      std::cout << "cornerPointMeasured init 2" << std::endl;
+//      std::cout << "staticSegments.size() = " << staticSegments.size() << std::endl;
      
     for(unsigned int iSegment = 0; iSegment < staticSegments.size(); iSegment++)
     {
-            std::cout << "Bla";
+//             std::cout << "Bla";
            ScanSegment staticSegment = staticSegments[iSegment];
 //            std::cout << "After Bla";
-           std::cout << "For iSegment = " << iSegment << " staticSegment read. Size = " << staticSegment.size() << std::endl;
+//            std::cout << "For iSegment = " << iSegment << " staticSegment read. Size = " << staticSegment.size() << std::endl;
 //            std::cout << "Static Segment size = " << staticSegment.size() << std::endl;
            
            if( staticSegment.size() < MIN_POINTS_STRAIGHT_LINE )
@@ -980,8 +980,8 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
            
 //            std::vector< geo::Vec2f> points(  staticSegment.size() ), modelledPoints(  staticSegment.size() ) ;
            points.clear(); modelledPoints.clear() ;
-           std::cout << "Point info ";
-           std::cout << "staticSegment.size() = " << staticSegment.size();
+//            std::cout << "Point info ";
+//            std::cout << "staticSegment.size() = " << staticSegment.size();
            
            for( unsigned int iSeg2Point = 0; iSeg2Point < staticSegment.size(); iSeg2Point++)
            {
@@ -1010,9 +1010,9 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
            }
            
            
-           std::cout << "points[0, final] = " << points[0] << ", " << points.back() << ". modelledPoints[0, final] = " << modelledPoints[0] << ", " << modelledPoints.back() << std::endl;
+//            std::cout << "points[0, final] = " << points[0] << ", " << points.back() << ". modelledPoints[0, final] = " << modelledPoints[0] << ", " << modelledPoints.back() << std::endl;
                       
-           std::cout << " modelledPoints.size() = " << modelledPoints.size() << std::endl;
+//            std::cout << " modelledPoints.size() = " << modelledPoints.size() << std::endl;
            
            
 //            unsigned int segmentLength = staticSegment.size();       
@@ -1028,7 +1028,7 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
 //            std::vector<geo::Vec2f>::iterator it_end = std::next( points.begin(), finalElement );
             std::vector<geo::Vec2f>::iterator it_end = points.begin(); std::advance( it_end, finalElement );
            
-           std::cout << "\nFor measured points: ";
+//            std::cout << "\nFor measured points: ";
 //            bool cornerFound = ed::tracking::findPossibleCorner ( points, &possibleCorners, &it_start, &it_end, MIN_DISTANCE_CORNER_DETECTION_LARGE );
            possibleCorners.clear();
            bool cornersFoundMeasured = ed::tracking::findPossibleCorners (points, &possibleCorners, MIN_DISTANCE_CORNER_DETECTION_LARGE  );
@@ -1036,38 +1036,38 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
            
 //            std::cout << "cornerPointsFound  = " << cornerPointsFound << " cornerFound = " << cornerFound << std::endl;
            
-           std::cout << "cornersFoundMeasured = " << cornersFoundMeasured << " @ ";
+//            std::cout << "cornersFoundMeasured = " << cornersFoundMeasured << " @ ";
            
-           for( unsigned int ipossibleCorners = 0; ipossibleCorners < possibleCorners.size(); ipossibleCorners++)
-           {
-                   std::cout << possibleCorners[ipossibleCorners] << ", \t";
-           }
+//            for( unsigned int ipossibleCorners = 0; ipossibleCorners < possibleCorners.size(); ipossibleCorners++)
+//            {
+//                    std::cout << possibleCorners[ipossibleCorners] << ", \t";
+//            }
            
           
            
-           std::cout << termcolor::red << "correctXYpos_ = " << correctXYpos_ << termcolor::reset << std::endl;
+//            std::cout << termcolor::red << "correctXYpos_ = " << correctXYpos_ << termcolor::reset << std::endl;
            
            if (!cornerPointsFound && cornersFoundMeasured && correctXYpos_)
            {
                 it_start = modelledPoints.begin(); std::advance(it_start, startElement);
 //              std::next( modelledPoints.begin(), startElement );
                 it_end = modelledPoints.begin(); std::advance(it_end , finalElement );
-                std::cout << "For modelled points: ";
+//                 std::cout << "For modelled points: ";
 //                 bool cornerFoundModel = ed::tracking::findPossibleCorner ( modelledPoints, &possibleCornersModel, &it_start, &it_end, MIN_DISTANCE_CORNER_DETECTION_LARGE );
                 
                 possibleCornersModel.clear();
                 bool cornersFoundModelled = ed::tracking::findPossibleCorners (modelledPoints, &possibleCornersModel, MIN_DISTANCE_CORNER_DETECTION_LARGE  );
-                std::cout << "cornersFoundMeasured = " << cornersFoundModelled << " @ ";
-           for( unsigned int ipossibleCorners = 0; ipossibleCorners < possibleCornersModel.size(); ipossibleCorners++)
-           {
-                   std::cout << possibleCornersModel[ipossibleCorners] << ", \t";
-           }
-                 std::cout << "cornerFoundModel  = " << cornersFoundModelled << std::endl;
+//                 std::cout << "cornersFoundMeasured = " << cornersFoundModelled << " @ ";
+//            for( unsigned int ipossibleCorners = 0; ipossibleCorners < possibleCornersModel.size(); ipossibleCorners++)
+//            {
+//                    std::cout << possibleCornersModel[ipossibleCorners] << ", \t";
+//            }
+//                  std::cout << "cornerFoundModel  = " << cornersFoundModelled << std::endl;
                  
                 if(cornersFoundMeasured && cornersFoundModelled)
                 {
-                        std::cout << "CornerModelFound" << std::endl;
-                        std::cout << "cornerPointMeasured assigned "<< std::endl;
+//                         std::cout << "CornerModelFound" << std::endl;
+//                         std::cout << "cornerPointMeasured assigned "<< std::endl;
                         cornerPointsFound = true;
                         
                         
@@ -1092,12 +1092,12 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
                                std::cout << "Cost = " << cost(2, 3) << std::endl;
                                std::cout << "Cost = " << cost(3, 2) << std::endl;
 */
-                      std::cout << "max sizes = " << possibleCorners.size() << ", " << possibleCornersModel.size() << std::endl;
+//                       std::cout << "max sizes = " << possibleCorners.size() << ", " << possibleCornersModel.size() << std::endl;
                       unsigned int size = std::max(possibleCorners.size(), possibleCornersModel.size());
                       dlib::matrix<int> cost = dlib::ones_matrix<int> (size, size); // assignment can handly int's only, so convert to mm
                       cost = 0;// makes it a zero-matrix over all elements
 //                       cost = std::numeric_limits< double >::infinity()*cost; 
-                      std::cout << "cost = " << cost << " size = " << size << std::endl;
+//                       std::cout << "cost = " << cost << " size = " << size << std::endl;
                       
                       for (unsigned int iMeasuredCorners = 0; iMeasuredCorners < possibleCorners.size(); iMeasuredCorners++)
                       { 
@@ -1117,7 +1117,7 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
 //                       std::cout << "p_sensor = " << p_sensor << " p_model = " << p_model << std::endl;
                       
                                       float dist = std::sqrt( std::pow(p_sensor.x - p_model.x, 2.0 ) +  std::pow(p_sensor.y - p_model.y, 2.0 ) );
-                                      std::cout << "moeh dist = " << dist;
+//                                       std::cout << "moeh dist = " << dist;
                                      int ElementCost = (int) 1000 / dist;
                                       
                                       cost(iMeasuredCorners, iModelledCorners) = ElementCost; // assignment can handle int's only, so scale wisely
@@ -1126,7 +1126,7 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
                       }
                       
                       
-                        std::cout << "cost = " << cost << " size = " << size << std::endl;
+//                         std::cout << "cost = " << cost << " size = " << size << std::endl;
                       
                        // To find out the best assignment of people to jobs we just need to call this function.
                         std::vector<long> assignment = dlib::max_cost_assignment(cost);
@@ -1135,10 +1135,10 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
                         // the person from the first row of the cost matrix to job 2, the middle row person to
                         // job 0, and the bottom row person to job 1.
                         
-                        std::cout << "assignment.size() = " << assignment.size() << std::endl;
+//                         std::cout << "assignment.size() = " << assignment.size() << std::endl;
                         
                         for (unsigned int i = 0; i < assignment.size(); i++)
-                                std::cout << assignment[i] << ", Element = " << i << assignment[i] << "Cost = " << cost(i, assignment[i]) << std::endl;
+//                                 std::cout << assignment[i] << ", Element = " << i << assignment[i] << "Cost = " << cost(i, assignment[i]) << std::endl;
 // 
                         // This prints optimal cost:  16.0
                         // which is correct since our optimal assignment is 6+5+5.
@@ -1223,8 +1223,8 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
                         
 //                         std::cout << "cornerPointMeasured = " << cornerPointMeasured << " cornerPointModelled = " << cornerPointModelled << std::endl;
 
-                   std::cout << " AngleStart = " << yawSensor + lrf_model_.getAngleMin() + lrf_model_.getAngleIncrement()*staticSegment[0] << " staticSegment[0] = " << staticSegment[0];
-                   std::cout << "yawSensor = " << yawSensor << " lrf_model_.getAngleMin() = " << lrf_model_.getAngleMin()  << " lrf_model_.getAngleIncrement() = " << lrf_model_.getAngleIncrement() << std::endl;
+//                    std::cout << " AngleStart = " << yawSensor + lrf_model_.getAngleMin() + lrf_model_.getAngleIncrement()*staticSegment[0] << " staticSegment[0] = " << staticSegment[0];
+//                    std::cout << "yawSensor = " << yawSensor << " lrf_model_.getAngleMin() = " << lrf_model_.getAngleMin()  << " lrf_model_.getAngleIncrement() = " << lrf_model_.getAngleIncrement() << std::endl;
                    
                         visualization_msgs::Marker pointsModelledAll;
                         pointsModelledAll.header.frame_id = "/map";
@@ -1751,6 +1751,7 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
     std::vector<ed::WorldModel::const_iterator> it_laserEntities;
     std::vector< EntityProperty > EntityPropertiesForAssociation;
 
+    if( DEBUG )
 std::cout << "Debug 8.1 \t";
     // Check which entities might associate for tracking based on their latest location in order to prevent to check all the entities 
     for ( ed::WorldModel::const_iterator e_it = world.begin(); e_it != world.end(); ++e_it )
@@ -1758,12 +1759,12 @@ std::cout << "Debug 8.1 \t";
         const ed::EntityConstPtr& e = *e_it;
 //                      std::cout << "Going to check entity with id = " << e->id() << std::endl;
         std::string laserID = "-laserTracking";
-
+if( DEBUG )
 std::cout << "Debug 8.2 \t";
         if ( e->id().str().length() < laserID.length() )
         {
 
-
+if( DEBUG )
 std::cout << "Debug 8.3 \t";
             continue;
         }
@@ -1783,36 +1784,44 @@ std::cout << "Debug 8.3 \t";
             }
             */
 
-
+if( DEBUG )
 std::cout << "Debug 8.4 \t";
             it_laserEntities.push_back ( e_it );
-
+            
+            std::cout << "tracking loop: Entity added to list of laserEntities: id = " << e->id() << std::endl;
+if( DEBUG )
 std::cout << "Debug 8.4.1 \t";
-std::cout << "e id = " << e->id() << std::endl;
+// std::cout << "e id = " << e->id() << std::endl;
             ed::tracking::FeatureProperties featureProperties;
-std::cout << "bla " << featureProperties_.idx << std::endl;
+//std::cout << "bla " << featureProperties_.idx << std::endl;
 
 	if( !e->property( featureProperties_) )
 	{
 
 std::cout << termcolor::cyan << "HEU" << termcolor::reset << std::endl;
 ROS_WARN( "NO SEGFAULT NOW! :)"  );
+        req.removeEntity ( e->id() );
 		continue;
 	}
 
 
 featureProperties = e->property ( featureProperties_ );
-std::cout << "Debug 8.4.2 \t";
+if( DEBUG )
+        std::cout << "Debug 8.4.2 \t";
             EntityProperty currentProperty;
-std::cout << "Debug 8.4.3 \t";
+if( DEBUG )
+        std::cout << "Debug 8.4.3 \t";
             float dt = scan->header.stamp.toSec() - e->lastUpdateTimestamp();
 
-std::cout << "Debug 8.5 \t";
+if( DEBUG )
+        std::cout << "Debug 8.5 \t";
             // For the entities which already exist in the WM, determine the relevant properties in order to determine which entities _might_ associate to which clusters
             if ( featureProperties.getFeatureProbabilities().get_pCircle() > featureProperties.getFeatureProbabilities().get_pRectangle() )
             {
 
-std::cout << "Debug 8.6 \t";
+if( DEBUG )
+        std::cout << "Debug 8.6 \t";
+
                 ed::tracking::Circle circle = featureProperties.getCircle();
                 circle.predictAndUpdatePos(dt);
                 
@@ -1820,10 +1829,14 @@ std::cout << "Debug 8.6 \t";
                 currentProperty.entity_max.x = circle.get_x() + ( 0.5*ASSOCIATION_DISTANCE + circle.get_radius() );
                 currentProperty.entity_min.y = circle.get_y() - ( 0.5*ASSOCIATION_DISTANCE + circle.get_radius() );
                 currentProperty.entity_max.y = circle.get_y() + ( 0.5*ASSOCIATION_DISTANCE + circle.get_radius() );
+                
+                if( DEBUG )
 std::cout << "Debug 8.7 \t";
+
             }
             else
             {
+                    if( DEBUG )
 std::cout << "Debug 8.8 \t";
                 ed::tracking::Rectangle rectangle = featureProperties.getRectangle();
                 rectangle.predictAndUpdatePos(dt);
@@ -1831,19 +1844,22 @@ std::cout << "Debug 8.8 \t";
                 std::vector<geo::Vec2f> corners = rectangle.determineCorners ( ASSOCIATION_DISTANCE );
                 currentProperty.entity_min = corners[0];
                 currentProperty.entity_max = corners[0];
-
+if( DEBUG )
 std::cout << "Debug 8.9 \t";
                 for ( unsigned int i_corner = 1; i_corner < corners.size(); i_corner++ )
                 {
+                        if( DEBUG )
 std::cout << "Debug 8.10 \t";
                     currentProperty.entity_min.x = std::min ( corners[i_corner].x, currentProperty.entity_min.x );
                     currentProperty.entity_min.y = std::min ( corners[i_corner].y, currentProperty.entity_min.y );
                     currentProperty.entity_max.x = std::max ( corners[i_corner].x, currentProperty.entity_max.x );
                     currentProperty.entity_max.y = std::max ( corners[i_corner].y, currentProperty.entity_max.y );
+                    if( DEBUG )
 std::cout << "Debug 8.11 \t";
                 }
             }
             EntityPropertiesForAssociation.push_back ( currentProperty );
+            if( DEBUG )
 std::cout << "Debug 8.12 \t";
         }
     }
@@ -1858,7 +1874,7 @@ std::cout << "Debug 8.12 \t";
 //             EntityPropertiesForAssociation[iTest].entity_max.y  << ", " << std::endl;
 //     }
     
-//     if( DEBUG )
+    if( DEBUG )
             std::cout << "Debug 9 \t";
     
     
@@ -1929,7 +1945,7 @@ std::cout << "Debug 8.12 \t";
 //         seg_max.x << ", " << 
 //         seg_max.y << std::endl;
 
-// if( DEBUG )
+if( DEBUG )
         std::cout << "Debug 11 \t";
     
         // After the properties of each segment are determined, check which clusters and entities might associate
@@ -1937,6 +1953,8 @@ std::cout << "Debug 8.12 \t";
 //         std::cout << "it_laserEntities.size() = " << it_laserEntities.size() << std::endl;
         for ( unsigned int jj = 0; jj < it_laserEntities.size(); ++jj )
         {
+                if( DEBUG )
+                std::cout << "Debug 11.1 \t";
 //                  const ed::EntityConstPtr& e = *it_laserEntities[jj];
 //                 std::cout << "Entity min/mx = " <<  EntityPropertiesForAssociation[jj].entity_min.x << ", " << 
 //                 EntityPropertiesForAssociation[jj].entity_max.x << ", " <<
@@ -1968,48 +1986,66 @@ std::cout << "Debug 8.12 \t";
         std::vector<float> distances ( points.size() );
         std::vector<unsigned int> IDs ( points.size() ); // IDs of the entity which is closest to that point
 
-//             if( DEBUG_SF )
+            if( DEBUG_SF )
             std::cout << "Debug 13.1 \t";
         
         for ( unsigned int i_points = 0; i_points < points.size(); ++i_points )  // Determine closest object and distance to this object. If distance too large, relate to new object
         {
-//                     if( DEBUG )
-//             std::cout << "Debug 13.2, size = " << possibleSegmentEntityAssociations.size() << " \t";
+                    if( DEBUG )
+            std::cout << "Debug 13.2, size = " << possibleSegmentEntityAssociations.size() << " \t";
             geo::Vec2f p = points[i_points];
             float shortestDistance = std::numeric_limits< float >::max();
             unsigned int id_shortestEntity = std::numeric_limits< unsigned int >::max();
-//                 if( DEBUG )
-//             std::cout << "Debug 13.3 \t";
+                if( DEBUG )
+            std::cout << "Debug 13.3 \t";
             
-             std::cout << "possibleSegmentEntityAssociations.size() = " << possibleSegmentEntityAssociations.size() << "\t";
+//              std::cout << "possibleSegmentEntityAssociations.size() = " << possibleSegmentEntityAssociations.size() << "\t";
 
-            for ( unsigned int jj = 0; jj < possibleSegmentEntityAssociations.size(); ++jj )  // relevant entities only
+            for ( unsigned int jj = 0; jj < possibleSegmentEntityAssociations.size(); jj++ )  // relevant entities only
             {
-//                         if( DEBUG )
-             std::cout << "jj = " << jj << " \t";
+                std::cout << "New pos \t";
+                if( DEBUG )
+                std::cout << "jj = " << jj << " \t";
                 const ed::EntityConstPtr& e = *it_laserEntities[ possibleSegmentEntityAssociations[jj] ];
 
-//if( !e-> property ( featureProperties_) )
-//{
-//	continue;
-//}
-
+                if( !e-> property ( featureProperties_) )
+                {
+                        req.removeEntity ( e->id() );
+                        std::cout << "req to remove ent " << e->id() << std::endl;
+                        continue;
+                }
+                if( DEBUG )
+                std::cout << "Debug 13.4 \t";
+std::cout << "Tracking plugin: Going to get properties of entity" << e->id() << "having age " << scan->header.stamp.toSec() - e->lastUpdateTimestamp() << " \t";
                 ed::tracking::FeatureProperties featureProperties = e->property ( featureProperties_ );
+                std::cout << "Properties obtained";
                 float dist;
                 float dt = scan->header.stamp.toSec() - e->lastUpdateTimestamp();
-                    if( DEBUG )
-            std::cout << "Debug 13.5 \t";
+                
+                if( DEBUG )
+                std::cout << "Debug 13.5 \t";
 
-featureProperties.printProperties();
+                //featureProperties.printProperties();
 
-std::cout << "entity id = " << e->id() << std::endl;
-std::cout << "hoi" << std::endl;
-std::cout << "test1 = " << featureProperties.getFeatureProbabilities().get_pCircle() << std::endl;
-std::cout << "test2 = " << featureProperties.getFeatureProbabilities().get_pRectangle() << std::endl;
-bool test = featureProperties.getFeatureProbabilities().get_pCircle() > featureProperties.getFeatureProbabilities().get_pRectangle();
-std::cout << "bool test = " << test  << std::endl;
-std::cout << "Debug 13.5.1 \t";
-                if ( featureProperties.getFeatureProbabilities().get_pCircle() > featureProperties.getFeatureProbabilities().get_pRectangle() )  // entity is considered to be a circle
+//                 std::cout << "entity id = " << e->id() << std::endl;
+//                 std::cout << "hoi" << std::endl;
+                double prob1 = featureProperties.getFeatureProbabilities().get_pCircle();
+//                 std::cout << "test1 = " << prob1 << std::endl;
+                double prob2 = featureProperties.getFeatureProbabilities().get_pRectangle();
+//                 std::cout << "test2 = " << prob2 << std::endl;
+                bool test = featureProperties.getFeatureProbabilities().get_pCircle() > featureProperties.getFeatureProbabilities().get_pRectangle();
+//                 std::cout << "bool test = " << test  << std::endl;
+//                 std::cout << "Debug 13.5.1 \t";
+ std::cout << "pCirc = " << prob1<< " pRect = " << prob2 << std::endl;
+                
+                if(prob1 == -1.0 || prob2 == -1.0 )
+                {
+                        std::cout << "tracking plugin: req to remove entity with id = " << e->id() << std::endl;
+                req.removeEntity ( e->id() );
+                continue;
+                }
+
+                if ( prob1 > prob2 )  // entity is considered to be a circle
                 {
                             if( DEBUG )
             std::cout << "Debug 13.6 \t";
@@ -2110,17 +2146,23 @@ std::cout << "Debug 13.5.1 \t";
 //             std::cout << "possibleSegmentEntityAssociations.size() = " << possibleSegmentEntityAssociations.size() << "jj = " << jj << std::endl;
 //             std::cout << "id_shortestEntity = " << id_shortestEntity << std::endl;
                     id_shortestEntity = jj;
+                    if( DEBUG )
+                                std::cout << "Debug 13.11.4.1 \t";
                 }
+                if( DEBUG )
+                 std::cout << "Debug 13.11.4.2 \t";
+                if( DEBUG )
+                 std::cout << "jj = " << jj << " possibleSegmentEntityAssociations.size() = " << possibleSegmentEntityAssociations.size() << " \t";
             }
                                                     if( DEBUG )
             std::cout << "Debug 13.11.5 \t";
             distances[i_points] = shortestDistance;
-                                                                if( DEBUG )
+//                                                                 if( DEBUG )
             std::cout << "Debug 13.11.6 \t";
             IDs[i_points] = id_shortestEntity;
         }
         
-         if ( DEBUG_SF )
+//          if ( DEBUG_SF )
         std::cout << "End of loop debug 13.12.0 " << std::endl;
         
 //         std::cout << "Shortest Distances = " ;
@@ -2275,7 +2317,7 @@ std::cout << "Debug 13.5.1 \t";
                         }           
                 }
 
-//                  if ( DEBUG_SF )
+                 if ( DEBUG_SF )
                 std::cout << "Debug 13.18.2 \t";
 //                 std::cout << "3: associated, previousSegmentAssociated" << associated << previousSegmentAssociated << std::endl;
                 if ( associated )  // add all points to associated entity
@@ -2445,28 +2487,29 @@ std::cout << "Debug 13.5.1 \t";
         {
                 cornerIndex = cornerIndices[0];
         }
-        
+ std::cout << "while processing2: " << std::endl;       
         for ( std::vector<unsigned int>::const_iterator it_in = cornerIndices.begin(); it_in != cornerIndices.end(); ++it_in )
         {
              const unsigned int& index = *it_in;
         }
         
  if ( DEBUG_SF )
-                std::cout << "Debug 16 \t";
+                std::cout << "Debug 15.0 \t";
 
         ed::tracking::Circle circle;   
         ed::tracking::Rectangle rectangle;    
         std::vector<geo::Vec2f>::iterator it_low, it_high;
         
+        std::cout << "Debug 15.1 \t";
         ed::tracking::FITTINGMETHOD method = ed::tracking::CIRCLE;
         float error_circle2 = ed::tracking::fitObject ( points, method, &cornerIndex, &rectangle, &circle, &it_low, &it_high, sensor_pose );
         unsigned int elementLow = associatedPointsInfo[iList].laserIDs[0];
         unsigned int elementHigh = associatedPointsInfo[iList].laserIDs.back();
 //         measuredProperties[iList].confidenceCircle = ed::tracking::determineSegmentConfidence ( scan, elementLow, elementHigh);
-
+std::cout << "Debug 15.2 \t";
         method = ed::tracking::determineCase ( points, &cornerIndex, &it_low, &it_high, sensor_pose ); // chose to fit a single line or a rectangle (2 lines)        
         float error_rectangle2 = ed::tracking::fitObject ( points, method,  &cornerIndex, &rectangle, &circle, &it_low, &it_high,  sensor_pose );
-
+std::cout << "Debug 15.3 \t";
         measuredProperties[iList].confidenceRectangleWidth = false;
         measuredProperties[iList].confidenceRectangleWidthLow = false;
         measuredProperties[iList].confidenceRectangleWidthHigh = false;
@@ -2759,7 +2802,7 @@ std::cout << "Debug 13.5.1 \t";
             }
             
             if( DEBUG )
-                    std::cout << "Debug 1 " << std::endl;
+                    std::cout << "Debug zoveel " << std::endl;
 
             if ( !e->hasFlag ( "locked" ) )
             {
@@ -3200,6 +3243,9 @@ std::cout << "Debug 13.5.1 \t";
         // Set feature properties en publish geometries
         if ( check )
         {
+                std::cout << termcolor::magenta << "Going to set prop for entity with id = " << id << " having prop " << termcolor::reset << std::endl;
+                entityProperties.printProperties();
+                
             req.setProperty ( id, featureProperties_, entityProperties );
             req.setPose ( id, new_pose );
 
@@ -3213,7 +3259,7 @@ std::cout << "Debug 13.5.1 \t";
 
 // - - - - - - - - - - - - - - - - -
 
-//     std::cout << "Total took " << t_total.getElapsedTimeInMilliSec() << " ms. \n\n\n" << std::endl;
+    std::cout << "tracking plugin: Total took " << t_total.getElapsedTimeInMilliSec() << " ms. \n\n\n" << std::endl;
 }
 
 // ----------------------------------------------------------------------------------------------------
