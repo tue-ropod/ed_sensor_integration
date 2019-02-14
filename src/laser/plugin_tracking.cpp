@@ -751,7 +751,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
 // 
 //          std::cout << "Start of plugin at t = " << now.tv_sec << "." << now.tv_usec << std::endl;
          
-          std::cout << termcolor::on_yellow << "Start of plugin" << termcolor::reset << std::endl;
+   //       std::cout << termcolor::on_yellow << "Start of plugin" << termcolor::reset << std::endl;
 
 
     // - - - - - - - - - - - - - - - - - -
@@ -1472,7 +1472,7 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
                 
                 ed::tracking::unwrap(&modelledAngle, measuredAngle, 2*M_PI);
                 diffAngle = measuredAngle - modelledAngle;
-                std::cout << "Diffangle = " << diffAngle << std::endl;
+//                 std::cout << "Diffangle = " << diffAngle << std::endl;
                 
                 if(diffAngle < MAX_DEVIATION_ANGLE_CORRECTION ) // Only correct if localization partially leads to problems
                 {
@@ -1493,14 +1493,14 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
            
     }
            
-           std::cout << "angleCorrectionFound = " << angleCorrectionFound << std::endl;
+//            std::cout << "angleCorrectionFound = " << angleCorrectionFound << std::endl;
            if( angleCorrectionFound )
            {                     
                    
             
-               std::cout << termcolor::cyan << "Yaw before = " << yawSensor << " diff = " << diffAngle ; // << "Measured Angle = " << measuredAngle << " Modelled Angle = " << modelledAngle  << " Yaw new =  " << yawSensor - (measuredAngle - modelledAngle) << termcolor::reset << std::endl;
+//                std::cout << termcolor::cyan << "Yaw before = " << yawSensor << " diff = " << diffAngle ; // << "Measured Angle = " << measuredAngle << " Modelled Angle = " << modelledAngle  << " Yaw new =  " << yawSensor - (measuredAngle - modelledAngle) << termcolor::reset << std::endl;
                         yawSensor -= diffAngle;
-                        std::cout << " yaw new = " << yawSensor << termcolor::reset << std::endl;
+//                         std::cout << " yaw new = " << yawSensor << termcolor::reset << std::endl;
                         ed::tracking::wrap2Interval(&yawSensor, (double) 0.0, (double) 2*M_PI);
         //             std::cout << "sensor_pose before = " << sensor_pose << std::endl;
                 
@@ -1518,7 +1518,7 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
                         
                         geo::Vector3 p_model = lrf_model_.rayDirections() [sensorElementOfCornerModelled] * modelRangesAssociatedRanges2StaticWorld[sensorElementOfCornerModelled];
                         geo::Vector3 p_modelled = sensor_pose * p_model;
-                        std::cout << " cornerPointModelled before correction = " << cornerPointModelled << std::endl;
+//                         std::cout << " cornerPointModelled before correction = " << cornerPointModelled << std::endl;
                         cornerPointModelled = geo::Vec2f ( p_modelled.x, p_modelled.y );
         //             std::cout << "sensor_pose after = " << sensor_pose << std::endl;
                         
@@ -1550,15 +1550,15 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
                         */
            }
             
-            std::cout << "cornerPointsFound && correctXYpos_ = " << cornerPointsFound << correctXYpos_ << std::endl;
+//             std::cout << "cornerPointsFound && correctXYpos_ = " << cornerPointsFound << correctXYpos_ << std::endl;
             
             if( cornerPointsFound && correctXYpos_)
             {
-             std::cout << "Diff init " << std::endl;       
+//              std::cout << "Diff init " << std::endl;       
 //                     geo::Vec2f diff = cornerPointMeasured - cornerPointModelled;
              geo::Vec2f diff = xyDiff;
                     
-                    std::cout << termcolor::magenta << "x,y diff = " << diff << " cornerPointMeasured = " << cornerPointMeasured << ", " << cornerPointModelled << termcolor::reset << std::endl;
+//                     std::cout << termcolor::magenta << "x,y diff = " << diff << " cornerPointMeasured = " << cornerPointMeasured << ", " << cornerPointModelled << termcolor::reset << std::endl;
                     
                     geo::Vec3T< geo::real > updatedPos(sensor_pose.getOrigin().getX() - diff.x, sensor_pose.getOrigin().getY() - diff.y, sensor_pose.getOrigin().getZ() );
                     sensor_pose.setOrigin( updatedPos );
@@ -1604,7 +1604,7 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
     
 //     sensor_pose.setRPY( sensorRotation );
 
-                        std::cout << "Going to render world" << std::endl;
+//                         std::cout << "Going to render world" << std::endl;
                         
 renderWorld(sensor_pose, model_ranges, world, lrf_model_);
     
@@ -1788,7 +1788,7 @@ if( DEBUG )
 std::cout << "Debug 8.4 \t";
             it_laserEntities.push_back ( e_it );
             
-            std::cout << "tracking loop: Entity added to list of laserEntities: id = " << e->id() << std::endl;
+//             std::cout << "tracking loop: Entity added to list of laserEntities: id = " << e->id() << std::endl;
 if( DEBUG )
 std::cout << "Debug 8.4.1 \t";
 // std::cout << "e id = " << e->id() << std::endl;
@@ -2003,7 +2003,7 @@ if( DEBUG )
 
             for ( unsigned int jj = 0; jj < possibleSegmentEntityAssociations.size(); jj++ )  // relevant entities only
             {
-                std::cout << "New pos \t";
+               // std::cout << "New pos \t";
                 if( DEBUG )
                 std::cout << "jj = " << jj << " \t";
                 const ed::EntityConstPtr& e = *it_laserEntities[ possibleSegmentEntityAssociations[jj] ];
@@ -2016,9 +2016,9 @@ if( DEBUG )
                 }
                 if( DEBUG )
                 std::cout << "Debug 13.4 \t";
-std::cout << "Tracking plugin: Going to get properties of entity" << e->id() << "having age " << scan->header.stamp.toSec() - e->lastUpdateTimestamp() << " \t";
+//std::cout << "Tracking plugin: Going to get properties of entity" << e->id() << "having age " << scan->header.stamp.toSec() - e->lastUpdateTimestamp() << " \t";
                 ed::tracking::FeatureProperties featureProperties = e->property ( featureProperties_ );
-                std::cout << "Properties obtained";
+//                 std::cout << "Properties obtained";
                 float dist;
                 float dt = scan->header.stamp.toSec() - e->lastUpdateTimestamp();
                 
@@ -2036,7 +2036,7 @@ std::cout << "Tracking plugin: Going to get properties of entity" << e->id() << 
                 bool test = featureProperties.getFeatureProbabilities().get_pCircle() > featureProperties.getFeatureProbabilities().get_pRectangle();
 //                 std::cout << "bool test = " << test  << std::endl;
 //                 std::cout << "Debug 13.5.1 \t";
- std::cout << "pCirc = " << prob1<< " pRect = " << prob2 << std::endl;
+//  std::cout << "pCirc = " << prob1<< " pRect = " << prob2 << std::endl;
                 
                 if(prob1 == -1.0 || prob2 == -1.0 )
                 {
@@ -2157,12 +2157,13 @@ std::cout << "Tracking plugin: Going to get properties of entity" << e->id() << 
                                                     if( DEBUG )
             std::cout << "Debug 13.11.5 \t";
             distances[i_points] = shortestDistance;
-//                                                                 if( DEBUG )
+
+            if( DEBUG )
             std::cout << "Debug 13.11.6 \t";
             IDs[i_points] = id_shortestEntity;
         }
         
-//          if ( DEBUG_SF )
+         if ( DEBUG_SF )
         std::cout << "End of loop debug 13.12.0 " << std::endl;
         
 //         std::cout << "Shortest Distances = " ;
@@ -2379,7 +2380,7 @@ std::cout << "Tracking plugin: Going to get properties of entity" << e->id() << 
 
     }
     
-    std::cout << " Test zoveel " << std::endl;
+//     std::cout << " Test zoveel " << std::endl;
      // ############################## TEMP ############################
     
 //     unsigned int IDPoints = 0;
@@ -2482,12 +2483,12 @@ std::cout << "Tracking plugin: Going to get properties of entity" << e->id() << 
         std::vector<geo::Vec2f>::iterator it_end = points.end();
         unsigned int cornerIndex = std::numeric_limits<unsigned int>::quiet_NaN();
           
- std::cout << "while processing: " << std::endl;
+//  std::cout << "while processing: " << std::endl;
         if( ed::tracking::findPossibleCorner ( points, &cornerIndices, &it_start, &it_end, MIN_DISTANCE_CORNER_DETECTION ) )
         {
                 cornerIndex = cornerIndices[0];
         }
- std::cout << "while processing2: " << std::endl;       
+//  std::cout << "while processing2: " << std::endl;       
         for ( std::vector<unsigned int>::const_iterator it_in = cornerIndices.begin(); it_in != cornerIndices.end(); ++it_in )
         {
              const unsigned int& index = *it_in;
@@ -2500,16 +2501,16 @@ std::cout << "Tracking plugin: Going to get properties of entity" << e->id() << 
         ed::tracking::Rectangle rectangle;    
         std::vector<geo::Vec2f>::iterator it_low, it_high;
         
-        std::cout << "Debug 15.1 \t";
+//         std::cout << "Debug 15.1 \t";
         ed::tracking::FITTINGMETHOD method = ed::tracking::CIRCLE;
         float error_circle2 = ed::tracking::fitObject ( points, method, &cornerIndex, &rectangle, &circle, &it_low, &it_high, sensor_pose );
         unsigned int elementLow = associatedPointsInfo[iList].laserIDs[0];
         unsigned int elementHigh = associatedPointsInfo[iList].laserIDs.back();
 //         measuredProperties[iList].confidenceCircle = ed::tracking::determineSegmentConfidence ( scan, elementLow, elementHigh);
-std::cout << "Debug 15.2 \t";
+// std::cout << "Debug 15.2 \t";
         method = ed::tracking::determineCase ( points, &cornerIndex, &it_low, &it_high, sensor_pose ); // chose to fit a single line or a rectangle (2 lines)        
         float error_rectangle2 = ed::tracking::fitObject ( points, method,  &cornerIndex, &rectangle, &circle, &it_low, &it_high,  sensor_pose );
-std::cout << "Debug 15.3 \t";
+// std::cout << "Debug 15.3 \t";
         measuredProperties[iList].confidenceRectangleWidth = false;
         measuredProperties[iList].confidenceRectangleWidthLow = false;
         measuredProperties[iList].confidenceRectangleWidthHigh = false;
@@ -3243,8 +3244,8 @@ std::cout << "Debug 15.3 \t";
         // Set feature properties en publish geometries
         if ( check )
         {
-                std::cout << termcolor::magenta << "Going to set prop for entity with id = " << id << " having prop " << termcolor::reset << std::endl;
-                entityProperties.printProperties();
+        //        std::cout << termcolor::magenta << "Going to set prop for entity with id = " << id << " having prop " << termcolor::reset << std::endl;
+        //        entityProperties.printProperties();
                 
             req.setProperty ( id, featureProperties_, entityProperties );
             req.setPose ( id, new_pose );
@@ -3259,7 +3260,7 @@ std::cout << "Debug 15.3 \t";
 
 // - - - - - - - - - - - - - - - - -
 
-    std::cout << "tracking plugin: Total took " << t_total.getElapsedTimeInMilliSec() << " ms. \n\n\n" << std::endl;
+//     std::cout << "tracking plugin: Total took " << t_total.getElapsedTimeInMilliSec() << " ms. \n\n\n" << std::endl;
 }
 
 // ----------------------------------------------------------------------------------------------------
