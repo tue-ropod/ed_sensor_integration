@@ -3247,6 +3247,8 @@ if( DEBUG )
         //        std::cout << termcolor::magenta << "Going to set prop for entity with id = " << id << " having prop " << termcolor::reset << std::endl;
         //        entityProperties.printProperties();
                 
+//                 std::cout << "Tracking plugin updates: id = " << id << std::endl;
+//                 entityProperties.printProperties();
             req.setProperty ( id, featureProperties_, entityProperties );
             req.setPose ( id, new_pose );
 
