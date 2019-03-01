@@ -84,7 +84,7 @@ private:
     
     ros::Publisher door_pub_;
     
-//     ros::Publisher ObjectMarkers_pub_; // ############################## TEMP ############################
+    ros::Publisher ObjectMarkers_pub_; // ############################## TEMP ############################
     
 //     ros::Publisher PointMarkers_pub_; // ############################## TEMP ############################
     

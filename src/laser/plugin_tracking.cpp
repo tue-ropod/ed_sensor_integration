@@ -83,8 +83,8 @@ visualization_msgs::Marker getMarker ( ed::tracking::FeatureProperties& featureP
     visualization_msgs::Marker marker;
     std_msgs::ColorRGBA color;
 
-        color.r = 1;
-        color.g = 140/255;
+        color.r = 0;
+        color.g = 255;
         color.b = 0;
         color.a = ( float ) 0.5;
 
@@ -628,7 +628,7 @@ void LaserPluginTracking::initialize(ed::InitData& init)
     unsigned int bufferSize = 1; // TODO increase to 3(?) in order to make it possible to process more laser data in 1 iteration. Set low for testing purposes now.
     sub_scan_ = nh.subscribe<sensor_msgs::LaserScan>(laser_topic, bufferSize, &LaserPluginTracking::scanCallback, this);
     door_pub_ = nh.advertise<ed_sensor_integration::doorDetection>("door", 3);
-//     ObjectMarkers_pub_ = nh.advertise<visualization_msgs::MarkerArray> ( "ed/gui/objectMarkers2", 3 ); // TEMP
+    ObjectMarkers_pub_ = nh.advertise<visualization_msgs::MarkerArray> ( "ed/gui/objectMarkers2", 3 ); // TEMP
 //     PointMarkers_pub_ = nh.advertise<visualization_msgs::MarkerArray> ( "ed/gui/pointMarkers", 3 ); // TEMP
 //     processedLaserPoints_pub_ = nh.advertise<sensor_msgs::LaserScan> ( "processedLaserScan", 3 ); // TEMP
     pose_updated_pub_ = nh.advertise<geometry_msgs::PoseStamped> ( "PoseTest", 3 ); // TEMP
@@ -2750,8 +2750,8 @@ if( DEBUG )
     if( DEBUG )
             std::cout << "Debug 18 \t";
     
-//     visualization_msgs::MarkerArray markers;
-//     unsigned int ID = 100;
+    visualization_msgs::MarkerArray markers;
+    unsigned int ID = 100;
     
     for ( unsigned int iProperties = 0; iProperties < measuredProperties.size(); iProperties++ ) // Update associated entities
     {
@@ -2766,7 +2766,7 @@ if( DEBUG )
         measuredProperty = measuredProperties[iProperties].featureProperty;
         
         // temporary: pub measured properties in order to visualize the properties which are added
-//         markers.markers.push_back( getMarker(measuredProperty, ID++) ); // TEMP
+        markers.markers.push_back( getMarker(measuredProperty, ID++) ); // TEMP
 
         
 //         measuredProperty.getRectangle().printProperties();
@@ -3250,6 +3250,10 @@ if( DEBUG )
 //                 std::cout << "Tracking plugin updates: id = " << id << std::endl;
 //                 entityProperties.printProperties();
             req.setProperty ( id, featureProperties_, entityProperties );
+            
+//             std::cout << "Prop of ent. " << id << " updated with properties = "; entityProperties.printProperties(); 
+            std::cout << " measuredProperty of ent " << id << " = "; measuredProperty.printProperties();
+            
             req.setPose ( id, new_pose );
 
             // Set timestamp
@@ -3258,7 +3262,7 @@ if( DEBUG )
         }
     }
     
-//     ObjectMarkers_pub_.publish(markers);
+    ObjectMarkers_pub_.publish(markers);
 
 // - - - - - - - - - - - - - - - - -
 
