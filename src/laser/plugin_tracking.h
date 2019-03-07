@@ -35,11 +35,11 @@
 #define ANGLE_MARGIN_FITTING 25*M_PI/180                // [rad]
 // #define POINTS_TO_CHECK_CONFIDENCE 3                 // [-]
 // #define EPSILON 1e-4                                 // [m]
-#define MIN_POINTS_STRAIGHT_LINE 10                     // [-]
+#define MIN_POINTS_STRAIGHT_LINE 8                     // [-]
 #define MAX_DEVIATION_IAV_STRAIGHT_LINE 10*M_PI/180     // [rad]
 #define MAX_DEVIATION_ANGLE_CORRECTION 20*M_PI/180      // [rad]
 #define SEGMENT_DIVISION_FOR_FITTING 5                 // [-]
-#define MIN_DISTANCE_CORNER_DETECTION   0.05            // [m]
+#define MIN_DISTANCE_CORNER_DETECTION   0.15            // [m]
 #define MIN_DISTANCE_CORNER_DETECTION_LARGE   2*MIN_DISTANCE_CORNER_DETECTION       // [m]
 #define MAX_DISTANCE_POS_CORRECTION2 std::pow(0.3, 2.0) // [m]
 
@@ -103,7 +103,9 @@ private:
    ros::Publisher cornerPointModelled_pub_; // ############################## TEMP ############################
    
    ros::Publisher cornerPointMeasured_pub_; // ############################## TEMP ############################
-   
+
+   ros::Publisher associatedPoints_pub_; // ############################## TEMP ############################
+
    ros::Publisher improvedRobotPos_pub_;
    
    ros::Subscriber amclPose_sub_;

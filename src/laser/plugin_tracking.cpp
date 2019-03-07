@@ -638,7 +638,7 @@ void LaserPluginTracking::initialize(ed::InitData& init)
     points_measured_all_pub_ = nh.advertise<visualization_msgs::Marker> ( "MeasuredPointsAll", 3 ); // TEMP;
     cornerPointModelled_pub_ = nh.advertise<visualization_msgs::Marker> ( "cornerPointModelled", 3 ); // TEMP
     cornerPointMeasured_pub_ = nh.advertise<visualization_msgs::Marker> ( "cornerPointMeasured", 3 ); // TEMP
-    
+    associatedPoints_pub_ = nh.advertise<sensor_msgs::LaserScan> ("ed/associatedPoints", 3); // TEMP
 //     initializedPose_sub_ = nh.subscribe<geometry_msgs::PoseWithCovarianceStamped>("initPose", bufferSize, &LaserPluginTracking::PoseWithCovarianceStampedInitCallback, this);
 //     improvedRobotPos_pub_= nh.advertise<geometry_msgs::PoseWithCovarianceStamped> ( "initialpose", 3 );
 //     amclPose_sub_ = nh.subscribe<geometry_msgs::PoseWithCovarianceStamped>("amcl_pose", bufferSize, &LaserPluginTracking::PoseWithCovarianceStampedCallback, this);
@@ -1031,7 +1031,7 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
 //            std::cout << "\nFor measured points: ";
 //            bool cornerFound = ed::tracking::findPossibleCorner ( points, &possibleCorners, &it_start, &it_end, MIN_DISTANCE_CORNER_DETECTION_LARGE );
            possibleCorners.clear();
-           bool cornersFoundMeasured = ed::tracking::findPossibleCorners (points, &possibleCorners, MIN_DISTANCE_CORNER_DETECTION_LARGE  );
+           bool cornersFoundMeasured = ed::tracking::findPossibleCorners (points, &possibleCorners, MIN_DISTANCE_CORNER_DETECTION_LARGE, MIN_POINTS_STRAIGHT_LINE  );
           
            
 //            std::cout << "cornerPointsFound  = " << cornerPointsFound << " cornerFound = " << cornerFound << std::endl;
@@ -1056,7 +1056,7 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
 //                 bool cornerFoundModel = ed::tracking::findPossibleCorner ( modelledPoints, &possibleCornersModel, &it_start, &it_end, MIN_DISTANCE_CORNER_DETECTION_LARGE );
                 
                 possibleCornersModel.clear();
-                bool cornersFoundModelled = ed::tracking::findPossibleCorners (modelledPoints, &possibleCornersModel, MIN_DISTANCE_CORNER_DETECTION_LARGE  );
+                bool cornersFoundModelled = ed::tracking::findPossibleCorners (modelledPoints, &possibleCornersModel, MIN_DISTANCE_CORNER_DETECTION_LARGE, MIN_POINTS_STRAIGHT_LINE  );
 //                 std::cout << "cornersFoundMeasured = " << cornersFoundModelled << " @ ";
 //            for( unsigned int ipossibleCorners = 0; ipossibleCorners < possibleCornersModel.size(); ipossibleCorners++)
 //            {
@@ -1885,6 +1885,15 @@ std::cout << "Debug 8.12 \t";
 //      std::cout << "segments.size() = " << segments.size() << std::endl;
 //     visualization_msgs::MarkerArray markerArrayPoints;
 //     unsigned int IDPoints = 0;
+   
+
+    sensor_msgs::LaserScan test;
+    test = *scan;
+
+for(unsigned int iTestLength = 0; iTestLength < test.ranges.size(); iTestLength++)
+{
+test.ranges[iTestLength] = 0.0;
+}
     
     for ( unsigned int iSegments = 0; iSegments < segments.size(); ++iSegments )
     {
@@ -1912,7 +1921,7 @@ std::cout << "Debug 8.12 \t";
         {
             unsigned int j = segment[iSegment];
             geo::Vector3 p_sensor = lrf_model_.rayDirections() [j] * sensor_ranges[j];
-
+test.ranges[j] = sensor_ranges[j];
             // Transform to world frame
             geo::Vector3 p = sensor_pose * p_sensor;
 
@@ -2380,6 +2389,7 @@ if( DEBUG )
 
     }
     
+    associatedPoints_pub_.publish(test);
 //     std::cout << " Test zoveel " << std::endl;
      // ############################## TEMP ############################
     
@@ -2484,7 +2494,7 @@ if( DEBUG )
         unsigned int cornerIndex = std::numeric_limits<unsigned int>::quiet_NaN();
           
 //  std::cout << "while processing: " << std::endl;
-        if( ed::tracking::findPossibleCorner ( points, &cornerIndices, &it_start, &it_end, MIN_DISTANCE_CORNER_DETECTION ) )
+        if( ed::tracking::findPossibleCorner ( points, &cornerIndices, &it_start, &it_end, MIN_DISTANCE_CORNER_DETECTION, MIN_POINTS_STRAIGHT_LINE ) )
         {
                 cornerIndex = cornerIndices[0];
         }
@@ -2503,13 +2513,13 @@ if( DEBUG )
         
 //         std::cout << "Debug 15.1 \t";
         ed::tracking::FITTINGMETHOD method = ed::tracking::CIRCLE;
-        float error_circle2 = ed::tracking::fitObject ( points, method, &cornerIndex, &rectangle, &circle, &it_low, &it_high, sensor_pose );
+        float error_circle2 = ed::tracking::fitObject ( points, method, &cornerIndex, &rectangle, &circle, &it_low, &it_high, sensor_pose, MIN_POINTS_STRAIGHT_LINE );
         unsigned int elementLow = associatedPointsInfo[iList].laserIDs[0];
         unsigned int elementHigh = associatedPointsInfo[iList].laserIDs.back();
 //         measuredProperties[iList].confidenceCircle = ed::tracking::determineSegmentConfidence ( scan, elementLow, elementHigh);
 // std::cout << "Debug 15.2 \t";
         method = ed::tracking::determineCase ( points, &cornerIndex, &it_low, &it_high, sensor_pose ); // chose to fit a single line or a rectangle (2 lines)        
-        float error_rectangle2 = ed::tracking::fitObject ( points, method,  &cornerIndex, &rectangle, &circle, &it_low, &it_high,  sensor_pose );
+        float error_rectangle2 = ed::tracking::fitObject ( points, method,  &cornerIndex, &rectangle, &circle, &it_low, &it_high,  sensor_pose, MIN_POINTS_STRAIGHT_LINE );
 // std::cout << "Debug 15.3 \t";
         measuredProperties[iList].confidenceRectangleWidth = false;
         measuredProperties[iList].confidenceRectangleWidthLow = false;
@@ -3252,7 +3262,7 @@ if( DEBUG )
             req.setProperty ( id, featureProperties_, entityProperties );
             
 //             std::cout << "Prop of ent. " << id << " updated with properties = "; entityProperties.printProperties(); 
-            std::cout << " measuredProperty of ent " << id << " = "; measuredProperty.printProperties();
+//            std::cout << " measuredProperty of ent " << id << " = "; measuredProperty.printProperties();
             
             req.setPose ( id, new_pose );
 
@@ -3263,6 +3273,7 @@ if( DEBUG )
     }
     
     ObjectMarkers_pub_.publish(markers);
+
 
 // - - - - - - - - - - - - - - - - -
 
