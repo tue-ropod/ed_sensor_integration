@@ -606,6 +606,7 @@ void LaserPluginTracking::initialize(ed::InitData& init)
     config.value("min_cluster_size", min_cluster_size_);
     config.value("max_cluster_size", max_cluster_size_);
     config.value("max_gap_size", max_gap_size_);
+    config.value("min_gap_size_for_split", min_gap_size_for_split_);
     config.value("nominal_corridor_width", nominal_corridor_width_);    
 
     int i_fit_entities = 0;
@@ -2204,7 +2205,7 @@ if( DEBUG )
         {
                     if( DEBUG )
             std::cout << "Debug 13.13 \t";
-            if ( IDs[iDistances] == IDtoCheck && iDistances != distances.size() - 1 ) // ID similar and not at final reading, check if next element is similar or not
+            if ( IDs[iDistances] == IDtoCheck && iDistances != distances.size() - 1 ) // ID similar and not at final reading, check if next element is associated to same entity or not
             {
                     if( DEBUG )
                     std::cout << "Debug 13.13.0 \t";
@@ -2441,18 +2442,136 @@ if( DEBUG )
 //     }
     
  // ############################## TEMP END ############################
-    
- 
-    
-    
+   
+    for ( unsigned int iList = 0; iList < associatedPointsInfo.size(); iList++ )
+    {
+                             if ( DEBUG_SF )
+                std::cout << "Debug 13.17.1 \t";
+                
+            std::vector<unsigned int> IDs = associatedPointsInfo[iList].laserIDs;
+      
+                         if ( DEBUG_SF )
+                std::cout << "Debug 13.17.2 \t";
+            
+            if( IDs.size() == 0 )
+                    continue;
+            
+            std::cout << "\nIDs.size() = " <<  IDs.size();
+            // TODO not taken into account yet: if 2 consecutive points are associated, but there is a gap. Splitting occures if another object is seen! Must this be taken into account?!
+            for(unsigned int iIDs = 1; iIDs < IDs.size(); iIDs++)
+            {
+//                                  if ( DEBUG_SF )
+                std::cout << "Debug 13.17.3 \t";
+                    unsigned int idLow = iIDs - 1;
+                    unsigned int gapSize = IDs[iIDs] - IDs[iIDs - 1];
+                    std::cout << "idLow = " << idLow << " gapSize = " << gapSize << " idHigh = " << iIDs << " senserElement Low = " << IDs[iIDs - 1] << " senserElement high = " << IDs[iIDs] << "\t";
+                    if( gapSize >= min_gap_size_for_split_ )
+                    {
+//                                          if ( DEBUG_SF )
+                std::cout << "13.17.4 Debug \t";
+                        // check ranges in gap
+                        // if there is a set of consecutive ranges (min_gap_size_for_split_) which is significantly larger than ranges before gap and after gap, the entities should be splitted and treated as 2 separate ones
+                            
+                            unsigned int nLowElements, nHighElements;
+                            if (idLow < min_gap_size_for_split_)
+                            {
+                                    nLowElements = idLow;
+                            }
+                            else
+                            {
+                                    nLowElements = min_gap_size_for_split_;
+                            }
+                            
+                            if (iIDs > (IDs.size() - min_gap_size_for_split_))
+                            {
+                                    nHighElements = IDs.size() - iIDs;
+                            }
+                            else
+                            {
+                                    nHighElements = min_gap_size_for_split_;
+                            }
+//                                          if ( DEBUG_SF )
+                std::cout << "Debug 13.17.5 \t";
+                            
+                            float avgRangeLow = 0.0, avgRangeHigh = 0.0;
+                            for(unsigned int iAvgLow = 0; iAvgLow < nLowElements; iAvgLow++)
+                            {
+                                    float range = sensor_ranges[idLow + iAvgLow];
+                                    if (range == 0.0 ) // ranges were set to zero if associated to world
+                                            range = scan->range_max;
+                                    
+                                    avgRangeLow += range;
+                            }
+                            avgRangeLow /= nLowElements;
+//                                          if ( DEBUG_SF )
+                std::cout << "Debug 13.17.6 \t";
+                            
+                            for(unsigned int iAvgHigh = 0; iAvgHigh < nHighElements; iAvgHigh++)
+                            {
+                                    float range = sensor_ranges[iIDs + iAvgHigh];
+                                    if (range == 0.0 ) // ranges were set to zero if associated to world
+                                            range = scan->range_max;
+                                    
+                                    avgRangeHigh += range;
+                            }
+                            avgRangeHigh /= nHighElements;
+//              if ( DEBUG_SF )
+                std::cout << "Debug 13.17.7 \t";
+                            
+                            float maxReference = std::max(avgRangeLow, avgRangeHigh);
+                            unsigned int nLargerRanges = 0;
+
+                            for(unsigned int iGap = idLow; iGap < IDs[iIDs]; iGap++ )
+                            {
+//                                                  if ( DEBUG_SF )
+                std::cout << "Debug 13.17.8 \t";
+                                    if( IDs[iGap] > maxReference )
+                                    {
+                                            nLargerRanges++;
+                                    }
+                                    else
+                                    {
+                                            nLargerRanges = 0;
+                                    }
+                                    
+                                    if(nLargerRanges >= min_gap_size_for_split_)
+                                    {
+//                                                          if ( DEBUG_SF )
+                std::cout << "Debug 13.17.9 \t";
+                                            // split
+                                            PointsInfo splittedInfo;
+
+                                            std::vector<geo::Vec2f> points = associatedPointsInfo[iList].points;
+                                            std::copy( associatedPointsInfo[iList].laserIDs.begin() + iIDs, associatedPointsInfo[iList].laserIDs.end(), std::back_inserter(splittedInfo.laserIDs) );
+                                            std::copy( associatedPointsInfo[iList].points.begin() + iIDs, associatedPointsInfo[iList].points.end(),  std::back_inserter(splittedInfo.points) );
+                                            
+                                            associatedPointsInfo.push_back( splittedInfo );
+                                            
+                                            associatedPointsInfo[iList].laserIDs.erase (associatedPointsInfo[iList].laserIDs.begin() + iIDs, associatedPointsInfo[iList].laserIDs.end() );
+                                            associatedPointsInfo[iList].points.erase (associatedPointsInfo[iList].points.begin() + iIDs, associatedPointsInfo[iList].points.end() );
+                                            goto endOfLoop;
+                                    }
+                            }
+                    }
+                      std::cout << "Debug 13.17.10 \t";
+            }
+            
+              std::cout << "Debug 13.17.11 \t";
+            endOfLoop:;
+              std::cout << "Debug 13.17.12 \t";
+               
+    }
+
     if( DEBUG )
             std::cout << "Debug 14 \t";
     
     // TODO check at which point the segment should be splitted
     
+    std::vector<measuredPropertyInfo> measuredProperties ( associatedPointsInfo.size() ); // The first sequence in this vector (with the length of laser entitities) consits of the properties corresponding to existing entities
+    
 //    std::vector<ed::tracking::FeatureProperties> measuredProperties;
-//     std::vector<ed::tracking::FeatureProperties> measuredProperties ( associatedPointsInfo.size() ); // The first sequence in this vector (with the length of laser entitities) are the properties corresponding to existing entities
-    std::vector<measuredPropertyInfo> measuredProperties ( associatedPointsInfo.size() ); // The first sequence in this vector (with the length of laser entitities) are the properties corresponding to existing entities
+//     std::vector<ed::tracking::FeatureProperties> measuredProperties ( associatedPointsInfo.size() ); // The first sequence in this vector (with the length of laser entitities) consits of the properties corresponding to existing entities
+//      measuredProperties.resize(  associatedPointsInfo.size() );     // The first sequence in this vector (with the length of laser entitities) are the properties corresponding to existing entities
     
 //     std::cout << "associatedPointsList.size() = " << associatedPointsList.size() << std::endl;
 //     visualization_msgs::MarkerArray markerArrayPoints;
