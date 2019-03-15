@@ -74,6 +74,8 @@ struct measuredPropertyInfo
        bool confidenceRectangleDepthLow;
        bool confidenceRectangleDepthHigh;
        ed::tracking::FITTINGMETHOD methodRectangle; //
+       float fittingErrorCircle;
+       float fittingErrorRectangle;
        std::vector<geo::Vec2f> measuredCorners;
 };
 
@@ -750,7 +752,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
 //         gettimeofday(&now, NULL);
 // 
 //          std::cout << "Start of plugin at t = " << now.tv_sec << "." << now.tv_usec << std::endl;
-         
+          std::cout << "Start of plugin" << std::endl;
    //       std::cout << termcolor::on_yellow << "Start of plugin" << termcolor::reset << std::endl;
 
 
@@ -1492,7 +1494,7 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
             
            
     }
-           
+           geo::Pose3D sensor_poseCorrected;
 //            std::cout << "angleCorrectionFound = " << angleCorrectionFound << std::endl;
            if( angleCorrectionFound )
            {                     
@@ -1504,7 +1506,9 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
                         ed::tracking::wrap2Interval(&yawSensor, (double) 0.0, (double) 2*M_PI);
         //             std::cout << "sensor_pose before = " << sensor_pose << std::endl;
                 
-                        sensor_pose.setRPY(rollSensor, pitchSensor, yawSensor );
+                       // sensor_pose.setRPY(rollSensor, pitchSensor, yawSensor );
+                        sensor_poseCorrected = sensor_pose;
+                        sensor_poseCorrected.setRPY(rollSensor, pitchSensor, yawSensor );
                         
                         // Rotation updated, so this influences the delta in x,y. Recompute the cornerPointModelled
                         
@@ -1517,7 +1521,7 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
 //                         std::cout << "measuredCornerElement = " << elementOfCornerModelled << " shift = " << shift << " elementOfCorner = " << elementOfCorner << std::endl;
                         
                         geo::Vector3 p_model = lrf_model_.rayDirections() [sensorElementOfCornerModelled] * modelRangesAssociatedRanges2StaticWorld[sensorElementOfCornerModelled];
-                        geo::Vector3 p_modelled = sensor_pose * p_model;
+                        geo::Vector3 p_modelled = sensor_poseCorrected * p_model;
 //                         std::cout << " cornerPointModelled before correction = " << cornerPointModelled << std::endl;
                         cornerPointModelled = geo::Vec2f ( p_modelled.x, p_modelled.y );
         //             std::cout << "sensor_pose after = " << sensor_pose << std::endl;
@@ -1560,8 +1564,8 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
                     
 //                     std::cout << termcolor::magenta << "x,y diff = " << diff << " cornerPointMeasured = " << cornerPointMeasured << ", " << cornerPointModelled << termcolor::reset << std::endl;
                     
-                    geo::Vec3T< geo::real > updatedPos(sensor_pose.getOrigin().getX() - diff.x, sensor_pose.getOrigin().getY() - diff.y, sensor_pose.getOrigin().getZ() );
-                    sensor_pose.setOrigin( updatedPos );
+                    geo::Vec3T< geo::real > updatedPos(sensor_poseCorrected.getOrigin().getX() - diff.x, sensor_poseCorrected.getOrigin().getY() - diff.y, sensor_poseCorrected.getOrigin().getZ() );
+                    sensor_poseCorrected.setOrigin( updatedPos );
                     
             }
             
@@ -1604,9 +1608,9 @@ renderWorld(sensor_pose, model_ranges, world, lrf_model_);
     
 //     sensor_pose.setRPY( sensorRotation );
 
-//                         std::cout << "Going to render world" << std::endl;
-                        
-renderWorld(sensor_pose, model_ranges, world, lrf_model_);
+//                         std::cout << "Going to render world" << std::endl;                        
+        
+    renderWorld(sensor_poseCorrected, model_ranges, world, lrf_model_);
     
     for(unsigned int i = 0; i < num_beams; ++i)
     {
@@ -2025,7 +2029,7 @@ if( DEBUG )
                 }
                 if( DEBUG )
                 std::cout << "Debug 13.4 \t";
-//std::cout << "Tracking plugin: Going to get properties of entity" << e->id() << "having age " << scan->header.stamp.toSec() - e->lastUpdateTimestamp() << " \t";
+// std::cout << "Tracking plugin: Going to get properties of entity" << e->id() << "having age " << scan->header.stamp.toSec() - e->lastUpdateTimestamp() << " \t";
                 ed::tracking::FeatureProperties featureProperties = e->property ( featureProperties_ );
 //                 std::cout << "Properties obtained";
                 float dist;
@@ -2049,7 +2053,7 @@ if( DEBUG )
                 
                 if(prob1 == -1.0 || prob2 == -1.0 )
                 {
-                        std::cout << "tracking plugin: req to remove entity with id = " << e->id() << std::endl;
+//                         std::cout << "tracking plugin: req to remove entity with id = " << e->id() << std::endl;
                 req.removeEntity ( e->id() );
                 continue;
                 }
@@ -2513,13 +2517,13 @@ if( DEBUG )
         
 //         std::cout << "Debug 15.1 \t";
         ed::tracking::FITTINGMETHOD method = ed::tracking::CIRCLE;
-        float error_circle2 = ed::tracking::fitObject ( points, method, &cornerIndex, &rectangle, &circle, &it_low, &it_high, sensor_pose, MIN_POINTS_STRAIGHT_LINE );
+        float errorCircle = ed::tracking::fitObject ( points, method, &cornerIndex, &rectangle, &circle, &it_low, &it_high, sensor_pose, MIN_POINTS_STRAIGHT_LINE );
         unsigned int elementLow = associatedPointsInfo[iList].laserIDs[0];
         unsigned int elementHigh = associatedPointsInfo[iList].laserIDs.back();
 //         measuredProperties[iList].confidenceCircle = ed::tracking::determineSegmentConfidence ( scan, elementLow, elementHigh);
 // std::cout << "Debug 15.2 \t";
         method = ed::tracking::determineCase ( points, &cornerIndex, &it_low, &it_high, sensor_pose ); // chose to fit a single line or a rectangle (2 lines)        
-        float error_rectangle2 = ed::tracking::fitObject ( points, method,  &cornerIndex, &rectangle, &circle, &it_low, &it_high,  sensor_pose, MIN_POINTS_STRAIGHT_LINE );
+        float errorRectangle = ed::tracking::fitObject ( points, method,  &cornerIndex, &rectangle, &circle, &it_low, &it_high,  sensor_pose, MIN_POINTS_STRAIGHT_LINE );
 // std::cout << "Debug 15.3 \t";
         measuredProperties[iList].confidenceRectangleWidth = false;
         measuredProperties[iList].confidenceRectangleWidthLow = false;
@@ -2528,7 +2532,12 @@ if( DEBUG )
         measuredProperties[iList].confidenceRectangleDepthLow = false;
         measuredProperties[iList].confidenceRectangleDepthHigh = false;
         measuredProperties[iList].methodRectangle = method;
-                
+        measuredProperties[iList].fittingErrorCircle = errorCircle;
+        measuredProperties[iList].fittingErrorRectangle = errorRectangle;
+        
+//         std::cout << "errorRectangle = " << errorRectangle << std::endl;
+//         std::cout << "measuredProperties[iList].fittingErrorRectangle = " << measuredProperties[iList].fittingErrorRectangle << std::endl;
+        
 //         if( iList < it_laserEntities.size() )
 //         {
 //              const ed::EntityConstPtr& eTest = *it_laserEntities[ iList ];
@@ -2712,7 +2721,7 @@ if( DEBUG )
                     std::cout << "Debug 16.1 \t";
          
         ed::tracking::FeatureProbabilities prob;
-        if ( prob.setMeasurementProbabilities ( error_rectangle2, error_circle2, 2*circle.get_radius() , nominal_corridor_width_ ) )
+        if ( prob.setMeasurementProbabilities ( errorRectangle, errorCircle, 2*circle.get_radius() , nominal_corridor_width_ ) )
         {
 
             ed::tracking::FeatureProperties properties;
@@ -2723,10 +2732,14 @@ if( DEBUG )
             if ( rectangle.get_x() != rectangle.get_x() )
             {
                 ROS_WARN ( "Rectangle: invalid properties set" );
-//                 rectangle.printProperties();
+//                  rectangle.printProperties();
 //                 std::cout << "Prob = " << prob.get_pCircle() << ", " << prob.get_pRectangle() << std::endl;
 //                 std::cout << "Method = " << method << std::endl;
-//                 std::cout << "Errors = " << error_rectangle2 << ", " << error_circle2 << std::endl;
+//                 std::cout << "Errors = " << errorRectangle2 << ", " << error_circle2 << std::endl;
+            }
+            else
+            {
+                    std::cout << rectangle.get_yaw() << std::endl;
             }
 
             measuredProperties[iList].featureProperty =  properties ;
@@ -2774,6 +2787,9 @@ if( DEBUG )
             std::cout << "Debug 18.2 \t";
             
         measuredProperty = measuredProperties[iProperties].featureProperty;
+        
+//         std::cout << "measuredProperties[iProperties]..fittingErrorRectangle" << measuredProperties[iProperties].fittingErrorRectangle << std::endl;
+//         std::cout << "Method = " << measuredProperties[iProperties].methodRectangle << std::endl;
         
         // temporary: pub measured properties in order to visualize the properties which are added
         markers.markers.push_back( getMarker(measuredProperty, ID++) ); // TEMP
@@ -2825,7 +2841,8 @@ if( DEBUG )
                 
                 float Q = 0.4; // Measurement noise covariance. TODO: let it depend on if an object is partially occluded. Now, objects are assumed to be completely visible
                 float R = 0.2; // Process noise covariance
-                float largeCovariance = 1000.0;
+                float RVariable = 1000000*R*pow(measuredProperties[iProperties].fittingErrorRectangle, 2.0);
+                float largeCovariance = 100000.0;
                 float mediumDimensionCovariance = 2.0;
                 float dt = scan->header.stamp.toSec() - e->lastUpdateTimestamp();
                 
@@ -2839,7 +2856,11 @@ if( DEBUG )
                 if( DEBUG )
                         std::cout << "Test 2 \t";
                 QmRectangle.diagonal() << Q, Q, Q, Q, Q, Q, Q, Q;
-                RmRectangle.diagonal() << R, R, R, R, R;
+//                 RmRectangle.diagonal() << R, R, R, R, R;
+                      RmRectangle.diagonal() << R, R, RVariable, R, R;
+                      
+//                 std::cout << "RVariable = " << RVariable << std::endl;
+//                 std::cout << "measuredProperties[iProperties].fittingErrorRectangle = " << measuredProperties[iProperties].fittingErrorRectangle << std::endl;
                 
 //                 std::cout << "Confidence width = " << measuredProperties[iProperties].confidenceRectangleWidth << ", confidence depth = " << measuredProperties[iProperties].confidenceRectangleDepth << std::endl;
                 
@@ -2864,6 +2885,12 @@ if( DEBUG )
 //                 }
 //                 
                 
+                      std::cout << "measuredProperties = " << 
+                        measuredProperties[iProperties].confidenceRectangleWidthLow <<
+                        measuredProperties[iProperties].confidenceRectangleWidthHigh <<
+                        measuredProperties[iProperties].confidenceRectangleDepthLow <<
+                        measuredProperties[iProperties].confidenceRectangleDepthHigh << std::endl;
+                      
                 if( !measuredProperties[iProperties].confidenceRectangleWidth && !measuredProperties[iProperties].confidenceRectangleDepth )
                 {
                         // if there is uncertainty about the positions based on the dimensional check, first check if there are relevant features (corners!) which can give you a better estimation
@@ -2891,13 +2918,9 @@ if( DEBUG )
         //                         // TODO Neighrest neighbour association of cornerpoints -> still necessary? 
         //                 }
               
-              /*
-                        std::cout << "measuredProperties = " << 
-                        measuredProperties[iProperties].confidenceRectangleWidthLow <<
-                        measuredProperties[iProperties].confidenceRectangleWidthHigh <<
-                        measuredProperties[iProperties].confidenceRectangleDepthLow <<
-                        measuredProperties[iProperties].confidenceRectangleDepthHigh << std::endl;
-                        */
+              
+                        
+                        
         //                 
         //                 std::cout << "checkCornerConfidence = " << 
         //                 checkCornerConfidence << std::endl;
@@ -3043,8 +3066,7 @@ if( DEBUG )
                                 
                                 // Give certainties in terms of the world frame
                                 Eigen::MatrixXf Rot = Eigen::MatrixXf::Zero( 2, 2 );
-                                Rot << std::cos( rot ), -std::sin( rot ),
-                                std::sin( rot ),  std::cos( rot);
+                                Rot << std::cos( rot ), -std::sin( rot ), std::sin( rot ),  std::cos( rot);
                         
                                 RmRectangle.block< 2, 2 >( 0, 0 ) = Rot*C*Rot.transpose();
                         }
@@ -3260,7 +3282,9 @@ if( DEBUG )
 //                 std::cout << "Tracking plugin updates: id = " << id << std::endl;
 //                 entityProperties.printProperties();
             req.setProperty ( id, featureProperties_, entityProperties );
-            
+//             measuredProperty.getRectangle().printProperties();
+//             std::cout << "Measured yaw = " << measuredProperty.getRectangle().get_yaw() << std::endl;
+            std::cout << "\n";
 //             std::cout << "Prop of ent. " << id << " updated with properties = "; entityProperties.printProperties(); 
 //            std::cout << " measuredProperty of ent " << id << " = "; measuredProperty.printProperties();
             
