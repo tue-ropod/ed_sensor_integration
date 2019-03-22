@@ -35,13 +35,14 @@
 #define ANGLE_MARGIN_FITTING 25*M_PI/180                // [rad]
 // #define POINTS_TO_CHECK_CONFIDENCE 3                 // [-]
 // #define EPSILON 1e-4                                 // [m]
-#define MIN_POINTS_STRAIGHT_LINE 8                     // [-]
+// #define MIN_POINTS_STRAIGHT_LINE 5                     // [-]
 #define MAX_DEVIATION_IAV_STRAIGHT_LINE 10*M_PI/180     // [rad]
 #define MAX_DEVIATION_ANGLE_CORRECTION 20*M_PI/180      // [rad]
 #define SEGMENT_DIVISION_FOR_FITTING 5                 // [-]
 #define MIN_DISTANCE_CORNER_DETECTION   0.10            // [m]
 #define MIN_DISTANCE_CORNER_DETECTION_LARGE   2*MIN_DISTANCE_CORNER_DETECTION       // [m]
 #define MAX_DISTANCE_POS_CORRECTION2 std::pow(0.3, 2.0) // [m]
+#define N_POINTS_MARGIN_FOR_BEING_CONSECUTIVE 3    // [-]
 
 #define DELAY_AFTER_INIT ros::Duration(1.0)             // [s]
 
@@ -58,6 +59,9 @@
 #include "../../../../dlib-19.16/dlib/optimization/max_cost_assignment.h" // TODO temp, improvement of lib-inclusion needed, see http://dlib.net/
 
 #define INF 10000
+
+#define DEBUG false // TEMP
+#define DEBUG_SF false // TEMP
 
 
 // ----------------------------------------------------------------------------------------------------
@@ -148,6 +152,7 @@ private:
 
     int max_gap_size_;
     int min_gap_size_for_split_; 
+    float dist_for_object_split_;
     std::map<ed::UUID,geo::Pose3D> pose_cache;
 
     // 'Feature' property key
