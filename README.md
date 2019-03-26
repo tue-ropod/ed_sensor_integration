@@ -39,7 +39,7 @@ All ED tutorials can be found in the ed_tutorials package: https://github.com/tu
   5. In order to discriminate between a circle and a rectangle, a probability is determined using the fitting error. As fitting a circle with an infinite radius approximates a straight line, the probability is scaled with a typical corridor width. Over time, this probability is updated using a probability mass function. In order to allow for recovery, the maximum probabilty of an entity being a circle or rectangle is set to 0.9
   
   **Tunable Parameters**:
-  Below, an example is given to add to your ED-config file. 
+  Below, an example is given for your ED-configration file:
   <pre>
   plugins:
   - name: laser_integration
