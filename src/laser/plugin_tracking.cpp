@@ -612,10 +612,10 @@ void LaserPluginTracking::initialize(ed::InitData& init)
     config.value("fit_entities", i_fit_entities, tue::OPTIONAL);
     fit_entities_ = (i_fit_entities != 0);
     
-    int i_check_door_status = 0;
-    config.value("check_door_status", i_check_door_status, tue::OPTIONAL);
-    check_door_status_ = (i_check_door_status != 0);
-    
+//     int i_check_door_status = 0;
+//     config.value("check_door_status", i_check_door_status, tue::OPTIONAL);
+//     check_door_status_ = (i_check_door_status != 0);
+//     
     int i_correct_x_yPos = 0;
     config.value("correctXYpos", i_correct_x_yPos, tue::OPTIONAL);
     correctXYpos_ = (i_correct_x_yPos != 0);

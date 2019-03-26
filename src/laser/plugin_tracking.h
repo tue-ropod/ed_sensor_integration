@@ -25,24 +25,18 @@
 #include "ed/convex_hull_calc.h"
 #include "ed/featureProperties_info.h"
 
-#define MOBIDIK_WIDTH 0.72                              // [m]
-#define MOBIDIK_LENGTH 0.81                             // [m]
-#define MOBIDIK_MARGIN 0.1                              // [m]
-
-#define ASSOCIATION_DISTANCE 0.5                        // [m]
-#define MIN_ASSOCIATION_DISTANCE 0.3                    // [m] TODO reduce
+#define ASSOCIATION_DISTANCE 0.5                        // [m] For the entities which already exist in the WM, determine the relevant properties in order to determine which entities _might_ associate to which clusters Association distance 
+#define MIN_ASSOCIATION_DISTANCE 0.3                    // [m] Maximum distance to reassociate consecutive segments
 #define MIN_ASSOCIATION_DISTANCE_SEGMENTS 0.1           // [m] 
 #define ANGLE_MARGIN_FITTING 25*M_PI/180                // [rad]
-// #define POINTS_TO_CHECK_CONFIDENCE 3                 // [-]
-// #define EPSILON 1e-4                                 // [m]
-// #define MIN_POINTS_STRAIGHT_LINE 5                     // [-]
-#define MAX_DEVIATION_IAV_STRAIGHT_LINE 10*M_PI/180     // [rad]
+
+// For corrections based on reading being associated to the environment
 #define MAX_DEVIATION_ANGLE_CORRECTION 20*M_PI/180      // [rad]
-#define SEGMENT_DIVISION_FOR_FITTING 5                 // [-]
 #define MIN_DISTANCE_CORNER_DETECTION   0.10            // [m]
 #define MIN_DISTANCE_CORNER_DETECTION_LARGE   2*MIN_DISTANCE_CORNER_DETECTION       // [m]
 #define MAX_DISTANCE_POS_CORRECTION2 std::pow(0.3, 2.0) // [m]
-#define N_POINTS_MARGIN_FOR_BEING_CONSECUTIVE 3    // [-]
+
+#define N_POINTS_MARGIN_FOR_BEING_CONSECUTIVE 3    // [-] points must be consecutive for splitting if there is a proven gap. This is the margin for points being considered as consecutive
 
 #define DELAY_AFTER_INIT ros::Duration(1.0)             // [s]
 
@@ -146,7 +140,7 @@ private:
     double min_cluster_size_;
     double max_cluster_size_;
     bool fit_entities_;
-    bool check_door_status_;
+//     bool check_door_status_;
     float nominal_corridor_width_;
     bool correctXYpos_;
 
