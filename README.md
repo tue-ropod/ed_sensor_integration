@@ -31,7 +31,53 @@ All ED tutorials can be found in the ed_tutorials package: https://github.com/tu
 **General idea**: By fitting rectangles and circles and updating the properties (position, (rotational) velocity and the dimensions) over time with a Kalman-Filter, non-semantic tracking of objects is achieved
 
 **Conceptual working principles**:
-    1. Assuming the robot being localized, sensor-readings related to the static map are filtered out
-    2. Readings not related to the environement are grouped into segments. A gap between sensor readings is an indication for the maximum size of a segment.
-    3. Now, for each segment is determined which readings should be associated to entities being modelled before.  A closest distance criterion is used. If there is proof that a single entity actually belongs to multiple objects, segments are splitted. This is for example the case when an elevator door opens.
-    4. For each segment associated to an entity, its geometric properties (position and radius for a circle, position, depth and width for a rectangle) are determined. Now, the properties of the model of the object are updated using a Kalman filter. For estimating the position and velocity, a constant-velocity model is used. Corrections are made for differences in dimensions between the model and the current measurement.
+
+  1.  Assuming the robot being localized, sensor-readings related to the static map are filtered out
+  2. Readings not related to the environement are grouped into segments. A gap between sensor readings is an indication for the maximum size of a segment.
+  3. Now, for each segment is determined which readings should be associated to entities being modelled before.  A closest distance criterion is used. If there is proof that a single entity actually belongs to multiple objects, segments are splitted. This is for example the case when an elevator door opens.
+  4. For each segment associated to an entity, its geometric properties (position and radius for a circle, position, depth and width for a rectangle) are determined. Now, the properties of the model of the object are updated using a Kalman filter. For estimating the position and velocity, a constant-velocity model is used. Corrections are made for differences in dimensions between the model and the current measurement.
+  5. In order to discriminate between a circle and a rectangle, a probability is determined using the fitting error. As fitting a circle with an infinite radius approximates a straight line, the probability is scaled with a typical corridor width. Over time, this probability is updated using a probability mass function. In order to allow for recovery, the maximum probabilty of an entity being a circle or rectangle is set to 0.9
+  
+  **Tunable Parameters**:
+  Below, an example is given to add to your ED-config file. 
+  <pre>
+  plugins:
+  - name: laser_integration
+    lib: libed_laser_plugin_tracking.so
+    frequency: 30
+    parameters:
+        laser_topic: /ropod/laser/scan
+        min_segment_size_pixels: 6
+        world_association_distance: 0.2
+        segment_depth_threshold: 0.08
+        min_cluster_size: 0.05
+        max_cluster_size: 10.0
+        max_gap_size: 1
+        min_gap_size_for_split: 5
+        nominal_corridor_width: 0.5
+        correctRot: 1
+        correctTrans: 0
+        dist_for_object_split: 0.4
+  - name: entity_clearer
+    lib: libed_clearer_plugin.so
+    enabled: 1
+    parameters:
+        entity_timeout: 3.0
+</pre>
+
+The entity-clearer removes objects which have not been seen for "entity_timeout"-seconds. With the enable-parameters you can turn it on or off.
+
+The meaning of the parameters for the tracker is as follows:
+
+  * laser_topic: ros-topic on on which the relevant LRF-data are publised
+  * min_segment_size_pixels
+  * world_association_distance: if the distance [m] between the sensor reading and the expected sensor reading is less than this parameters, than the reading is assumed to be associated to the static environment.
+  * segment_depth_threshold: if the distance [m] between 2 sensor readings is above this threshold, than it is considered as a gap.
+  * min_cluster_size: minimum size [m] of a segment
+  * max_cluster_size: maximum size [m] of a segment
+  * max_gap_size: Size [number of pixels] of a gap to split a segment
+  * nominal_corridor_width: typical corridor with in order to scale the probability of an entity being a circle or rectangle.
+  * correctRot: For reading being associated to the environment, straight lines are used to correct the orientation during the association phase. This prevents false positives.
+  * correctTrans: Idem, but for translation based on corners. Does not work robustly!
+  * min_gap_size_for_split: When points have been associated and there are at least "min_gap_size_for_split"-pixels for which there is a reading which is significantly larger, the segment is splitted in 2 segments.
+  * dist_for_object_split: When points have been associated and there are at least dist_for_object_split-pixels[m] for which there is a reading which is significantly larger, the segment is splitted in 2 segments.
