@@ -69,15 +69,15 @@ The entity-clearer removes objects which have not been seen for "entity_timeout"
 
 The meaning of the parameters for the tracker is as follows:
 
-  * laser_topic: ros-topic on on which the relevant LRF-data are publised
-  * min_segment_size_pixels
-  * world_association_distance: if the distance [m] between the sensor reading and the expected sensor reading is less than this parameters, than the reading is assumed to be associated to the static environment.
-  * segment_depth_threshold: if the distance [m] between 2 sensor readings is above this threshold, than it is considered as a gap.
-  * min_cluster_size: minimum size [m] of a segment
-  * max_cluster_size: maximum size [m] of a segment
-  * max_gap_size: Size [number of pixels] of a gap to split a segment
-  * nominal_corridor_width: typical corridor with in order to scale the probability of an entity being a circle or rectangle.
-  * correctRot: For reading being associated to the environment, straight lines are used to correct the orientation during the association phase. This prevents false positives.
-  * correctTrans: Idem, but for translation based on corners. Does not work robustly!
-  * min_gap_size_for_split: When points have been associated and there are at least "min_gap_size_for_split"-pixels for which there is a reading which is significantly larger, the segment is splitted in 2 segments.
-  * dist_for_object_split: When points have been associated and there are at least dist_for_object_split-pixels[m] for which there is a reading which is significantly larger, the segment is splitted in 2 segments.
+  * _laser_topic_: ros-topic on on which the relevant LRF-data are publised
+  * _min_segment_size_pixels_: Minimum number of pixels required to consider a segment
+  * _world_association_distance_: if the distance [m] between the sensor reading and the expected sensor reading is less than this parameters, than the reading is assumed to be associated to the static environment.
+  * _segment_depth_threshold_: if the distance [m] between 2 sensor readings is above this threshold, than it is considered as a gap.
+  * _min_cluster_size_: minimum size [m] of a segment
+  * _max_cluster_size_: maximum size [m] of a segment
+  * _max_gap_size_: Size [number of pixels] of a gap to split a segment
+  * _nominal_corridor_width_: typical corridor with in order to scale the probability of an entity being a circle or rectangle.
+  * _correctRot_: For reading being associated to the environment, straight lines are used to correct the orientation during the association phase. This prevents false positives.
+  * _correctTrans_: Idem, but for translation based on corners. Does not work robustly!
+  * _min_gap_size_for_split_: When points have been associated and there are at least "min_gap_size_for_split"-pixels for which there is a reading which is significantly larger, the segment is splitted in 2 segments.
+  * _dist_for_object_split_: When points have been associated and there are at least dist_for_object_split-pixels[m] for which there is a reading which is significantly larger, the segment is splitted in 2 segments.
