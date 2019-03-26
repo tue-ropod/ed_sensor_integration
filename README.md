@@ -38,7 +38,7 @@ All ED tutorials can be found in the ed_tutorials package: https://github.com/tu
   4. For each segment associated to an entity, its geometric properties (position and radius for a circle, position, depth and width for a rectangle) are determined. Now, the properties of the model of the object are updated using a Kalman filter. For estimating the position and velocity, a constant-velocity model is used. Corrections are made for differences in dimensions between the model and the current measurement.
   5. In order to discriminate between a circle and a rectangle, a probability is determined using the fitting error. As fitting a circle with an infinite radius approximates a straight line, the probability is scaled with a typical corridor width. Over time, this probability is updated using a probability mass function. In order to allow for recovery, the maximum probabilty of an entity being a circle or rectangle is set to 0.9
   
-  **Tunable Parameters**:
+**Tunable Parameters**:
   Below, an example is given for your ED-configration file:
   <pre>
   plugins:
@@ -81,3 +81,12 @@ The meaning of the parameters for the tracker is as follows:
   * _correctTrans_: Idem, but for translation based on corners. Does not work robustly!
   * _min_gap_size_for_split_: When points have been associated and there are at least "min_gap_size_for_split"-pixels for which there is a reading which is significantly larger, the segment is splitted in 2 segments.
   * _dist_for_object_split_: When points have been associated and there are at least dist_for_object_split-pixels[m] for which there is a reading which is significantly larger, the segment is splitted in 2 segments.
+  
+**Visualization**:
+In order to visualize relevant data, you can listen to the following topics:
+  * _ed/gui/measuredObjects_: Position and dimensions of a single scan
+  * _ed/associatedPoints_: Sensor readings which are associated to an object
+  
+  If the ed-gui-server is added as well, see https://github.com/tue-robotics/ed_tutorials:
+   * _/ed/gui/objectMarkers_: model of the entities
+   * _/ed/gui/entities_: visualisation of ED including the entity-IDs.
