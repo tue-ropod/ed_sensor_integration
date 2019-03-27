@@ -43,12 +43,7 @@
 #include <iostream>
 #include <cstdlib>
 #include <ctime>
-#include <algorithm>    // std::copy
-
-//#include <munkres.h>
-//#include <adapters/boostmatrixadapter.h>
-
-//include <dlib19.16/optimization/max_cost_assignment.h>
+#include <algorithm>
 
 #include "../../../../dlib-19.16/dlib/optimization/max_cost_assignment.h" // TODO temp, improvement of lib-inclusion needed, see http://dlib.net/
 

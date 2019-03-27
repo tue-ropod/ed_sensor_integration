@@ -630,7 +630,7 @@ void LaserPluginTracking::initialize(ed::InitData& init)
     unsigned int bufferSize = 1; // TODO increase to 3(?) in order to make it possible to process more laser data in 1 iteration. Set low for testing purposes now.
     sub_scan_ = nh.subscribe<sensor_msgs::LaserScan>(laser_topic, bufferSize, &LaserPluginTracking::scanCallback, this);
     door_pub_ = nh.advertise<ed_sensor_integration::doorDetection>("door", 3);
-    ObjectMarkers_pub_ = nh.advertise<visualization_msgs::MarkerArray> ( "ed/gui/objectMarkers2", 3 ); // TEMP
+    ObjectMarkers_pub_ = nh.advertise<visualization_msgs::MarkerArray> ( "ed/gui/measuredObjects", 3 ); // TEMP
 //     PointMarkers_pub_ = nh.advertise<visualization_msgs::MarkerArray> ( "ed/gui/pointMarkers", 3 ); // TEMP
 //     processedLaserPoints_pub_ = nh.advertise<sensor_msgs::LaserScan> ( "processedLaserScan", 3 ); // TEMP
     pose_updated_pub_ = nh.advertise<geometry_msgs::PoseStamped> ( "PoseTest", 3 ); // TEMP
@@ -752,7 +752,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
 //         gettimeofday(&now, NULL);
 // 
 //          std::cout << "Start of plugin at t = " << now.tv_sec << "." << now.tv_usec << std::endl;
-          std::cout << "Start of plugin" << std::endl;
+//           std::cout << "Start of plugin" << std::endl;
    //       std::cout << termcolor::on_yellow << "Start of plugin" << termcolor::reset << std::endl;
 
 
@@ -3683,7 +3683,7 @@ std::cout << "Debug 15.3 \t";
             req.setProperty ( id, featureProperties_, entityProperties );
 //             measuredProperty.getRectangle().printProperties();
 //             std::cout << "Measured yaw = " << measuredProperty.getRectangle().get_yaw() << std::endl;
-            std::cout << "\n";
+//             std::cout << "\n";
 //             std::cout << "Prop of ent. " << id << " updated with properties = "; entityProperties.printProperties(); 
 //            std::cout << " measuredProperty of ent " << id << " = "; measuredProperty.printProperties();
             
