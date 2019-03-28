@@ -1810,6 +1810,14 @@ ROS_WARN( "NO SEGFAULT NOW! :)"  );
 
 
 featureProperties = e->property ( featureProperties_ );
+if(featureProperties.getFeatureProbabilities().getDomainSize() != 2 ) // TODO ugly! What causes that the domainsize !=2 ?
+{
+ROS_WARN( "NO SEGFAULT 2 NOW! :)"  );
+        req.removeEntity ( e->id() );
+                continue;
+
+}
+
 if( DEBUG )
         std::cout << "Debug 8.4.2 \t";
             EntityProperty currentProperty;
@@ -2039,7 +2047,12 @@ if( DEBUG )
                 
                 if( DEBUG )
                 std::cout << "Debug 13.5 \t";
-
+		if(featureProperties.getFeatureProbabilities().getDomainSize() != 2 )// TODO ugly!
+		{
+			req.removeEntity ( e->id() );
+                        std::cout << "req to remove ent " << e->id() << std::endl;
+                        continue;
+		}	
                 //featureProperties.printProperties();
 
 //                 std::cout << "entity id = " << e->id() << std::endl;
@@ -3131,7 +3144,7 @@ std::cout << "Debug 15.3 \t";
             if ( rectangle.get_x() != rectangle.get_x() )
             {
                 ROS_WARN ( "Rectangle: invalid properties set" );
-                 rectangle.printProperties();
+//                 rectangle.printProperties();
                 std::cout << "Prob = " << prob.get_pCircle() << ", " << prob.get_pRectangle() << std::endl;
                 std::cout << "Method = " << method << std::endl;
                 std::cout << "Errors = " << errorRectangle << ", " << errorCircle << std::endl;
@@ -3569,15 +3582,19 @@ std::cout << "Debug 15.3 \t";
                 measuredProperty.getCircle().get_radius();
                 
 
-                
+//               measuredProperty.printProperties();
+ed::tracking::FeatureProbabilities measuredProb = measuredProperty.getFeatureProbabilities(); 
                 
 //                 if( DEBUG )
 //                         std::cout << "Test 7 \t";
                 entityProperties.updateCircleFeatures(QmCircle, RmCircle, zmCircle, dt);
 //                 if( DEBUG )
 //                         std::cout << "Test 8 \t";
-                entityProperties.updateProbabilities ( measuredProperty.getFeatureProbabilities() );
-                
+//                entityProperties.updateProbabilities ( measuredProperty.getFeatureProbabilities() );
+  
+entityProperties.updateProbabilities ( measuredProb );
+
+              
 //                 std::cout << "Entity Property after = " << std::endl; entityProperties.printProperties();
                 
 //                 if( DEBUG )

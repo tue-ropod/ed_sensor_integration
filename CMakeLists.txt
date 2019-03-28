@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.8.12)
 project(ed_sensor_integration)
 
-#set(CMAKE_BUILD_TYPE "RelWithDebInfo")
+set(CMAKE_BUILD_TYPE "RelWithDebInfo")
 find_package(catkin REQUIRED COMPONENTS
   cb_planner_msgs_srvs
   ed
@@ -115,6 +115,13 @@ add_library(ed_laser_plugin_tracking
     src/laser/plugin_tracking.h
 )
 target_link_libraries(ed_laser_plugin_tracking ed_association ${catkin_LIBRARIES} dlib::dlib)
+
+add_library(ed_laser_plugin_tracking2
+    src/laser/plugin_tracking.cpp
+    src/laser/plugin_tracking.h
+)
+target_link_libraries(ed_laser_plugin_tracking2 ed_association ${catkin_LIBRARIES} dlib::dlib)
+
 
 # ------------------------------------------------------------------------------------------------
 
