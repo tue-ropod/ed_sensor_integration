@@ -35,7 +35,7 @@ void ClearerPlugin::process(const ed::PluginInput& data, ed::UpdateRequest& req)
     for(ed::WorldModel::const_iterator it = world.begin(); it != world.end(); ++it)
     {
         const ed::EntityConstPtr& e = *it;
-std::cout << "Clearer plugin: check flags" << std::endl;
+//std::cout << "Clearer plugin: check flags" << std::endl;
         // If the entity is locked, always keep it (don't delete it)
         if (e->hasFlag("locked") || e->shape() || e->hasFlag("Mobidik"))
             continue;
@@ -63,9 +63,9 @@ std::cout << "Clearer plugin: check flags" << std::endl;
         for ( std::map<std::string, ed::MeasurementConvexHull>::const_iterator it2 = chull_map.begin(); it2 != chull_map.end(); ++it2 )
         {
             const ed::MeasurementConvexHull& m = it2->second;
-std::cout << "ent clearer: timestamp, timeout, cur time = " << m.timestamp << "\t";
-std::cout << entity_timeout_ << "\t";
-std::cout << current_time << std::endl;
+//std::cout << "ent clearer: timestamp, timeout, cur time = " << m.timestamp << "\t";
+//std::cout << entity_timeout_ << "\t";
+//std::cout << current_time << std::endl;
 
             if (m.timestamp + entity_timeout_ < current_time)
             {

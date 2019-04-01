@@ -177,18 +177,18 @@ void renderWorld(const geo::Pose3D& sensor_pose, std::vector<double>& model_rang
     for(ed::WorldModel::const_iterator it = world.begin(); it != world.end(); ++it)
     {
         const ed::EntityConstPtr& e = *it;
- std::cout << "Shape before = " << e->shape() << std::endl;
+ //std::cout << "Shape before = " << e->shape() << std::endl;
 
 
-    std::cout << "enti id = " << e->id() << std::endl;
+//    std::cout << "enti id = " << e->id() << std::endl;
 //e->printFlags();
  
         if (e->shape() && e->has_pose() && !(e->hasType("left_door") || e->hasType("door_left") || e->hasType("right_door") || e->hasType("door_right" ) || e->hasFlag("non-localizable")))
         {
-       std::cout << "Shape after = " << e->shape() << std::endl;
+   //    std::cout << "Shape after = " << e->shape() << std::endl;
             // Set render options
             geo::LaserRangeFinder::RenderOptions opt;
-	std::cout << "Want to render ent with id = " << e->id() << std::endl;
+//	std::cout << "Want to render ent with id = " << e->id() << std::endl;
 	 geo::Mesh testMesh = e->shape()->getMesh();
             geo::Pose3D poseTest = sensor_pose_inv ;
 	geo::Pose3D poseTest2 = e->pose();
@@ -198,7 +198,7 @@ void renderWorld(const geo::Pose3D& sensor_pose, std::vector<double>& model_rang
             geo::LaserRangeFinder::RenderResult res(model_ranges);
             lrf_model.render(opt, res);
 
-std::cout << "Render finished" << std::endl;
+//std::cout << "Render finished" << std::endl;
         }        
     }       
 }
