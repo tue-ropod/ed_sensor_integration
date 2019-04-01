@@ -116,11 +116,11 @@ add_library(ed_laser_plugin_tracking
 )
 target_link_libraries(ed_laser_plugin_tracking ed_association ${catkin_LIBRARIES} dlib::dlib)
 
-add_library(ed_laser_plugin_tracking2
-    src/laser/plugin_tracking.cpp
-    src/laser/plugin_tracking.h
-)
-target_link_libraries(ed_laser_plugin_tracking2 ed_association ${catkin_LIBRARIES} dlib::dlib)
+#add_library(ed_laser_plugin_tracking2
+#    src/laser/plugin_tracking.cpp
+#    src/laser/plugin_tracking.h
+#)
+#target_link_libraries(ed_laser_plugin_tracking2 ed_association ${catkin_LIBRARIES} dlib::dlib)
 
 
 # ------------------------------------------------------------------------------------------------
