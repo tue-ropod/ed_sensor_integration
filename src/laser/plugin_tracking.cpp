@@ -346,6 +346,431 @@ geo::Pose3D fitEntity(const ed::Entity& e, const geo::Pose3D& sensor_pose, const
 }
 
 
+
+void splitSegmentsWhenGapDetected( std::vector< PointsInfo >& associatedPointsInfo, int min_gap_size_for_split,int min_segment_size_pixels, float dist_for_object_split, 
+                                   std::vector<float>& sensor_ranges, const sensor_msgs::LaserScan::ConstPtr& scan)
+{
+        
+
+        for ( unsigned int iList = 0; iList < associatedPointsInfo.size(); iList++ )
+    {
+//                              if ( DEBUG_SF )
+//                 std::cout << "Debug 13.17.1 \t";
+                
+            std::vector<unsigned int> IDs = associatedPointsInfo[iList].laserIDs;
+      
+                         if ( DEBUG_SF )
+//                 std::cout << "Debug 13.17.2 \t";
+//             std::cout << "\nDebug 13.17.2.1 IDs.size() = " <<  IDs.size();
+            if( IDs.size() == 0 )
+                    continue;
+            
+//             std::cout << "\nIDs.size() = " <<  IDs.size();
+            for(unsigned int iIDs = 1; iIDs < IDs.size(); iIDs++)
+            {
+//                                  if ( DEBUG_SF )
+//                 std::cout << "Debug 13.17.3 \t";
+                    unsigned int idLow = iIDs - 1;
+                    unsigned int gapSize = IDs[iIDs] - IDs[iIDs - 1];
+                    
+//                     std::cout << "gapSize = " << gapSize << "\t";
+                    
+//                     std::cout << "idLow = " << idLow << " gapSize = " << gapSize << " idHigh = " << iIDs << " senserElement Low = " << IDs[iIDs - 1] << " senserElement high = " << IDs[iIDs] << "\t";
+                    if( gapSize >= min_gap_size_for_split )
+                    {
+//                                          if ( DEBUG_SF )
+//                 std::cout << "13.17.4 Debug \t";
+                        // check ranges in gap
+                        // if there is a set of consecutive ranges (min_gap_size_for_split) which is significantly larger than ranges before gap and after gap, this implies that there is free space
+                        // instead of an object which blocks the view on the object. The entities are splitted and treated as 2 separate ones.
+                            
+                            unsigned int nLowElements, nHighElements;
+                            if (idLow < min_gap_size_for_split)
+                            {
+                                    nLowElements = idLow;
+                            }
+                            else
+                            {
+                                    nLowElements = min_gap_size_for_split;
+                            }
+                            
+                            if (iIDs > (IDs.size() - min_gap_size_for_split))
+                            {
+                                    nHighElements = IDs.size() - iIDs;
+                            }
+                            else
+                            {
+                                    nHighElements = min_gap_size_for_split;
+                            }
+//                                          if ( DEBUG_SF )
+//                 std::cout << "Debug 13.17.5 \t";
+                            
+                            float avgRangeLow = 0.0, avgRangeHigh = 0.0;
+                            for(unsigned int iAvgLow = 0; iAvgLow < nLowElements; iAvgLow++)
+                            {
+                                    float range = sensor_ranges[IDs[idLow + iAvgLow]];
+                                    if (range == 0.0 ) // ranges were set to zero if associated to world
+                                            range = scan->range_max;
+                                    
+//                                     std::cout << "RangeLow = " << range << std::endl;
+                                    
+                                    avgRangeLow += range;
+                            }
+                            avgRangeLow /= nLowElements;
+                            
+                            
+//                             std::cout << "avgRangeLow = " << avgRangeLow;
+//                                          if ( DEBUG_SF )
+//                 std::cout << "Debug 13.17.6 \t";
+                            
+                            for(unsigned int iAvgHigh = 0; iAvgHigh < nHighElements; iAvgHigh++)
+                            {
+                                    float range = sensor_ranges[IDs[iIDs + iAvgHigh]];
+                                    if (range == 0.0 ) // ranges were set to zero if associated to world
+                                            range = scan->range_max;
+                                    
+//                                     std::cout << "RangeHigh = " << range << std::endl;
+                                    avgRangeHigh += range;
+                            }
+                            avgRangeHigh /= nHighElements;
+//              if ( DEBUG_SF )
+//                 std::cout << "Debug 13.17.7 \t";
+//                               std::cout << " avgRangeHigh = " << avgRangeHigh << std::endl;
+                            float maxReference = std::max(avgRangeLow, avgRangeHigh);
+                            unsigned int nLargerRanges = 0;
+                            
+//                             std::cout << "maxReference = " << maxReference << std::endl;
+                            
+// std::cout << "idLow = " << idLow;
+// std::cout << " IDs.size() = " << IDs.size() << std::endl;
+// std::cout << " iIDs = " << iIDs;
+// std::cout << " IDs[iIDs] = " << IDs[iIDs] << std::endl;
+// std::cout << " IDs[idLow] = " << IDs[idLow] << std::endl;
+// std::cout << "Range @ ID = " << sensor_ranges[IDs[iIDs]] << std::endl;
+
+                            for(unsigned int iGap = IDs[idLow]; iGap < IDs[iIDs]; iGap++ )
+                            {
+// //                                                  if ( DEBUG_SF )
+//                 std::cout << "Debug 13.17.8 \t";
+                                 
+                                    
+//                                     std::cout << "iGap = " << iGap; 
+//                                     std::cout << " IDs[iGap] = " << IDs[iGap];
+//                                     bool refTest =;
+//                                     std::cout << "Debug 13.17.8.1 \t" << std::endl;
+                                    
+//                                     std::cout << " sensor_ranges[IDs[iGap] = " << sensor_ranges[iGap ] << "\t";
+                                    
+                                    if(  sensor_ranges[iGap] > maxReference ||  sensor_ranges[iGap] == 0.0 ) // as points associated to the world are set to 0
+                                    {
+//                                             std::cout << " Larger range detected " << std::endl;
+                                            nLargerRanges++;
+                                    }
+                                    else
+                                    {
+//                                             std::cout << "Check 2" << std::endl;
+                                            nLargerRanges = 0;
+                                    }
+                                    
+                                    
+                                    if(nLargerRanges >= min_gap_size_for_split)
+                                    {
+//                                                          if ( DEBUG_SF )
+//                 std::cout << "Debug 13.17.9 \t";
+                                            
+                                            
+//                                             std::cout << "Split using method 1" << std::endl;
+                                            
+                                            // split
+//                                             std::cout << "Debug 13.17.10 \t";       
+                                            PointsInfo splittedInfo;
+
+                                            std::vector<geo::Vec2f> points = associatedPointsInfo[iList].points;
+                                            std::copy( associatedPointsInfo[iList].laserIDs.begin() + iIDs, associatedPointsInfo[iList].laserIDs.end(), std::back_inserter(splittedInfo.laserIDs) );
+                                            std::copy( associatedPointsInfo[iList].points.begin() + iIDs, associatedPointsInfo[iList].points.end(),  std::back_inserter(splittedInfo.points) );
+//                                             std::cout << "Debug 13.17.11 \t";
+                                            associatedPointsInfo.push_back( splittedInfo );
+//                                             std::cout << "Debug 13.17.12 \t";
+                                            associatedPointsInfo[iList].laserIDs.erase (associatedPointsInfo[iList].laserIDs.begin() + iIDs, associatedPointsInfo[iList].laserIDs.end() );
+                                            associatedPointsInfo[iList].points.erase (associatedPointsInfo[iList].points.begin() + iIDs, associatedPointsInfo[iList].points.end() );
+                                            goto endOfLoop;
+                                    }
+//                                      std::cout << "Debug 13.17.9.1 \t";
+                            }
+//                             std::cout << "Debug 13.17.9.2 \t";
+                    }
+//                       std::cout << "Debug 13.17.10 \t";
+            }
+            
+//               std::cout << "Debug 13.17.11 \t";
+            endOfLoop:;
+//               std::cout << "Debug 13.17.12 \t";
+               
+    }
+    
+    
+    
+//     std::cout << "Before: associatedPointsInfo.size() = " << associatedPointsInfo.size() << std::endl;
+    
+    for ( unsigned int iList = 0; iList < associatedPointsInfo.size(); iList++ )
+    {
+            // As each point is associated to an object, it might happen that 2 objects close to each other can be seen as one. This results in large distances between consecutive points.
+            // Here it is checked if this is the case. If so, objects are being splitted.
+            
+//             if ( DEBUG_SF )
+//                 std::cout << "Debug 13.18.1 " << "iList = " << iList << "\t"; 
+            ScanSegment IDs = associatedPointsInfo[iList].laserIDs;
+            std::vector< geo::Vec2f > segmentPoints = associatedPointsInfo[iList].points;
+      
+//                  if ( DEBUG_SF )
+//                 std::cout << "Debug 13.18.2 \t"; 
+//                 std::cout << "IDs.size() = " << IDs.size() << std::endl;
+//            std::cout << "IDs = " << std::endl;
+//             for (unsigned int iTest = 0; iTest < IDs.size(); iTest++)
+//             {
+//                 std::cout << IDs[iTest] << "\t" << sensor_ranges[IDs[iTest]] << "\t" << segmentPoints[iTest].x << "\t" << segmentPoints[iTest].y << std::endl;
+//             }   
+//             std::cout << "\nDebug 13.18.2.1 \t";
+            
+//             std::cout << "min_segment_size_pixels_ = " << min_segment_size_pixels_ << std::endl;
+            
+            unsigned int nPointsForAvg;
+            min_segment_size_pixels % 2 == 0 ? nPointsForAvg = min_segment_size_pixels / 2 : nPointsForAvg = (min_segment_size_pixels - 1) / 2;
+            
+            if( IDs.size() < 2*nPointsForAvg ) // 2 times, because we have to determine the average for the lower and upper part
+            {
+//                     std::cout << "continue"<< std::endl;
+                    continue;
+            }
+            
+//             std::cout << "nPointsForAvg = " << nPointsForAvg << std::endl;
+            
+//             if ( DEBUG_SF )
+//                 std::cout << "Debug 13.18.3 \t"; 
+//             float rangeLowSum = 0.0, rangeHighSum = 0.0;
+            
+            geo::Vec2f pointLowSum, pointHighSum;
+            pointLowSum.x = 0.0;
+            pointLowSum.y = 0.0;
+            pointHighSum.x = 0.0;
+            pointHighSum.y = 0.0;
+            
+            for(unsigned int iAvgLow = 0; iAvgLow < nPointsForAvg; iAvgLow++)
+            {
+//                     std::cout << "iAvgLow  = " <<  iAvgLow  << std::endl;
+//                     std::cout << "IDs[iAvgLow]  = " <<  IDs[iAvgLow]  << std::endl;
+//                     std::cout << "sensor_ranges[ IDs[iAvgLow] ] = " << sensor_ranges[ IDs[iAvgLow] ] << std::endl;
+//                      std::cout << "test" << std::endl;
+//                     rangeLowSum += sensor_ranges[ IDs[iAvgLow] ];
+                    
+                    pointLowSum += segmentPoints[iAvgLow];
+//                       std::cout << "test2" << std::endl;
+            }
+//              if ( DEBUG_SF )
+//                       std::cout << "test3" << std::endl; 
+            geo::Vec2f avgPointLow = pointLowSum / nPointsForAvg;
+             
+            for(unsigned int iAvgHigh = nPointsForAvg; iAvgHigh < 2*nPointsForAvg; iAvgHigh++)
+            {
+//                     std::cout << "iAvgHigh  = " <<  iAvgHigh  << std::endl;
+//                     std::cout << "IDs[iAvgHigh]  = " <<  IDs[iAvgHigh]  << std::endl;
+//                     std::cout << "sensor_ranges[ IDs[iAvgHigh] ] = " << sensor_ranges[ IDs[iAvgHigh] ] << std::endl;
+//                     std::cout << "IDs.size() = " << IDs.size() << std::endl;
+                    
+//                     rangeHighSum += sensor_ranges[ IDs[iAvgHigh] ];
+                    pointHighSum += segmentPoints [iAvgHigh];
+            }
+//             std::cout << "test4" << std::endl; 
+//             if ( DEBUG_SF )
+//                 std::cout << "Debug 13.18.5 \t"; 
+            geo::Vec2f avgPointHigh = pointHighSum / nPointsForAvg;
+            
+            bool splitFound = false;
+            
+             if( std::fabs( IDs[2*nPointsForAvg] - IDs[0]) <=  2*nPointsForAvg + N_POINTS_MARGIN_FOR_BEING_CONSECUTIVE &&
+                 std::fabs( IDs[2*nPointsForAvg] - IDs[0]) >=  2*nPointsForAvg - N_POINTS_MARGIN_FOR_BEING_CONSECUTIVE ) // points must be consecutive
+             { 
+//                      std::cout << "test4.1" << std::endl; 
+//                      if ( DEBUG_SF )
+//                 std::cout << "Debug 13.18.6 \t"; 
+//                      std::cout << "avg ranges & abs diff = " << avgPointHigh << ", " << avgPointLow << ", " << avgPointHigh.dist( avgPointLow ) << std::endl;
+                     
+                if( avgPointHigh.dist( avgPointLow ) >  dist_for_object_split )
+                {
+                        
+//                         std::cout << "Going to split 1, avgRangeHigh = " << avgRangeHigh << " avgRangeLow = " << avgRangeLow << "split @ " << nPointsForAvg << std::endl;
+                        std::cout << "Split using method 2.1" << std::endl;
+//                         if ( DEBUG_SF )
+//                 std::cout << "Debug 13.18.7 \t"; 
+                        PointsInfo splittedInfo;       
+                        unsigned int position2Split = nPointsForAvg;//IDs[nPointsForAvg];
+                        std::vector<geo::Vec2f> points = associatedPointsInfo[iList].points;             
+                        std::copy( associatedPointsInfo[iList].laserIDs.begin() + position2Split, associatedPointsInfo[iList].laserIDs.end(), std::back_inserter(splittedInfo.laserIDs) );
+                        std::copy( associatedPointsInfo[iList].points.begin() + position2Split, associatedPointsInfo[iList].points.end(),  std::back_inserter(splittedInfo.points) );
+                        associatedPointsInfo.push_back( splittedInfo );
+                        
+//                         std::cout << "test4.2" << std::endl; 
+                        
+//                                                 if ( DEBUG_SF )
+//                 std::cout << "Debug 13.18.8 \t"; 
+                        associatedPointsInfo[iList].laserIDs.erase (associatedPointsInfo[iList].laserIDs.begin() + position2Split, associatedPointsInfo[iList].laserIDs.end() );
+                        associatedPointsInfo[iList].points.erase (associatedPointsInfo[iList].points.begin() + position2Split, associatedPointsInfo[iList].points.end() );
+                        splitFound = true;
+//                         if ( DEBUG_SF )
+//                 std::cout << "Debug 13.18.9, split @ " << position2Split  << "for iList = " << iList << "\t"; 
+//                 std::cout << termcolor::magenta << "Debug 13.18.9, split @" << position2Split << "for iList = " << iList << " associatedPointsInfo[iList].laserIDs.size() = " <<  associatedPointsInfo[iList].laserIDs.size() << "\t" << termcolor::reset; 
+//                 std::cout << "test5" << std::endl; 
+                }
+                    
+//                             if ( DEBUG_SF )
+//                 std::cout << "Debug 13.18.10 " << std::endl; 
+             }
+//               std::cout << termcolor::magenta << "test6" << termcolor::reset << std::endl; 
+//             if ( DEBUG_SF )
+//                 std::cout << "Debug 13.18.11 \t"; 
+//               std::cout << "IDs.size() = " << IDs.size() << std::endl;
+//               std::cout << "nPointsForAvg = " << nPointsForAvg << std::endl;
+//               std::cout << "IDs.size() - 2*nPointsForAvg - 1 = " << IDs.size() - 2*nPointsForAvg - 1 << std::endl;
+              
+              
+            for(unsigned int iIDs = 0; iIDs < (IDs.size() - 2*nPointsForAvg - 1) && !splitFound && IDs.size() >= ( 2*nPointsForAvg + 1); iIDs++) // -1 because the first segment is already determined as above
+            { 
+//                     std::cout << "test7" << std::endl; 
+//                     if ( DEBUG_SF )
+//                 std::cout << "Debug 13.18.12 \t";
+//                     std::cout << "IDs.size() = " << IDs.size() << std::endl;
+//                 std::cout << "(IDs.size() - 2*nPointsForAvyg - 1) = " << (IDs.size() - 2*nPointsForAvg - 1) << std::endl;
+//                 std::cout << "iIDs = " << iIDs ;
+//                 std::cout << " IDs[iIDs] = " << IDs[iIDs];
+//                 std::cout << " IDs.size() = " << IDs.size();
+//                 std::cout << " IDs[iIDs + 2*nPointsForAvg] = " << IDs[iIDs + 2*nPointsForAvg] << std::endl;
+//                 std::cout << " sensor_ranges.size() = " << sensor_ranges.size();
+                
+                
+                    pointLowSum -= segmentPoints[iIDs];
+//                     std::cout << "pointLowSum: substracted " << segmentPoints[iIDs] << "\t";
+                    pointLowSum += segmentPoints[iIDs + nPointsForAvg];
+                    
+//                     std::cout << "pointLowSum: added " << segmentPoints[iIDs + nPointsForAvg] << "\t";
+                    
+//                     std::cout << "test7.0.1"<< std::endl;
+//                     if ( DEBUG_SF )
+//                 std::cout << "Debug 13.18.13 \t"; 
+                    pointHighSum -= segmentPoints[iIDs + nPointsForAvg];
+//                       std::cout << "pointHighSum: substracted " << segmentPoints[iIDs + nPointsForAvg] << "\t";
+//                     std::cout << "test7.0.1"<< std::endl;
+                    pointHighSum += segmentPoints[iIDs + 2*nPointsForAvg];
+//                       std::cout << "pointHighSum: added " << segmentPoints[iIDs + 2*nPointsForAvg] << "\t";
+                    
+//                      pointLowSum -= segmentPoints[iIDs];
+// //                     std::cout << "test7.0.1"<< std::endl;
+//                     pointLowSum += segmentPoints[iIDs + nPointsForAvg];
+// //                     std::cout << "test7.0.1"<< std::endl;
+// //                     if ( DEBUG_SF )
+// //                 std::cout << "Debug 13.18.13 \t"; 
+//                     pointHighSum -= segmentPoints[iIDs + nPointsForAvg];
+// //                     std::cout << "test7.0.1"<< std::endl;
+//                     pointHighSum += segmentPoints[iIDs + 2*nPointsForAvg];
+                    
+//                     if ( DEBUG_SF )
+//                 std::cout << "Debug 13.18.14 \t"; 
+//                         std::cout << "test7.1" << std::endl; 
+                    if( IDs[iIDs + 2*nPointsForAvg] - IDs[iIDs] ==  2*nPointsForAvg) // points must be consecutive
+                    {
+//                             std::cout << "test8" << std::endl; 
+//                             if ( DEBUG_SF )
+//                 std::cout << "Debug 13.18.15 \t"; 
+                        avgPointLow = pointLowSum / nPointsForAvg;
+                        avgPointHigh = pointHighSum / nPointsForAvg;
+                    
+//                         if ( DEBUG_SF )
+//                 std::cout << "Debug 13.18.16 \t"; 
+                        
+//                           std::cout << "avg ranges & abs diff = " << avgPointHigh << ", " << avgPointLow << ", " << avgPointHigh.dist( avgPointLow ) << std::endl;
+                        
+                        if( avgPointHigh.dist( avgPointLow ) >  dist_for_object_split )
+                        {
+//                                 if ( DEBUG_SF )0
+//                 std::cout << "Debug 13.18.17 \t"; 
+                                
+//                                 std::cout << "test9" << std::endl; 
+                                
+                                PointsInfo splittedInfo;       
+                                unsigned int position2Split = iIDs;//IDs[nPointsForAvg];
+                                std::vector<geo::Vec2f> points = associatedPointsInfo[iList].points; 
+                                std::cout << "Split using method 2.2" << std::endl;
+//     std::cout << "Going to split 2, avgRangeHigh = " << avgRangeHigh << " avgRangeLow = " << avgRangeLow << "split @ " << position2Split << std::endl;
+    
+        for(unsigned int iPrint = 0; iPrint < associatedPointsInfo[iList].laserIDs.size(); iPrint++)
+        {
+                std::cout << associatedPointsInfo[iList].laserIDs[iPrint] << "\t";
+                
+                if(associatedPointsInfo[iList].laserIDs[iPrint]  > sensor_ranges.size())
+                {
+//                               std::cout << "sensor_ranges.size() = " << sensor_ranges.size() << std::endl;
+                        ROS_ERROR("BAD INFORMATION 0!!");
+                         exit(0);
+                }
+        }
+                                
+//                                 std::cout << "position2Split = " << position2Split << " associatedPointsInfo.laserIDs.size() = " << associatedPointsInfo[iList].laserIDs.size() << " \n";
+                                std::copy( associatedPointsInfo[iList].laserIDs.begin() + position2Split, associatedPointsInfo[iList].laserIDs.end(), std::back_inserter(splittedInfo.laserIDs) );
+                                std::copy( associatedPointsInfo[iList].points.begin() + position2Split, associatedPointsInfo[iList].points.end(),  std::back_inserter(splittedInfo.points) );
+                                associatedPointsInfo.push_back( splittedInfo );
+//                                 std::cout << "test9" << std::endl; 
+//                                                  if ( DEBUG_SF )
+//                 std::cout << "Debug 13.18.18 \t";    
+//                                                          std::cout << "associatedPointsInfo[iList].laserIDs.size() = "<<  associatedPointsInfo[iList].laserIDs.size() << " @iList = " << iList << "\t";
+                                associatedPointsInfo[iList].laserIDs.erase (associatedPointsInfo[iList].laserIDs.begin() + position2Split, associatedPointsInfo[iList].laserIDs.end() );
+                                associatedPointsInfo[iList].points.erase (associatedPointsInfo[iList].points.begin() + position2Split, associatedPointsInfo[iList].points.end() );
+                                splitFound = true;
+                                
+//                                  std::cout << "position2Split = " << position2Split << " associatedPointsInfo.laserIDs.size() = " << associatedPointsInfo[iList].laserIDs.size() << " \n";
+                                for(unsigned int iPrint = 0; iPrint < associatedPointsInfo[iList].laserIDs.size(); iPrint++)
+                                {
+//                                         std::cout << associatedPointsInfo[iList].laserIDs[iPrint] << "\t";
+                                        
+                                        if(associatedPointsInfo[iList].laserIDs[iPrint]  > sensor_ranges.size())
+                                        {
+//                                                 std::cout << "sensor_ranges.size() = " << sensor_ranges.size() << std::endl;
+                                                ROS_ERROR("BAD INFORMATION 1!!");
+                                                exit(0);
+                                        }
+                                }
+                                
+                                
+                                for(unsigned int iPrint = 0; iPrint <splittedInfo.laserIDs.size(); iPrint++)
+                                {
+//                                         std::cout << splittedInfo.laserIDs[iPrint] << "\t";
+                                        
+                                        if(splittedInfo.laserIDs[iPrint]  > sensor_ranges.size())
+                                        {
+//                                                 std::cout << "sensor_ranges.size() = " << sensor_ranges.size() << std::endl;
+                                                ROS_ERROR("BAD INFORMATION 2!!");
+                                                exit(0);
+                                        }
+                                }
+        
+                                
+                                
+//                                  if ( DEBUG_SF )
+//                                  std::cout << termcolor::magenta << "Debug 13.18.18.1, split @ " << position2Split << " associatedPointsInfo[iList].laserIDs.size() = " <<  associatedPointsInfo[iList].laserIDs.size() << "\t" << termcolor::reset; 
+//                                  std::cout << "test10" << std::endl; 
+                        }
+//                         if ( DEBUG_SF )
+//                 std::cout << "Debug 13.18.19 \t"; 
+                    }
+//                      std::cout << "test11" << std::endl; 
+//                     if ( DEBUG_SF )
+//                 std::cout << "Debug 13.18.10 \t"; 
+            }
+//             if ( DEBUG_SF )
+//                 std::cout << "End of splitting for consecutive sections" << std::endl; 
+    }
+    
+//     std::cout << "associatedPointsInfo.size() = " << associatedPointsInfo.size() << std::endl;
+}
+
 // ----------------------------------------------------------------------------------------------------
 
 bool pointIsPresent(double x_sensor, double y_sensor, const geo::LaserRangeFinder& lrf, const std::vector<float>& sensor_ranges)
@@ -2468,386 +2893,13 @@ if( DEBUG )
 //     }
     
  // ############################## TEMP END ############################
-   
-    for ( unsigned int iList = 0; iList < associatedPointsInfo.size(); iList++ )
-    {
-//                              if ( DEBUG_SF )
-//                 std::cout << "Debug 13.17.1 \t";
-                
-            std::vector<unsigned int> IDs = associatedPointsInfo[iList].laserIDs;
-      
-                         if ( DEBUG_SF )
-//                 std::cout << "Debug 13.17.2 \t";
-//             std::cout << "\nDebug 13.17.2.1 IDs.size() = " <<  IDs.size();
-            if( IDs.size() == 0 )
-                    continue;
-            
-//             std::cout << "\nIDs.size() = " <<  IDs.size();
-            for(unsigned int iIDs = 1; iIDs < IDs.size(); iIDs++)
-            {
-//                                  if ( DEBUG_SF )
-//                 std::cout << "Debug 13.17.3 \t";
-                    unsigned int idLow = iIDs - 1;
-                    unsigned int gapSize = IDs[iIDs] - IDs[iIDs - 1];
-//                     std::cout << "idLow = " << idLow << " gapSize = " << gapSize << " idHigh = " << iIDs << " senserElement Low = " << IDs[iIDs - 1] << " senserElement high = " << IDs[iIDs] << "\t";
-                    if( gapSize >= min_gap_size_for_split_ )
-                    {
-//                                          if ( DEBUG_SF )
-//                 std::cout << "13.17.4 Debug \t";
-                        // check ranges in gap
-                        // if there is a set of consecutive ranges (min_gap_size_for_split_) which is significantly larger than ranges before gap and after gap, this implies that there is free space
-                        // instead of an object which blocks the view on the object. The entities are splitted and treated as 2 separate ones.
-                            
-                            unsigned int nLowElements, nHighElements;
-                            if (idLow < min_gap_size_for_split_)
-                            {
-                                    nLowElements = idLow;
-                            }
-                            else
-                            {
-                                    nLowElements = min_gap_size_for_split_;
-                            }
-                            
-                            if (iIDs > (IDs.size() - min_gap_size_for_split_))
-                            {
-                                    nHighElements = IDs.size() - iIDs;
-                            }
-                            else
-                            {
-                                    nHighElements = min_gap_size_for_split_;
-                            }
-//                                          if ( DEBUG_SF )
-//                 std::cout << "Debug 13.17.5 \t";
-                            
-                            float avgRangeLow = 0.0, avgRangeHigh = 0.0;
-                            for(unsigned int iAvgLow = 0; iAvgLow < nLowElements; iAvgLow++)
-                            {
-                                    float range = sensor_ranges[idLow + iAvgLow];
-                                    if (range == 0.0 ) // ranges were set to zero if associated to world
-                                            range = scan->range_max;
-                                    
-                                    avgRangeLow += range;
-                            }
-                            avgRangeLow /= nLowElements;
-//                                          if ( DEBUG_SF )
-//                 std::cout << "Debug 13.17.6 \t";
-                            
-                            for(unsigned int iAvgHigh = 0; iAvgHigh < nHighElements; iAvgHigh++)
-                            {
-                                    float range = sensor_ranges[iIDs + iAvgHigh];
-                                    if (range == 0.0 ) // ranges were set to zero if associated to world
-                                            range = scan->range_max;
-                                    
-                                    avgRangeHigh += range;
-                            }
-                            avgRangeHigh /= nHighElements;
-//              if ( DEBUG_SF )
-//                 std::cout << "Debug 13.17.7 \t";
-                            
-                            float maxReference = std::max(avgRangeLow, avgRangeHigh);
-                            unsigned int nLargerRanges = 0;
-
-                            for(unsigned int iGap = idLow; iGap < IDs[iIDs]; iGap++ )
-                            {
-// //                                                  if ( DEBUG_SF )
-//                 std::cout << "Debug 13.17.8 \t";
-                                    if( IDs[iGap] > maxReference )
-                                    {
-                                            nLargerRanges++;
-                                    }
-                                    else
-                                    {
-                                            nLargerRanges = 0;
-                                    }
-                                    
-                                    if(nLargerRanges >= min_gap_size_for_split_)
-                                    {
-//                                                          if ( DEBUG_SF )
-//                 std::cout << "Debug 13.17.9 \t";
-                                            // split
-                                            PointsInfo splittedInfo;
-
-                                            std::vector<geo::Vec2f> points = associatedPointsInfo[iList].points;
-                                            std::copy( associatedPointsInfo[iList].laserIDs.begin() + iIDs, associatedPointsInfo[iList].laserIDs.end(), std::back_inserter(splittedInfo.laserIDs) );
-                                            std::copy( associatedPointsInfo[iList].points.begin() + iIDs, associatedPointsInfo[iList].points.end(),  std::back_inserter(splittedInfo.points) );
-                                            
-                                            associatedPointsInfo.push_back( splittedInfo );
-                                            
-                                            associatedPointsInfo[iList].laserIDs.erase (associatedPointsInfo[iList].laserIDs.begin() + iIDs, associatedPointsInfo[iList].laserIDs.end() );
-                                            associatedPointsInfo[iList].points.erase (associatedPointsInfo[iList].points.begin() + iIDs, associatedPointsInfo[iList].points.end() );
-                                            goto endOfLoop;
-                                    }
-                            }
-                    }
-//                       std::cout << "Debug 13.17.10 \t";
-            }
-            
-//               std::cout << "Debug 13.17.11 \t";
-            endOfLoop:;
-//               std::cout << "Debug 13.17.12 \t";
-               
-    }
+ 
     
     
     
-//     std::cout << "Before: associatedPointsInfo.size() = " << associatedPointsInfo.size() << std::endl;
+    splitSegmentsWhenGapDetected( associatedPointsInfo, min_gap_size_for_split_, min_segment_size_pixels_, dist_for_object_split_, sensor_ranges, scan);
     
-    for ( unsigned int iList = 0; iList < associatedPointsInfo.size(); iList++ )
-    {
-            // As each point is associated to an object, it might happen that 2 objects close to each other can be seen as one. An 
-            
-//             if ( DEBUG_SF )
-//                 std::cout << "Debug 13.18.1 " << "iList = " << iList << "\t"; 
-            ScanSegment IDs = associatedPointsInfo[iList].laserIDs;
-            std::vector< geo::Vec2f > segmentPoints = associatedPointsInfo[iList].points;
-      
-//                  if ( DEBUG_SF )
-//                 std::cout << "Debug 13.18.2 \t"; 
-//                 std::cout << "IDs.size() = " << IDs.size() << std::endl;
-//            std::cout << "IDs = " << std::endl;
-//             for (unsigned int iTest = 0; iTest < IDs.size(); iTest++)
-//             {
-//                 std::cout << IDs[iTest] << "\t" << sensor_ranges[IDs[iTest]] << "\t" << segmentPoints[iTest].x << "\t" << segmentPoints[iTest].y << std::endl;
-//             }   
-//             std::cout << "\nDebug 13.18.2.1 \t";
-            
-//             std::cout << "min_segment_size_pixels_ = " << min_segment_size_pixels_ << std::endl;
-            
-            unsigned int nPointsForAvg;
-            min_segment_size_pixels_ % 2 == 0 ? nPointsForAvg = min_segment_size_pixels_ / 2 : nPointsForAvg = (min_segment_size_pixels_ - 1) / 2;
-            
-            if( IDs.size() < 2*nPointsForAvg ) // 2 times, because we have to determine the average for the lower and upper part
-            {
-//                     std::cout << "continue"<< std::endl;
-                    continue;
-            }
-            
-//             std::cout << "nPointsForAvg = " << nPointsForAvg << std::endl;
-            
-//             if ( DEBUG_SF )
-//                 std::cout << "Debug 13.18.3 \t"; 
-//             float rangeLowSum = 0.0, rangeHighSum = 0.0;
-            
-            geo::Vec2f pointLowSum, pointHighSum;
-            pointLowSum.x = 0.0;
-            pointLowSum.y = 0.0;
-            pointHighSum.x = 0.0;
-            pointHighSum.y = 0.0;
-            
-            for(unsigned int iAvgLow = 0; iAvgLow < nPointsForAvg; iAvgLow++)
-            {
-//                     std::cout << "iAvgLow  = " <<  iAvgLow  << std::endl;
-//                     std::cout << "IDs[iAvgLow]  = " <<  IDs[iAvgLow]  << std::endl;
-//                     std::cout << "sensor_ranges[ IDs[iAvgLow] ] = " << sensor_ranges[ IDs[iAvgLow] ] << std::endl;
-//                      std::cout << "test" << std::endl;
-//                     rangeLowSum += sensor_ranges[ IDs[iAvgLow] ];
-                    
-                    pointLowSum += segmentPoints[iAvgLow];
-//                       std::cout << "test2" << std::endl;
-            }
-//              if ( DEBUG_SF )
-//                       std::cout << "test3" << std::endl; 
-            geo::Vec2f avgPointLow = pointLowSum / nPointsForAvg;
-             
-            for(unsigned int iAvgHigh = nPointsForAvg; iAvgHigh < 2*nPointsForAvg; iAvgHigh++)
-            {
-//                     std::cout << "iAvgHigh  = " <<  iAvgHigh  << std::endl;
-//                     std::cout << "IDs[iAvgHigh]  = " <<  IDs[iAvgHigh]  << std::endl;
-//                     std::cout << "sensor_ranges[ IDs[iAvgHigh] ] = " << sensor_ranges[ IDs[iAvgHigh] ] << std::endl;
-//                     std::cout << "IDs.size() = " << IDs.size() << std::endl;
-                    
-//                     rangeHighSum += sensor_ranges[ IDs[iAvgHigh] ];
-                    pointHighSum += segmentPoints [iAvgHigh];
-            }
-//             std::cout << "test4" << std::endl; 
-//             if ( DEBUG_SF )
-//                 std::cout << "Debug 13.18.5 \t"; 
-            geo::Vec2f avgPointHigh = pointHighSum / nPointsForAvg;
-            
-            bool splitFound = false;
-            
-             if( std::fabs( IDs[2*nPointsForAvg] - IDs[0]) <=  2*nPointsForAvg + N_POINTS_MARGIN_FOR_BEING_CONSECUTIVE &&
-                 std::fabs( IDs[2*nPointsForAvg] - IDs[0]) >=  2*nPointsForAvg - N_POINTS_MARGIN_FOR_BEING_CONSECUTIVE ) // points must be consecutive
-             { 
-//                      std::cout << "test4.1" << std::endl; 
-//                      if ( DEBUG_SF )
-//                 std::cout << "Debug 13.18.6 \t"; 
-//                      std::cout << "avg ranges & abs diff = " << avgPointHigh << ", " << avgPointLow << ", " << avgPointHigh.dist( avgPointLow ) << std::endl;
-                     
-                if( avgPointHigh.dist( avgPointLow ) >  dist_for_object_split_ )
-                {
-                        
-//                         std::cout << "Going to split 1, avgRangeHigh = " << avgRangeHigh << " avgRangeLow = " << avgRangeLow << "split @ " << nPointsForAvg << std::endl;
-                        
-//                         if ( DEBUG_SF )
-//                 std::cout << "Debug 13.18.7 \t"; 
-                        PointsInfo splittedInfo;       
-                        unsigned int position2Split = nPointsForAvg;//IDs[nPointsForAvg];
-                        std::vector<geo::Vec2f> points = associatedPointsInfo[iList].points;             
-                        std::copy( associatedPointsInfo[iList].laserIDs.begin() + position2Split, associatedPointsInfo[iList].laserIDs.end(), std::back_inserter(splittedInfo.laserIDs) );
-                        std::copy( associatedPointsInfo[iList].points.begin() + position2Split, associatedPointsInfo[iList].points.end(),  std::back_inserter(splittedInfo.points) );
-                        associatedPointsInfo.push_back( splittedInfo );
-                        
-//                         std::cout << "test4.2" << std::endl; 
-                        
-//                                                 if ( DEBUG_SF )
-//                 std::cout << "Debug 13.18.8 \t"; 
-                        associatedPointsInfo[iList].laserIDs.erase (associatedPointsInfo[iList].laserIDs.begin() + position2Split, associatedPointsInfo[iList].laserIDs.end() );
-                        associatedPointsInfo[iList].points.erase (associatedPointsInfo[iList].points.begin() + position2Split, associatedPointsInfo[iList].points.end() );
-                        splitFound = true;
-//                         if ( DEBUG_SF )
-//                 std::cout << "Debug 13.18.9, split @ " << position2Split  << "for iList = " << iList << "\t"; 
-//                 std::cout << termcolor::magenta << "Debug 13.18.9, split @" << position2Split << "for iList = " << iList << " associatedPointsInfo[iList].laserIDs.size() = " <<  associatedPointsInfo[iList].laserIDs.size() << "\t" << termcolor::reset; 
-//                 std::cout << "test5" << std::endl; 
-                }
-                    
-//                             if ( DEBUG_SF )
-//                 std::cout << "Debug 13.18.10 " << std::endl; 
-             }
-//               std::cout << termcolor::magenta << "test6" << termcolor::reset << std::endl; 
-//             if ( DEBUG_SF )
-//                 std::cout << "Debug 13.18.11 \t"; 
-//               std::cout << "IDs.size() = " << IDs.size() << std::endl;
-//               std::cout << "nPointsForAvg = " << nPointsForAvg << std::endl;
-//               std::cout << "IDs.size() - 2*nPointsForAvg - 1 = " << IDs.size() - 2*nPointsForAvg - 1 << std::endl;
-              
-              
-            for(unsigned int iIDs = 0; iIDs < (IDs.size() - 2*nPointsForAvg - 1) && !splitFound && IDs.size() >= ( 2*nPointsForAvg + 1); iIDs++) // -1 because the first segment is already determined as above
-            { 
-//                     std::cout << "test7" << std::endl; 
-//                     if ( DEBUG_SF )
-//                 std::cout << "Debug 13.18.12 \t";
-//                     std::cout << "IDs.size() = " << IDs.size() << std::endl;
-//                 std::cout << "(IDs.size() - 2*nPointsForAvyg - 1) = " << (IDs.size() - 2*nPointsForAvg - 1) << std::endl;
-//                 std::cout << "iIDs = " << iIDs ;
-//                 std::cout << " IDs[iIDs] = " << IDs[iIDs];
-//                 std::cout << " IDs.size() = " << IDs.size();
-//                 std::cout << " IDs[iIDs + 2*nPointsForAvg] = " << IDs[iIDs + 2*nPointsForAvg] << std::endl;
-//                 std::cout << " sensor_ranges.size() = " << sensor_ranges.size();
-                
-                
-                    pointLowSum -= segmentPoints[iIDs];
-//                     std::cout << "pointLowSum: substracted " << segmentPoints[iIDs] << "\t";
-                    pointLowSum += segmentPoints[iIDs + nPointsForAvg];
-                    
-//                     std::cout << "pointLowSum: added " << segmentPoints[iIDs + nPointsForAvg] << "\t";
-                    
-//                     std::cout << "test7.0.1"<< std::endl;
-//                     if ( DEBUG_SF )
-//                 std::cout << "Debug 13.18.13 \t"; 
-                    pointHighSum -= segmentPoints[iIDs + nPointsForAvg];
-//                       std::cout << "pointHighSum: substracted " << segmentPoints[iIDs + nPointsForAvg] << "\t";
-//                     std::cout << "test7.0.1"<< std::endl;
-                    pointHighSum += segmentPoints[iIDs + 2*nPointsForAvg];
-//                       std::cout << "pointHighSum: added " << segmentPoints[iIDs + 2*nPointsForAvg] << "\t";
-                    
-//                      pointLowSum -= segmentPoints[iIDs];
-// //                     std::cout << "test7.0.1"<< std::endl;
-//                     pointLowSum += segmentPoints[iIDs + nPointsForAvg];
-// //                     std::cout << "test7.0.1"<< std::endl;
-// //                     if ( DEBUG_SF )
-// //                 std::cout << "Debug 13.18.13 \t"; 
-//                     pointHighSum -= segmentPoints[iIDs + nPointsForAvg];
-// //                     std::cout << "test7.0.1"<< std::endl;
-//                     pointHighSum += segmentPoints[iIDs + 2*nPointsForAvg];
-                    
-//                     if ( DEBUG_SF )
-//                 std::cout << "Debug 13.18.14 \t"; 
-//                         std::cout << "test7.1" << std::endl; 
-                    if( IDs[iIDs + 2*nPointsForAvg] - IDs[iIDs] ==  2*nPointsForAvg) // points must be consecutive
-                    {
-//                             std::cout << "test8" << std::endl; 
-//                             if ( DEBUG_SF )
-//                 std::cout << "Debug 13.18.15 \t"; 
-                        avgPointLow = pointLowSum / nPointsForAvg;
-                        avgPointHigh = pointHighSum / nPointsForAvg;
-                    
-//                         if ( DEBUG_SF )
-//                 std::cout << "Debug 13.18.16 \t"; 
-                        
-//                           std::cout << "avg ranges & abs diff = " << avgPointHigh << ", " << avgPointLow << ", " << avgPointHigh.dist( avgPointLow ) << std::endl;
-                        
-                        if( avgPointHigh.dist( avgPointLow ) >  dist_for_object_split_ )
-                        {
-//                                 if ( DEBUG_SF )0
-//                 std::cout << "Debug 13.18.17 \t"; 
-                                
-//                                 std::cout << "test9" << std::endl; 
-                                
-                                PointsInfo splittedInfo;       
-                                unsigned int position2Split = iIDs;//IDs[nPointsForAvg];
-                                std::vector<geo::Vec2f> points = associatedPointsInfo[iList].points; 
-                                
-//     std::cout << "Going to split 2, avgRangeHigh = " << avgRangeHigh << " avgRangeLow = " << avgRangeLow << "split @ " << position2Split << std::endl;
     
-        for(unsigned int iPrint = 0; iPrint < associatedPointsInfo[iList].laserIDs.size(); iPrint++)
-        {
-                std::cout << associatedPointsInfo[iList].laserIDs[iPrint] << "\t";
-                
-                if(associatedPointsInfo[iList].laserIDs[iPrint]  > sensor_ranges.size())
-                {
-//                               std::cout << "sensor_ranges.size() = " << sensor_ranges.size() << std::endl;
-                        ROS_ERROR("BAD INFORMATION 0!!");
-                         exit(0);
-                }
-        }
-                                
-//                                 std::cout << "position2Split = " << position2Split << " associatedPointsInfo.laserIDs.size() = " << associatedPointsInfo[iList].laserIDs.size() << " \n";
-                                std::copy( associatedPointsInfo[iList].laserIDs.begin() + position2Split, associatedPointsInfo[iList].laserIDs.end(), std::back_inserter(splittedInfo.laserIDs) );
-                                std::copy( associatedPointsInfo[iList].points.begin() + position2Split, associatedPointsInfo[iList].points.end(),  std::back_inserter(splittedInfo.points) );
-                                associatedPointsInfo.push_back( splittedInfo );
-//                                 std::cout << "test9" << std::endl; 
-//                                                  if ( DEBUG_SF )
-//                 std::cout << "Debug 13.18.18 \t";    
-//                                                          std::cout << "associatedPointsInfo[iList].laserIDs.size() = "<<  associatedPointsInfo[iList].laserIDs.size() << " @iList = " << iList << "\t";
-                                associatedPointsInfo[iList].laserIDs.erase (associatedPointsInfo[iList].laserIDs.begin() + position2Split, associatedPointsInfo[iList].laserIDs.end() );
-                                associatedPointsInfo[iList].points.erase (associatedPointsInfo[iList].points.begin() + position2Split, associatedPointsInfo[iList].points.end() );
-                                splitFound = true;
-                                
-//                                  std::cout << "position2Split = " << position2Split << " associatedPointsInfo.laserIDs.size() = " << associatedPointsInfo[iList].laserIDs.size() << " \n";
-                                for(unsigned int iPrint = 0; iPrint < associatedPointsInfo[iList].laserIDs.size(); iPrint++)
-                                {
-//                                         std::cout << associatedPointsInfo[iList].laserIDs[iPrint] << "\t";
-                                        
-                                        if(associatedPointsInfo[iList].laserIDs[iPrint]  > sensor_ranges.size())
-                                        {
-//                                                 std::cout << "sensor_ranges.size() = " << sensor_ranges.size() << std::endl;
-                                                ROS_ERROR("BAD INFORMATION 1!!");
-                                                exit(0);
-                                        }
-                                }
-                                
-                                
-                                for(unsigned int iPrint = 0; iPrint <splittedInfo.laserIDs.size(); iPrint++)
-                                {
-//                                         std::cout << splittedInfo.laserIDs[iPrint] << "\t";
-                                        
-                                        if(splittedInfo.laserIDs[iPrint]  > sensor_ranges.size())
-                                        {
-//                                                 std::cout << "sensor_ranges.size() = " << sensor_ranges.size() << std::endl;
-                                                ROS_ERROR("BAD INFORMATION 2!!");
-                                                exit(0);
-                                        }
-                                }
-        
-                                
-                                
-//                                  if ( DEBUG_SF )
-//                                  std::cout << termcolor::magenta << "Debug 13.18.18.1, split @ " << position2Split << " associatedPointsInfo[iList].laserIDs.size() = " <<  associatedPointsInfo[iList].laserIDs.size() << "\t" << termcolor::reset; 
-//                                  std::cout << "test10" << std::endl; 
-                        }
-//                         if ( DEBUG_SF )
-//                 std::cout << "Debug 13.18.19 \t"; 
-                    }
-//                      std::cout << "test11" << std::endl; 
-//                     if ( DEBUG_SF )
-//                 std::cout << "Debug 13.18.10 \t"; 
-            }
-//             if ( DEBUG_SF )
-//                 std::cout << "End of splitting for consecutive sections" << std::endl; 
-    }
-    
-//     std::cout << "associatedPointsInfo.size() = " << associatedPointsInfo.size() << std::endl;
     
     
 
