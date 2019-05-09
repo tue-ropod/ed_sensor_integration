@@ -47,6 +47,10 @@
 
 #include "../../../../dlib-19.16/dlib/optimization/max_cost_assignment.h" // TODO temp, improvement of lib-inclusion needed, see http://dlib.net/
 
+#include "wire_msgs/WorldEvidence.h" // TEMP for publishing WIRE-evidence
+#include "wire_msgs/ObjectEvidence.h" // TEMP for publishing WIRE-evidence
+#include "problib/conversions.h" // TEMP for publishing WIRE-evidence
+
 #define INF 10000
 
 #define DEBUG false // TEMP
@@ -105,6 +109,9 @@ private:
    ros::Subscriber amclPose_sub_;
    
    ros::Subscriber initializedPose_sub_;
+   
+   // Publisher used to send evidence to world model
+   ros::Publisher world_evidence_publisher_; // ############################## TEMP ############################
 
     std::queue<sensor_msgs::LaserScan::ConstPtr> scan_buffer_;
     
