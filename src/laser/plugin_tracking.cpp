@@ -3120,7 +3120,7 @@ std::cout << "Debug 15.3 \t";
             if ( !e->hasFlag ( "locked" ) )
             {
                 entityProperties = e->property ( featureProperties_ );
-                 std::cout << "AFter request of entityProperties: Entity with id = " << e->id() << " has " << entityProperties.getNMeasurements() << " measurements" << std::endl;
+//                 std::cout << "AFter request of entityProperties: Entity with id = " << e->id() << " has " << entityProperties.getNMeasurements() << " measurements" << std::endl;
                 ed::tracking::Rectangle entityRectangle = entityProperties.getRectangle();
                 ed::tracking::Circle entityCircle = entityProperties.getCircle();
                 
@@ -3577,7 +3577,7 @@ entityProperties.updateProbabilities ( measuredProb );
                  int nMeasurements = entityProperties.getNMeasurements() + 1;
                 entityProperties.setNMeasurements(  nMeasurements );
             req.setProperty ( id, featureProperties_, entityProperties );
-            std::cout << "Entity with id = " << id << " has " << entityProperties.getNMeasurements() << " measurements" << std::endl;
+//            std::cout << "Entity with id = " << id << " has " << entityProperties.getNMeasurements() << " measurements" << std::endl;
 //             measuredProperty.getRectangle().printProperties();
 //             std::cout << "Measured yaw = " << measuredProperty.getRectangle().get_yaw() << std::endl;
 //             std::cout << "\n";
