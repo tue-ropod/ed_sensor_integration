@@ -14,8 +14,6 @@
 
 #include <opencv2/imgproc/imgproc.hpp>
 
-#include "ed/convex_hull_calc.h"
-
 #include <ed/io/json_writer.h>
 
 #include "ed_sensor_integration/association_matrix.h"

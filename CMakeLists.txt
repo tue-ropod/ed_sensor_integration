@@ -85,7 +85,7 @@ add_library(ed_kinect
     include/ed/kinect/updater.h
     include/ed/kinect/entity_update.h
     src/kinect/renderer.cpp
-    include/ed/kinect/renderer.h
+    include/ed/kinect/renderer.h   
 )
 target_link_libraries(ed_kinect ed_association ${catkin_LIBRARIES})
 add_dependencies(ed_kinect ${PROJECT_NAME}_gencpp ${${PROJECT_NAME}_EXPORTED_TARGETS})
@@ -114,6 +114,8 @@ add_dependencies(ed_kinect_plugin ${PROJECT_NAME}_gencpp ${${PROJECT_NAME}_EXPOR
 add_library(ed_laser_plugin_tracking
     src/laser/plugin_tracking.cpp
     src/laser/plugin_tracking.h
+    src/laser/feature_functions.cpp
+    src/laser/feature_functions.h
 )
 target_link_libraries(ed_laser_plugin_tracking ed_association ${catkin_LIBRARIES} dlib::dlib)
 
