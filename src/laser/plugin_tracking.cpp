@@ -899,6 +899,7 @@ void LaserPluginTracking::initialize(ed::InitData& init)
 
 void LaserPluginTracking::process(const ed::WorldModel& world, ed::UpdateRequest& req)
 {
+//         std::cout << "start" << std::endl;
 //         std::cout << termcolor::red << "pose_buffer_init_.size() before = " << pose_buffer_init_.size() << termcolor::reset << std::endl; 
   //      Do not pub improved localisation on AMCL-topic -> gives problems with time-synchronisation!
         /*
@@ -3432,12 +3433,12 @@ std::cout << "Debug 15.3 \t";
 
                 
                 // update circular properties
-                Eigen::MatrixXf QmCircle = Eigen::MatrixXf::Zero( 7, 7 );
+                Eigen::MatrixXf QmCircle = Eigen::MatrixXf::Zero( 5, 5 );
                 Eigen::MatrixXf RmCircle = Eigen::MatrixXf::Zero( 3, 3 );
                 
 //                 if( DEBUG )
 //                         std::cout << "Test 5 \t";
-                 QmCircle.diagonal() << Q, Q, Q, Q, Q; // xPos, yPos, xVel, yVel, xAccel, yAccel, radius
+                 QmCircle.diagonal() << Q, Q, Q, Q, Q; // xPos, yPos, xVel, yVel, radius
 //                 QmCircle.diagonal() << Q, Q, 20*Q, 20*Q, 2000*Q, 2000*Q, Q; // xPos, yPos, xVel, yVel, xAccel, yAccel, radius
                 RmCircle.diagonal() << R, R, R;
                 
