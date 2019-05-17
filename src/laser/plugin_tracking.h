@@ -38,6 +38,7 @@
 #define MAX_DISTANCE_POS_CORRECTION2 std::pow(0.3, 2.0) // [m]
 
 #define N_POINTS_MARGIN_FOR_BEING_CONSECUTIVE 3    // [-] points must be consecutive for splitting if there is a proven gap. This is the margin for points being considered as consecutive
+#define POINTS_TO_CHECK_CONFIDENCE      3               // [-]
 
 #define DELAY_AFTER_INIT ros::Duration(1.0)             // [s]
 

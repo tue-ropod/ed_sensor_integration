@@ -2868,7 +2868,7 @@ std::cout << "Debug 15.3 \t";
         }
         
 //         std::cout << "associatedPointsInfo[iList].laserIDs.size() = " << associatedPointsInfo[iList].laserIDs.size() << std::endl;
-//         std::cout << "IDs low & high = " << IDLowWidth << ", " << IDHighWidth << ", " << IDLowDepth << ", " << IDHighDepth << std::endl;
+         std::cout << "IDs low & high = " << IDLowWidth << ", " << IDHighWidth << ", " << IDLowDepth << ", " << IDHighDepth << std::endl;
 //         std::cout << " IDLowWidth = " << IDLowWidth << " IDHighWidth = " << IDHighWidth << " IDLowDepth = " << IDLowDepth << " IDHighDepth = " << IDHighDepth << std::endl;
          if ( DEBUG_SF )
                         std::cout << "Debug 16.0 \t";
@@ -2927,7 +2927,7 @@ std::cout << "Debug 15.3 \t";
                          {
                                  measuredProperties[iList].confidenceRectangleWidth = false;
                                  measuredProperties[iList].confidenceRectangleWidthLow = false;
-                                 measuredProperties[iList].confidenceRectangleWidthHigh = ed::tracking::determineCornerConfidence ( scan, elementHigh, false);
+                                 measuredProperties[iList].confidenceRectangleWidthHigh = ed::tracking::determineCornerConfidence ( scan, elementHigh, false, POINTS_TO_CHECK_CONFIDENCE + N_POINTS_MARGIN_FOR_BEING_CONSECUTIVE);
                                  
                                  
                                  if( measuredProperties[iList].confidenceRectangleWidthHigh )
@@ -2941,7 +2941,7 @@ std::cout << "Debug 15.3 \t";
                          if (determineDepthConfidence)
                          {
                                  measuredProperties[iList].confidenceRectangleDepth = false;
-                                 measuredProperties[iList].confidenceRectangleDepthLow = ed::tracking::determineCornerConfidence ( scan, elementLow, true); 
+                                 measuredProperties[iList].confidenceRectangleDepthLow = ed::tracking::determineCornerConfidence ( scan, elementLow, true, POINTS_TO_CHECK_CONFIDENCE + N_POINTS_MARGIN_FOR_BEING_CONSECUTIVE); 
                                  measuredProperties[iList].confidenceRectangleDepthHigh = false;
                                  
                                  if( measuredProperties[iList].confidenceRectangleDepthLow )
@@ -2953,23 +2953,35 @@ std::cout << "Debug 15.3 \t";
                  }
                  else
                  {
-//                           std::cout << "Statement = false"  << std::endl;
+                           std::cout << "Statement = false"  << std::endl;
                          if(determineWidthConfidence)
                          {
-                                 measuredProperties[iList].confidenceRectangleWidthLow = ed::tracking::determineCornerConfidence ( scan, elementLow, true);
-                                 measuredProperties[iList].confidenceRectangleWidthHigh = ed::tracking::determineCornerConfidence ( scan, elementHigh, false); 
+                                 measuredProperties[iList].confidenceRectangleWidthLow = ed::tracking::determineCornerConfidence ( scan, elementLow, true, POINTS_TO_CHECK_CONFIDENCE + N_POINTS_MARGIN_FOR_BEING_CONSECUTIVE);
+				 if ( method == ed::tracking::RECTANGLE && IDLowDepth == IDHighWidth )
+				 {
+					measuredProperties[iList].confidenceRectangleWidthHigh = true; // because we assume the object to be rectangular, so we have seen that the corner is at this element
+				 }
+				 else
+				 {
+                                 	measuredProperties[iList].confidenceRectangleWidthHigh = ed::tracking::determineCornerConfidence ( scan, elementHigh, false, POINTS_TO_CHECK_CONFIDENCE + N_POINTS_MARGIN_FOR_BEING_CONSECUTIVE); 
+				 }
+
                                  measuredProperties[iList].confidenceRectangleWidth = (measuredProperties[iList].confidenceRectangleWidthLow && measuredProperties[iList].confidenceRectangleWidthHigh );
                                  
                                  if( measuredProperties[iList].confidenceRectangleWidthLow )
                                  {
                                          measuredProperties[iList].measuredCorners.push_back( associatedPointsInfo[iList].points[PointIDLowWidth] );  
-//                                          std::cout << "Point added 0 = " << associatedPointsInfo[iList].points[PointIDLowWidth] << std::endl;
-                                 }
+
+                                          std::cout << "Point added 0 = " << associatedPointsInfo[iList].points[PointIDLowWidth] << std::endl;
+                                 }else{
+
+                                          std::cout << "Point not added 0 = " << associatedPointsInfo[iList].points[PointIDLowWidth] << std::endl;
+}
                                  
                                  if(  measuredProperties[iList].confidenceRectangleWidthHigh )
                                  {
                                          measuredProperties[iList].measuredCorners.push_back( associatedPointsInfo[iList].points[PointIDHighWidth] );  
-//                                          std::cout << "Point added 1 = " << associatedPointsInfo[iList].points[PointIDHighWidth] << std::endl;
+                                          std::cout << "Point added 1 = " << associatedPointsInfo[iList].points[PointIDHighWidth] << std::endl;
                                          
 //                                          std::cout << "associatedPointsInfo[iList].points.size() = " << associatedPointsInfo[iList].points.size() << ". PointIDHighWidth = " << PointIDHighWidth << " Points = " << std::endl;
 //                                          for(unsigned int iPointsTest = 0; iPointsTest < associatedPointsInfo[iList].points.size(); iPointsTest++)
@@ -2979,14 +2991,25 @@ std::cout << "Debug 15.3 \t";
                                          
                                          
                                          
-                                 }
+                                 } else {
+
+                                          std::cout << "Point not added 1 = " << associatedPointsInfo[iList].points[PointIDHighWidth] << std::endl;
+
+}
                                  
                          }
                          
                           if (determineDepthConfidence)
                           {
-                                 measuredProperties[iList].confidenceRectangleDepthLow = ed::tracking::determineCornerConfidence ( scan, elementLow, true) ;
-                                 measuredProperties[iList].confidenceRectangleDepthHigh = ed::tracking::determineCornerConfidence ( scan, elementHigh, false) ; 
+                                 if ( method == ed::tracking::RECTANGLE  && IDLowDepth == IDHighWidth )
+                                 {
+                                        measuredProperties[iList].confidenceRectangleDepthLow = true; // because we assume the object to be rectangular, so we have seen that the corner is at this element
+                                 }
+                                 else
+                                 {
+	                                 measuredProperties[iList].confidenceRectangleDepthLow = ed::tracking::determineCornerConfidence ( scan, elementLow, true, POINTS_TO_CHECK_CONFIDENCE + N_POINTS_MARGIN_FOR_BEING_CONSECUTIVE) ;
+			         }
+                                 measuredProperties[iList].confidenceRectangleDepthHigh = ed::tracking::determineCornerConfidence ( scan, elementHigh, false, POINTS_TO_CHECK_CONFIDENCE + N_POINTS_MARGIN_FOR_BEING_CONSECUTIVE) ; 
                                  measuredProperties[iList].confidenceRectangleDepth = (measuredProperties[iList].confidenceRectangleDepthLow && measuredProperties[iList].confidenceRectangleDepthHigh );
                                  
                                  if( measuredProperties[iList].confidenceRectangleDepthLow )
@@ -3096,8 +3119,15 @@ std::cout << "Debug 15.3 \t";
         if ( iProperties < it_laserEntities.size() )
         {
             const ed::EntityConstPtr& e = * ( it_laserEntities[iProperties] );
-//             std::cout << "Going to update entity " << e->id() << std::endl;
-
+ std::cout << "Going to update entity " << e->id() ;
+            std::cout << "Confidences = " <<
+            measuredProperties[iProperties].confidenceRectangleDepthLow <<
+            measuredProperties[iProperties].confidenceRectangleDepthHigh <<
+            measuredProperties[iProperties].confidenceRectangleDepth <<
+            measuredProperties[iProperties].confidenceRectangleWidthLow <<
+            measuredProperties[iProperties].confidenceRectangleWidthHigh <<
+            measuredProperties[iProperties].confidenceRectangleWidth << " frame_id = " << scan->header.frame_id << std::endl;
+measuredProperty.printProperties();
             // check if new properties are measured.
             bool check1 = measuredProperty.getCircle().get_radius() != measuredProperty.getCircle().get_radius();
             bool check2 = measuredProperty.getRectangle().get_w() != measuredProperty.getRectangle().get_w();
@@ -3210,7 +3240,7 @@ std::cout << "Debug 15.3 \t";
         //                 }
               
               
-                        
+                       std::cout << "checkCornerConfidence = " << checkCornerConfidence << std::endl;
                         
         //                 
         //                 std::cout << "checkCornerConfidence = " << 
@@ -3246,6 +3276,7 @@ std::cout << "Debug 15.3 \t";
                                 float deltaX = 0.0, deltaY = 0.0;
                                 for(unsigned int iMeasured = 0; iMeasured < cornersMeasured.size(); iMeasured++)
                                 {
+std::cout << "Corner Measured = " << cornersMeasured[iMeasured] << std::endl;
                                         // for each corner which is measured, find the closest corner modelled
                                         float smallestDistance2 = std::numeric_limits<float>::infinity();
                                         unsigned int closestElement;
@@ -3267,25 +3298,32 @@ std::cout << "Debug 15.3 \t";
                                         
                                         deltaX += cornersMeasured[iMeasured].x - cornersModelled[closestElement].x;
                                         deltaY += cornersMeasured[iMeasured].y - cornersModelled[closestElement].y;
-                                        
-//                                         std::cout << "In loop: deltaX, deltaY = " << deltaX << ", " << deltaY << std::endl;
+                                       std::cout << "corner Modelled = " << cornersModelled[closestElement] << std::endl; 
+
                                 }
                                 
                                 deltaX /= cornersMeasured.size();
                                 deltaY /= cornersMeasured.size();
                                 
+                                std::cout << "avg deltaX, deltaY = " << deltaX << ", " << deltaY << std::endl;
 //                                 std::cout << "deltaX, deltaY = " << deltaX << ", " << deltaY << std::endl;
                                 
-                                ed::tracking::Rectangle updatedRectangle = measuredProperty.getRectangle(); // TODO correct? Should we take measured dimensions into account? TEST
+                           //     ed::tracking::Rectangle updatedRectangle = measuredProperty.getRectangle(); // TODO correct? Should we take measured dimensions into account? TEST
                                 
-//                                 std::cout << "Measured Properties = " << updatedRectangle.get_x() << ", "  << updatedRectangle.get_y() << std::endl;
-//                                 std::cout << "Meas. Properties +D = " << updatedRectangle.get_x() + deltaX << ", "  << updatedRectangle.get_y() + deltaY << std::endl;
+                                ed::tracking::Rectangle updatedRectangle = entityProperties.getRectangle(); // TODO correct? Should we take measured dimensions into account? TEST
+
+                                 std::cout << "Measured Properties = " << updatedRectangle.get_x() << ", "  << updatedRectangle.get_y() << std::endl;
+                                 std::cout << "Meas. Properties +D = " << updatedRectangle.get_x() + deltaX << ", "  << updatedRectangle.get_y() + deltaY << std::endl;
                                 
                                 float updatedX = updatedRectangle.get_x() + deltaX;
                                 float updatedY = updatedRectangle.get_y() + deltaY;
-                                
-//                                 std::cout << "Meas. Properties up = " << updatedX << ", "  << updatedY << std::endl;
-                                
+                             
+                                 std::cout << "Meas. Properties up = " << updatedX << ", "  << updatedY << std::endl;
+
+
+std::cout << "Modelled properties = " << entityProperties.getRectangle().get_x() << ", " << entityProperties.getRectangle().get_y() << std::endl;                                
+std::cout << "Modeller properties updated v1 = " << entityProperties.getRectangle().get_x() + deltaX << ", " << entityProperties.getRectangle().get_y() + deltaY << std::endl;                                
+std::cout << "Modeller properties updated v2 = " << entityProperties.getRectangle().get_x() - deltaX << ", " << entityProperties.getRectangle().get_y() - deltaY << std::endl;                                
                                 updatedRectangle.set_x( updatedX );
                                 updatedRectangle.set_y( updatedY );
                                 
@@ -3429,6 +3467,8 @@ std::cout << "Debug 15.3 \t";
                 std::cout << " \n Measurement: \t" ;
                 measuredProperty.rectangle_.printProperties();
            */     
+
+std::cout << "Covariances: QmRectangle = " << QmRectangle << " RmRectangle = " << RmRectangle << std::endl;
                 entityProperties.updateRectangleFeatures(QmRectangle, RmRectangle, zmRectangle, dt, sensor_pose);
              /*
                 std::cout << "\nAfter update: \t";
