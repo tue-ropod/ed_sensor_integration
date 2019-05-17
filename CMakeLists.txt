@@ -41,7 +41,7 @@ generate_messages(
 
 catkin_package(
   INCLUDE_DIRS include
-  LIBRARIES ed_kinect
+  LIBRARIES ed_kinect ed_laser_plugin_tracking
   # DEPENDS
   CATKIN_DEPENDS geometry_msgs message_runtime
 )
