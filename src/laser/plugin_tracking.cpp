@@ -368,11 +368,17 @@ void splitSegmentsWhenGapDetected( std::vector< PointsInfo >& associatedPointsIn
                             unsigned int nLowElements, nHighElements;
                             if (idLow < min_gap_size_for_split)
                             {
-                                    nLowElements = idLow;
+                                    if ((2 * idLow) > IDs.size())
+                                        nLowElements = IDs.size() - idLow;
+                                    else
+                                        nLowElements = idLow;
                             }
                             else
                             {
-                                    nLowElements = min_gap_size_for_split;
+                                    if ((idLow + min_gap_size_for_split) > IDs.size())
+                                        nLowElements = IDs.size() - idLow;
+                                    else
+                                        nLowElements = min_gap_size_for_split;
                             }
                             
                             if (iIDs > (IDs.size() - min_gap_size_for_split))
