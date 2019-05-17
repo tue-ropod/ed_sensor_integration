@@ -151,12 +151,12 @@ float fitObject ( std::vector<geo::Vec2f>& points, int FITTINGMETHOD,  unsigned 
     return false; // end reached without doing something
 }
 
-bool determineCornerConfidence(const sensor_msgs::LaserScan::ConstPtr& scan, unsigned int element, bool checkElementLow) 
+bool determineCornerConfidence(const sensor_msgs::LaserScan::ConstPtr& scan, unsigned int element, bool checkElementLow, unsigned int nPointsToCheck )
 // if !elementLow, element = elementHigh;
 {
 //         std::cout << "determineCornerConfidence-function "<< std::endl;
         unsigned int num_beams = scan->ranges.size();
-        unsigned int nPointsToCheck = POINTS_TO_CHECK_CONFIDENCE;
+        //unsigned int nPointsToCheck = POINTS_TO_CHECK_CONFIDENCE;
         
 //         std::cout << "POINTS_TO_CHECK_CONFIDENCE = " << POINTS_TO_CHECK_CONFIDENCE << std::endl;
 //         std::cout << " element = " << element << " checkElementLow = " << checkElementLow << std::endl;
