@@ -28,7 +28,7 @@
 #define ARBITRARY_HEIGHT                0.03            // [m]
 #define ARBITRARY_DEPTH                 ARBITRARY_HEIGHT
 #define MARGIN_RECTANGLE_INTERCHANGE    30*M_PI/180     // [rad]
-#define POINTS_TO_CHECK_CONFIDENCE      3               // [-]
+//#define POINTS_TO_CHECK_CONFIDENCE      3               // [-]
 #define EPSILON                         1e-4            // [m]
 #define LASER_ACCURACY                  0.05            // [m]
 #define MIN_PROB_OBJECT			0.05		// [-]
@@ -281,7 +281,9 @@ FITTINGMETHOD determineCase ( std::vector<geo::Vec2f>& points, unsigned int* cor
 
 float fitObject ( std::vector<geo::Vec2f>& points, int FITTINGMETHOD, unsigned int* cornerIndex, ed::tracking::Rectangle* rectangle, ed::tracking::Circle* circle, std::vector<geo::Vec2f>::iterator* it_low, std::vector<geo::Vec2f>::iterator* it_high, const geo::Pose3D& sensor_pose, unsigned int minPointsLine);
 
-bool determineCornerConfidence(const sensor_msgs::LaserScan::ConstPtr& scan, unsigned int element, bool checkElementLow);
+bool determineCornerConfidence(const sensor_msgs::LaserScan::ConstPtr& scan, unsigned int element, bool checkElementLow, unsigned int nPointsToCheck );
+
+//    bool determineCornerConfidence(const sensor_msgs::LaserScan::ConstPtr& scan, unsigned int element, bool checkElementLow);
 
 // bool determineSegmentConfidence ( const sensor_msgs::LaserScan::ConstPtr& scan, unsigned int elementLow, unsigned int elementHigh );
 
