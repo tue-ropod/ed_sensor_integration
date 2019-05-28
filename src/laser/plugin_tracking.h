@@ -17,12 +17,9 @@
 #include <sensor_msgs/LaserScan.h>
 #include <ed_sensor_integration/doorDetection.h>
 #include <visualization_msgs/MarkerArray.h>
-// #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
 
 // Properties
-//#include "ed/convex_hull.h"
-//#include "ed/convex_hull_calc.h"
 #include "feature_functions.h"
 #include "ed_sensor_integration/properties/featureProperties_info.h"
 
@@ -85,34 +82,30 @@ private:
     
     ros::Publisher ObjectMarkers_pub_; // ############################## TEMP ############################
     
-//     ros::Publisher PointMarkers_pub_; // ############################## TEMP ############################
-    
-//     ros::Publisher processedLaserPoints_pub_; // ############################## TEMP ############################
-    
-   ros::Publisher pose_updated_pub_; // ############################## TEMP ############################
+    ros::Publisher pose_updated_pub_; // ############################## TEMP ############################
    
-   ros::Publisher points_modelled_pub_; // ############################## TEMP ############################
+    ros::Publisher points_modelled_pub_; // ############################## TEMP ############################
    
-   ros::Publisher points_modelled_all_pub_; // ############################## TEMP ############################
+    ros::Publisher points_modelled_all_pub_; // ############################## TEMP ############################
    
-   ros::Publisher points_measured_all_pub_; // ############################## TEMP ############################
+    ros::Publisher points_measured_all_pub_; // ############################## TEMP ############################
    
-   ros::Publisher points_measured_pub_; // ############################## TEMP ############################
+    ros::Publisher points_measured_pub_; // ############################## TEMP ############################
    
-   ros::Publisher cornerPointModelled_pub_; // ############################## TEMP ############################
+    ros::Publisher cornerPointModelled_pub_; // ############################## TEMP ############################
    
-   ros::Publisher cornerPointMeasured_pub_; // ############################## TEMP ############################
+    ros::Publisher cornerPointMeasured_pub_; // ############################## TEMP ############################
 
-   ros::Publisher associatedPoints_pub_; // ############################## TEMP ############################
+    ros::Publisher associatedPoints_pub_; // ############################## TEMP ############################
 
-   ros::Publisher improvedRobotPos_pub_;
+    ros::Publisher improvedRobotPos_pub_;
+    
+    ros::Subscriber amclPose_sub_;
+    
+    ros::Subscriber initializedPose_sub_;
    
-   ros::Subscriber amclPose_sub_;
-   
-   ros::Subscriber initializedPose_sub_;
-   
-   // Publisher used to send evidence to world model
-   ros::Publisher world_evidence_publisher_; // ############################## TEMP ############################
+    // Publisher used to send evidence to world model
+    ros::Publisher world_evidence_publisher_; // ############################## TEMP ############################
 
     std::queue<sensor_msgs::LaserScan::ConstPtr> scan_buffer_;
     
