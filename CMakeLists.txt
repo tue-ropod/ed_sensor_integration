@@ -46,7 +46,7 @@ catkin_package(
   CATKIN_DEPENDS geometry_msgs message_runtime
 )
 
-add_subdirectory(../../dlib-19.16 dlib_build)
+#add_subdirectory(../../dlib-19.16 dlib_build)
 
 # ------------------------------------------------------------------------------------------------
 #                                           BUILD
@@ -117,7 +117,7 @@ add_library(ed_laser_plugin_tracking
     src/laser/feature_functions.cpp
     src/laser/feature_functions.h
 )
-target_link_libraries(ed_laser_plugin_tracking ed_association ${catkin_LIBRARIES} dlib::dlib)
+target_link_libraries(ed_laser_plugin_tracking ed_association ${catkin_LIBRARIES})
 
 #add_library(ed_laser_plugin_tracking2
 #    src/laser/plugin_tracking.cpp

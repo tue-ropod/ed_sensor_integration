@@ -46,7 +46,7 @@
 #include <ctime>
 #include <algorithm>
 
-#include "../../../../dlib-19.16/dlib/optimization/max_cost_assignment.h" // TODO temp, improvement of lib-inclusion needed, see http://dlib.net/
+//#include "../../../../dlib-19.16/dlib/optimization/max_cost_assignment.h" // TODO temp, improvement of lib-inclusion needed, see http://dlib.net/
 
 #include "wire_msgs/WorldEvidence.h" // TEMP for publishing WIRE-evidence
 #include "wire_msgs/ObjectEvidence.h" // TEMP for publishing WIRE-evidence
