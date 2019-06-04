@@ -1310,7 +1310,7 @@ void FeatureProperties::updateRectangleFeatures ( Eigen::MatrixXf Q_k, Eigen::Ma
                 rectangle_.interchangeRectangleFeatures( );
                 unwrap( &z_k( yaw_zRef ), rectangle_.get_yaw(), (float) M_PI ); 
                 
-                ROS_WARN("Interchanged rectangular features");
+                //ROS_WARN("Interchanged rectangular features");
         }
         
         Eigen::MatrixXf Pdim = rectangle_.get_Pdim();

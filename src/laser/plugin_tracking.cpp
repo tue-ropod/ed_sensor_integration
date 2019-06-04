@@ -355,6 +355,18 @@ void splitSegmentsWhenGapDetected( std::vector< PointsInfo >& associatedPointsIn
                             
                             for(unsigned int iAvgHigh = 0; iAvgHigh < nHighElements; iAvgHigh++)
                             {
+                                    // Some checks just in case
+                                    if( iIDs + iAvgHigh >= IDs.size() )
+                                    {
+                                            ROS_WARN("Potential Problem in ED tracking plugin: iIDs + iAvgHigh >= IDs.size(). iIDs = %u  iAvgHigh = %u IDs.size() = %lu  nHighElements = %u  min_gap_size_for_split = %u", iIDs, iAvgHigh, IDs.size(), nHighElements, min_gap_size_for_split );
+                                    }
+                                    
+                                    if( IDs[iIDs + iAvgHigh] >= sensor_ranges.size() )
+                                    {
+                                            ROS_WARN("Potential Problem in ED tracking plugin: IDs[iIDs + iAvgHigh] >= sensor_ranges.size(). iIDs = %u iAvgHigh = %u IDs.size() = %lu IDs[iIDs + iAvgHigh] = %u nHighElements = %u min_gap_size_for_split = %u sensor_ranges.size() = %lu", iIDs, iAvgHigh, IDs.size(), IDs[iIDs + iAvgHigh], nHighElements, min_gap_size_for_split, sensor_ranges.size() );
+                                    }
+                                    
+                                    
                                     float range = sensor_ranges[IDs[iIDs + iAvgHigh]];
                                     if (range == 0.0 ) // ranges were set to zero if associated to world
                                             range = scan->range_max;
