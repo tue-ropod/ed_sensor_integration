@@ -369,7 +369,7 @@ void splitSegmentsWhenGapDetected( std::vector< PointsInfo >& associatedPointsIn
                                     {
                                             bool check = iIDs > (IDs.size() - min_gap_size_for_split);
                                             std::cout << "Test1: " << IDs.size() - min_gap_size_for_split << std::endl;
-                                            std::cout << "Test2: " << IDs.size() - (unsigned int) min_gap_size_for_split << std::endl;
+                                            std::cout << "Test2: " << (unsigned int) IDs.size() - (unsigned int) min_gap_size_for_split << std::endl;
                                             ROS_WARN("Potential Problem in ED tracking plugin: iIDs + iAvgHigh >= IDs.size(). iIDs = %u  iAvgHigh = %u IDs.size() = %lu  nHighElements = %u  min_gap_size_for_split = %u, check = %i", iIDs, iAvgHigh, IDs.size(), nHighElements, min_gap_size_for_split, check );
                                             nHighElements = iAvgHigh - 1; // safety measure!
                                             continue;
@@ -398,13 +398,23 @@ void splitSegmentsWhenGapDetected( std::vector< PointsInfo >& associatedPointsIn
                             } else {
                                     avgRangeHigh /= nHighElements;
                             }
+                            
+                            std::cout << "avgRangeLow = " << avgRangeLow << " avgRangeHigh = " << avgRangeHigh << std::endl;
 
                             float maxReference = std::max(avgRangeLow, avgRangeHigh);
                             unsigned int nLargerRanges = 0;
 
                             for(unsigned int iGap = IDs[idLow]; iGap < IDs[iIDs]; iGap++ )
                             {       
-                                    if(  sensor_ranges[iGap] > maxReference ||  sensor_ranges[iGap] == 0.0 ) // as points associated to the world are set to 0
+/*                                    
+                                    std::cout << "sensor_ranges[iGap] = " << sensor_ranges[iGap] << " maxReference = " << maxReference  << std::endl;
+                                    if(sensor_ranges[iGap] == 0.0 )
+                                    {
+                                            std::cout << "Zero gap: i = " << iGap;
+                                    }
+                                    */
+
+                                   if(  sensor_ranges[iGap] > maxReference ||  sensor_ranges[iGap] == 0.0 ) // as points associated to the world are set to 0
                                     {
                                             nLargerRanges++;
                                     }
@@ -413,8 +423,12 @@ void splitSegmentsWhenGapDetected( std::vector< PointsInfo >& associatedPointsIn
                                             nLargerRanges = 0;
                                     }
                                     
+//                                     std::cout << "nLargerRanges = " << nLargerRanges << std::endl;
+                                    
                                     if(nLargerRanges >= min_gap_size_for_split)
                                     {
+//                                             std::cout << "Going to split segment " << std::endl;
+                                            
                                             PointsInfo splittedInfo;
 
                                             std::vector<geo::Vec2f> points = associatedPointsInfo[iList].points;
@@ -1279,11 +1293,18 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
 
              if (   rs <= 0
                  || (rm > 0 && rs > rm)  // If the sensor point is behind the world model, skip it
-                 || (std::abs(rm - rs) < world_association_distance_))
+                 || ((std::abs(rm - rs) < world_association_distance_) && rm != 0))
                 {
+//                         bool check1 = (rs <= 0);
+//                         bool check2 = (rm > 0 && rs > rm);
+//                         bool check3 = (std::abs(rm - rs) < world_association_distance_);
+//                         std::cout << "i = " << i << ", checks = " << check1 << check2 << check3 << "rm, rs = " << rm << ", " << rs;
                         sensor_ranges[i] = 0;
                 }
     }   
+    
+//     std::cout << "\n";
+    
      std::vector<ScanSegment> segments = determineSegments(sensor_ranges, max_gap_size_, min_segment_size_pixels_, segment_depth_threshold_, lrf_model_, min_cluster_size_, max_cluster_size_ );         
     
     // Try to associate remaining laser points to specific entities
