@@ -331,9 +331,9 @@ void splitSegmentsWhenGapDetected( std::vector< PointsInfo >& associatedPointsIn
                                         nLowElements = IDs.size() - idLow;
                                     else
                                         nLowElements = min_gap_size_for_split;
-                            }
+                            }                           
                             
-                            if (iIDs > (IDs.size() - min_gap_size_for_split))
+                            if (iIDs > (IDs.size() - (unsigned int)  min_gap_size_for_split))
                             {
                                     nHighElements = IDs.size() - iIDs;
                             }
@@ -353,14 +353,32 @@ void splitSegmentsWhenGapDetected( std::vector< PointsInfo >& associatedPointsIn
                             }
                             avgRangeLow /= nLowElements;
                             
+                            // TEMP FOR TEST
+//                             bool check = iIDs > (IDs.size() - min_gap_size_for_split);
+//                             std::cout << "Bla: " << IDs.size() - min_gap_size_for_split << std::endl;
+//                             std::cout << "Bla2: " << IDs.size() - (unsigned int) min_gap_size_for_split << std::endl;
+                        //    ROS_WARN("Potential Problem in ED tracking plugin: iIDs + iAvgHigh >= IDs.size(). iIDs = %u  iAvgHigh = %u IDs.size() = %lu  nHighElements = %u  min_gap_size_for_split = %u, check = %i", iIDs, iAvgHigh, IDs.size(), nHighElements, min_gap_size_for_split, check );
+                            // 
+                                            
+                                            
+                            
                             for(unsigned int iAvgHigh = 0; iAvgHigh < nHighElements; iAvgHigh++)
                             {
                                     // Some checks just in case
                                     if( iIDs + iAvgHigh >= IDs.size() )
                                     {
-                                            ROS_WARN("Potential Problem in ED tracking plugin: iIDs + iAvgHigh >= IDs.size(). iIDs = %u  iAvgHigh = %u IDs.size() = %lu  nHighElements = %u  min_gap_size_for_split = %u", iIDs, iAvgHigh, IDs.size(), nHighElements, min_gap_size_for_split );
+                                            bool check = iIDs > (IDs.size() - min_gap_size_for_split);
+                                            std::cout << "Test1: " << IDs.size() - min_gap_size_for_split << std::endl;
+                                            std::cout << "Test2: " << IDs.size() - (unsigned int) min_gap_size_for_split << std::endl;
+                                            ROS_WARN("Potential Problem in ED tracking plugin: iIDs + iAvgHigh >= IDs.size(). iIDs = %u  iAvgHigh = %u IDs.size() = %lu  nHighElements = %u  min_gap_size_for_split = %u, check = %i", iIDs, iAvgHigh, IDs.size(), nHighElements, min_gap_size_for_split, check );
+                                            nHighElements = iAvgHigh - 1; // safety measure!
+                                            continue;
+                                            
                                     }
                                     
+                                    // Potential Problem in ED tracking plugin: iIDs + iAvgHigh >= IDs.size(). iIDs = 1  iAvgHigh = 1 IDs.size() = 2  nHighElements = 5  min_gap_size_for_split = 5
+                                    //[ WARN] [1559656004.524065310][/ed]: Potential Problem in ED tracking plugin: IDs[iIDs + iAvgHigh] >= sensor_ranges.size(). iIDs = 1 iAvgHigh = 1 IDs.size() = 2 IDs[iIDs + iAvgHigh] = 1111917452 nHighElements = 5 min_gap_size_for_split = 5 sensor_ranges.size() = 726
+
                                     if( IDs[iIDs + iAvgHigh] >= sensor_ranges.size() )
                                     {
                                             ROS_WARN("Potential Problem in ED tracking plugin: IDs[iIDs + iAvgHigh] >= sensor_ranges.size(). iIDs = %u iAvgHigh = %u IDs.size() = %lu IDs[iIDs + iAvgHigh] = %u nHighElements = %u min_gap_size_for_split = %u sensor_ranges.size() = %lu", iIDs, iAvgHigh, IDs.size(), IDs[iIDs + iAvgHigh], nHighElements, min_gap_size_for_split, sensor_ranges.size() );
@@ -373,7 +391,13 @@ void splitSegmentsWhenGapDetected( std::vector< PointsInfo >& associatedPointsIn
                                     
                                     avgRangeHigh += range;
                             }
-                            avgRangeHigh /= nHighElements;
+                            
+                            if(nHighElements <= 0)
+                            {
+                                    avgRangeHigh = scan->range_max;
+                            } else {
+                                    avgRangeHigh /= nHighElements;
+                            }
 
                             float maxReference = std::max(avgRangeLow, avgRangeHigh);
                             unsigned int nLargerRanges = 0;
@@ -907,10 +931,7 @@ void LaserPluginTracking::process(const ed::WorldModel& world, ed::UpdateRequest
 
 void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs::LaserScan::ConstPtr& scan,
                          geo::Pose3D& sensor_pose, ed::UpdateRequest& req)
-{
-    if( DEBUG )
-            std::cout << "Debug 1 \t";
-    
+{    
     tue::Timer t_total;
     t_total.start();
     double current_time = ros::Time::now().toSec();
@@ -1428,8 +1449,6 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                 float dist;
                 float dt = scan->header.stamp.toSec() - e->lastUpdateTimestamp();
                 
-                if( DEBUG )
-                std::cout << "Debug 13.5 \t";
 		if(featureProperties.getFeatureProbabilities().getDomainSize() != 2 )// TODO ugly!
 		{
 			req.removeEntity ( e->id() );
