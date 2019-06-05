@@ -1664,7 +1664,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
            measuredProperties[iList].propertiesDescribed = false;
            std::vector<geo::Vec2f> points  = associatedPointsInfo[iList].points ;
 
-           if( points.size() < min_segment_size_pixels_ )
+           if( points.size() < (unsigned int ) min_segment_size_pixels_ )
                    continue;
        
            std::vector<unsigned int> cornerIndices;
@@ -1672,7 +1672,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
            std::vector<geo::Vec2f>::iterator it_end = points.end();
            unsigned int cornerIndex = std::numeric_limits<unsigned int>::quiet_NaN();
           
-          if( ed::tracking::findPossibleCorner ( points, &cornerIndices, &it_start, &it_end, MIN_DISTANCE_CORNER_DETECTION, min_segment_size_pixels_ ) )
+          if( ed::tracking::findPossibleCorner ( points, &cornerIndices, &it_start, &it_end, MIN_DISTANCE_CORNER_DETECTION, (unsigned int) min_segment_size_pixels_ ) )
           {
                   cornerIndex = cornerIndices[0];
           }
@@ -1687,12 +1687,12 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
           std::vector<geo::Vec2f>::iterator it_low, it_high;
         
           ed::tracking::FITTINGMETHOD method = ed::tracking::CIRCLE;
-          float errorCircle = ed::tracking::fitObject ( points, method, &cornerIndex, &rectangle, &circle, &it_low, &it_high, sensor_pose, min_segment_size_pixels_ );
+          float errorCircle = ed::tracking::fitObject ( points, method, &cornerIndex, &rectangle, &circle, &it_low, &it_high, sensor_pose, (unsigned int) min_segment_size_pixels_ );
           unsigned int elementLow = associatedPointsInfo[iList].laserIDs[0];
           unsigned int elementHigh = associatedPointsInfo[iList].laserIDs.back();
 
-          method = ed::tracking::determineCase ( points, &cornerIndex, &it_low, &it_high, sensor_pose,  min_segment_size_pixels_); // chose to fit a single line or a rectangle (2 lines)
-          float errorRectangle = ed::tracking::fitObject ( points, method,  &cornerIndex, &rectangle, &circle, &it_low, &it_high,  sensor_pose, min_segment_size_pixels_ );
+          method = ed::tracking::determineCase ( points, &cornerIndex, &it_low, &it_high, sensor_pose, (unsigned int) min_segment_size_pixels_); // chose to fit a single line or a rectangle (2 lines)
+          float errorRectangle = ed::tracking::fitObject ( points, method,  &cornerIndex, &rectangle, &circle, &it_low, &it_high,  sensor_pose, (unsigned int) min_segment_size_pixels_ );
 
           measuredProperties[iList].confidenceRectangleWidth = false;
           measuredProperties[iList].confidenceRectangleWidthLow = false;

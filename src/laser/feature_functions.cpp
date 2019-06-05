@@ -491,7 +491,12 @@ float fitRectangle ( std::vector<geo::Vec2f>& points, ed::tracking::Rectangle* r
     std::vector<geo::Vec2f>::iterator it_end = points.end();
 
     Eigen::VectorXf beta_hat1 ( 2 ), beta_hat2 ( 2 );
-    bool validFit1, validFit2;
+//     bool validFit1, validFit2;
+    
+    if( std::distance(points.begin(), it_splitHigh ) > points.size() )
+    {
+             ROS_WARN("Potential problem in fitRectangle-function! std::distance(points.begin(), it_splitHigh ) > points.size(), std::distance(points.begin(), it_splitHigh )= %lu, points.size() = %lu", std::distance(points.begin(), it_splitHigh ), points.size());
+    }
 
     float mean_error1 = fitLine ( points, beta_hat1, &it_start, &it_splitLow ); //
     float mean_error2 = fitLine ( points, beta_hat2, &it_splitHigh, &it_end );
@@ -499,6 +504,12 @@ float fitRectangle ( std::vector<geo::Vec2f>& points, ed::tracking::Rectangle* r
     unsigned int nPointsForExtrema;
     minPointsLine % 2 == 0 ? nPointsForExtrema = minPointsLine / 2 : nPointsForExtrema = (minPointsLine - 1) / 2;
 
+    if(nPointsForExtrema > points.size() )
+    {
+            ROS_WARN("Potential problem in fitRectangle-function! nPointsForExtrema > points.size(), nPointsForExtrema = %u minPointsLine = %u, points.size() = %lu", nPointsForExtrema, minPointsLine, points.size());
+    }
+    
+    
     geo::Vec2f pointLow, pointHigh;
     pointLow.x = 0.0;
     pointLow.y = 0.0;
