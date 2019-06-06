@@ -483,8 +483,8 @@ void splitSegmentsWhenGapDetected( std::vector< PointsInfo >& associatedPointsIn
             
             bool splitFound = false;
             
-             if( std::fabs( IDs[2*nPointsForAvg] - IDs[0]) <=  2*nPointsForAvg + N_POINTS_MARGIN_FOR_BEING_CONSECUTIVE &&
-                 std::fabs( IDs[2*nPointsForAvg] - IDs[0]) >=  2*nPointsForAvg - N_POINTS_MARGIN_FOR_BEING_CONSECUTIVE ) // points must be consecutive
+             if( std::fabs( IDs[(2*nPointsForAvg) - 1] - IDs[0]) <=  2*nPointsForAvg + N_POINTS_MARGIN_FOR_BEING_CONSECUTIVE &&
+                 std::fabs( IDs[(2*nPointsForAvg) - 1] - IDs[0]) >=  2*nPointsForAvg - N_POINTS_MARGIN_FOR_BEING_CONSECUTIVE ) // points must be consecutive
              {                     
                 if( avgPointHigh.dist( avgPointLow ) >  dist_for_object_split )
                 {
@@ -752,7 +752,7 @@ bool isInside(std::vector<T> Points, T& p)
                                 gapRanges.clear();
 
                                 // Find next good value
-                                while ( sensor_ranges[i] == 0 && i < num_beams )
+                                while (i < num_beams &&  sensor_ranges[i] == 0)
                                 {
                                 ++i; // check for confidence left
                                 }
