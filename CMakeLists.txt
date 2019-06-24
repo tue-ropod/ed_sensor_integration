@@ -2,6 +2,14 @@ cmake_minimum_required(VERSION 2.8.12)
 project(ed_sensor_integration)
 
 #set(CMAKE_BUILD_TYPE "RelWithDebInfo")
+#set(CMAKE_BUILD_TYPE Debug)
+
+include(CheckCXXCompilerFlag)
+check_cxx_compiler_flag(-std=c++11 HAS_STD_CPP11_FLAG)
+if(HAS_STD_CPP11_FLAG)
+  add_compile_options(-std=c++11)
+endif()
+
 find_package(catkin REQUIRED COMPONENTS
   cb_planner_msgs_srvs
   ed

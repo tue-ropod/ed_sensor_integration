@@ -47,8 +47,12 @@ void ClearerPlugin::process(const ed::PluginInput& data, ed::UpdateRequest& req)
         {
             bool check1 = e->id().str().substr ( e->id().str().length() - laserID.length() ) == laserID; // entity described by laser
             bool check2 = e->lastUpdateTimestamp() + entity_timeout_ < current_time;
+            
+//             std::cout << "Clearer: e = " << e->id() << " e->lastUpdateTimestamp() = " << e->lastUpdateTimestamp() << " entity timeout_ = " << entity_timeout_ << " diff = " << e->lastUpdateTimestamp() - current_time << " current_time = " << current_time << std::endl;
+            
             if ( check1 && check2 )
             {
+//                     std::cout << "Clearer: going to remove ent " << e->id() << std::endl;
                 req.removeEntity ( e->id() );
                 continue;
             }

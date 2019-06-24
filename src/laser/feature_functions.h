@@ -292,42 +292,42 @@ Eigen::MatrixXf kalmanUpdate(Eigen::MatrixXf F, Eigen::MatrixXf H, Eigen::Matrix
 class FeatureProbabilities
 {
   public:
-    pbl::PMF pmf_;
+    std::shared_ptr<pbl::PMF> pmf_;
 
-	FeatureProbabilities()
+FeatureProbabilities()
 {
-
+        pmf_ = std::make_shared<pbl::PMF>();
 //    FeatureProbabilities ( void ) { // Initialize with 50/50 probabilities
-        pmf_.setDomainSize ( 2 );
-        pmf_.setProbability ( "Rectangle", 0.5 );
-        pmf_.setProbability ( "Circle", 0.5 );
+        pmf_->setDomainSize ( 2 );
+        pmf_->setProbability ( "Rectangle", 0.5 );
+        pmf_->setProbability ( "Circle", 0.5 );
     };
 
     void setProbabilities ( float pRectangle_in, float pCircle_in ) {
-        pmf_.setProbability ( "Rectangle", pRectangle_in );
-        pmf_.setProbability ( "Circle", pCircle_in );
+        pmf_->setProbability ( "Rectangle", pRectangle_in );
+        pmf_->setProbability ( "Circle", pCircle_in );
     };
 
     float get_pRectangle() const {
-            double out = pmf_.getProbability ( "Rectangle" );
+            double out = pmf_->getProbability ( "Rectangle" );
         return ( float ) out;
     } ;
 
     float get_pCircle() const {
 //            std::cout << "Feature prob: ptr = " << this << "\t";
-            double out = pmf_.getProbability ( "Circle" );
+            double out = pmf_->getProbability ( "Circle" );
         return ( float ) out;
     } ;
 
     int getDomainSize (){
-            return pmf_.getDomainSize();
+            return pmf_->getDomainSize();
             }
     bool setMeasurementProbabilities ( float errorRectangleSquared, float errorCircleSquared, float circleDiameter, float typicalCorridorWidth );
 
     void update ( float pRectangle_measured, float pCircle_measured );
     
     void update ( FeatureProbabilities& featureProbabilities_in );
-
+    
 };
 
 //FeatureProbabilities::FeatureProbabilities (  ) { // Initialize with 50/50 probabilities
@@ -348,8 +348,12 @@ class FeatureProperties
     int nMeasurements_;
     
     FeatureProperties ( ) { // Initialize with 50/50 probabilities unless otherwise indicated
-       featureProbabilities_.setProbabilities ( 0.5, 0.5 );
+      featureProbabilities_.setProbabilities ( 0.5, 0.5 );
       nMeasurements_ = 0;
+   };
+   
+   ~FeatureProperties ( ) { // Initialize with 50/50 probabilities unless otherwise indicated
+    //  delete featureProbabilities_;
    };
 
     FeatureProperties ( const FeatureProperties* other ) {  

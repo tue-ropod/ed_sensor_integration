@@ -19,7 +19,7 @@ public:
         const ed::tracking::FeatureProperties& p = v.getValue<ed::tracking::FeatureProperties>();
 
         std::string serializedData;
-        p.featureProbabilities_.pmf_.serialize ( serializedData );
+        p.featureProbabilities_.pmf_->serialize ( serializedData );
 
         w.writeGroup ( "prob" );
         w.writeValue ( "class_data", serializedData );
@@ -58,7 +58,7 @@ public:
 	{
           r.readValue("class_data", serializedData);
         }
-        p.featureProbabilities_.pmf_.deserialize( serializedData );
+        p.featureProbabilities_.pmf_->deserialize( serializedData );
        
         float x, y, z, w, d, h, roll, pitch, yaw;
         int nMeasurements;

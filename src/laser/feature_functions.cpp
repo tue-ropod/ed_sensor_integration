@@ -1173,15 +1173,15 @@ bool FeatureProbabilities::setMeasurementProbabilities ( float errorRectangleSqu
 
         float pRectangle =  1.0 - pCircle;  // Only 2 objects now, so the sum of it equals 1
 
-        pmf_.setProbability ( "Rectangle", pRectangle );
-        pmf_.setProbability ( "Circle", pCircle );
+        pmf_->setProbability ( "Rectangle", pRectangle );
+        pmf_->setProbability ( "Circle", pCircle );
         return true;
     }
     else
     {
         // Infinity detected on both of the elements: this is the case when the number of points is too small to do a fit. Equal probability set.
-        pmf_.setProbability ( "Rectangle", 0.5 );
-        pmf_.setProbability ( "Circle", 0.5 );
+        pmf_->setProbability ( "Rectangle", 0.5 );
+        pmf_->setProbability ( "Circle", 0.5 );
     
             // TODO if there are enough points for a single fit (probably circle only), is this fit realistic?
             // Acatually, it should be measured if the object which is modelled is realistic by comparing the laser scan with the expected scan based on that object
@@ -1192,14 +1192,14 @@ bool FeatureProbabilities::setMeasurementProbabilities ( float errorRectangleSqu
 
 void FeatureProbabilities::update ( float pRectangle_measured, float pCircle_measured )
 {
-    pbl::PMF pmf_measured = pmf_;
+    std::shared_ptr<pbl::PMF> pmf_measured = pmf_;
 
-    pmf_measured.setProbability ( "Rectangle", pRectangle_measured );
-    pmf_measured.setProbability ( "Circle", pCircle_measured );
+    pmf_measured->setProbability ( "Rectangle", pRectangle_measured );
+    pmf_measured->setProbability ( "Circle", pCircle_measured );
 
-    pmf_.update ( pmf_measured );
+    pmf_->update ( pmf_measured );
     
-    float pCircle = pmf_.getProbability ( "Circle" );            
+    float pCircle = pmf_->getProbability ( "Circle" );            
     
     if(pCircle < MIN_PROB_OBJECT) // smooth out prob such that recovery is easier
     {
@@ -1212,13 +1212,13 @@ void FeatureProbabilities::update ( float pRectangle_measured, float pCircle_mea
 
      float pRectangle =  1.0 - pCircle;  // Only 2 objects now, so the sum of it equals 1
 
-     pmf_.setProbability ( "Rectangle", pRectangle );
-     pmf_.setProbability ( "Circle", pCircle );
+     pmf_->setProbability ( "Rectangle", pRectangle );
+     pmf_->setProbability ( "Circle", pCircle );
 }
 
 void FeatureProbabilities::update ( FeatureProbabilities& featureProbabilities_in )
 {
-    this->pmf_.update ( featureProbabilities_in.pmf_ );
+    pmf_->update ( featureProbabilities_in.pmf_ );
 }
 
 void FeatureProperties::updateCircleFeatures ( Eigen::MatrixXf Q_k, Eigen::MatrixXf R_k, Eigen::MatrixXf z_k, float dt )

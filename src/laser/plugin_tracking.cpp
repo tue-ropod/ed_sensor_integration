@@ -810,14 +810,16 @@ void addEvidenceWIRE(wire_msgs::WorldEvidence& world_evidence, measuredPropertyI
         pbl::PMF classPMF;
         
         // Probability of the class label
-        classPMF.setProbability("circle", measuredPropertyInformation.featureProperty.getFeatureProbabilities().get_pCircle() );
-        classPMF.setProbability("rectangle", measuredPropertyInformation.featureProperty.getFeatureProbabilities().get_pRectangle() );
+        classPMF.setDomainSize(100);
+        classPMF.setProbability("Circle", measuredPropertyInformation.featureProperty.getFeatureProbabilities().get_pCircle() );
+        classPMF.setProbability("Rectangle", measuredPropertyInformation.featureProperty.getFeatureProbabilities().get_pRectangle() );
         pbl::PDFtoMsg(classPMF, classProp.pdf);
         obj_evidence.properties.push_back(classProp);
 
-         world_evidence.object_evidence.push_back(obj_evidence);
+        world_evidence.object_evidence.push_back(obj_evidence);
+        // TODO delete objects??
          
-         return;
+        return;
 }
 
 // ----------------------------------------------------------------------------------------------------
@@ -954,7 +956,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
 //  gettimeofday(&now, NULL);
 // 
 //  std::cout << "Start of plugin at t = " << now.tv_sec << "." << now.tv_usec << std::endl;
-//  std::cout << "Start of plugin" << std::endl;
+  //std::cout << "Start of tracking plugin" << std::endl;
 
     // - - - - - - - - - - - - - - - - - -
     // Update laser model
@@ -994,6 +996,8 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
     }
     
     std::vector<double> model_ranges(num_beams, 0);
+//     std::cout << "tracking, before renderWorld: sensor_pose = " << sensor_pose << std::endl;
+    
     renderWorld(sensor_pose, model_ranges, world, lrf_model_);
 
     // - - - - - - - - - - - - - - - - - -
@@ -1107,8 +1111,8 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                    
                    if ( (p - p_modelled).length() > 0.2 )
                    {
-                           std::cout << termcolor::yellow << "p = " << p << ", p_modelled = " << p_modelled << "j = " << j << "sensor_ranges = " << sensor_ranges[j];
-                           std::cout << "modelRangesAssociatedRanges2StaticWorld = " << modelRangesAssociatedRanges2StaticWorld[j] << "\t" << termcolor::reset;
+                        //   std::cout << termcolor::yellow << "p = " << p << ", p_modelled = " << p_modelled << "j = " << j << "sensor_ranges = " << sensor_ranges[j];
+                         //  std::cout << "modelRangesAssociatedRanges2StaticWorld = " << modelRangesAssociatedRanges2StaticWorld[j] << "\t" << termcolor::reset;
                    }
                    
                    
@@ -1972,15 +1976,10 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                 float mediumDimensionCovariance = 2.0;
                 float dt = scan->header.stamp.toSec() - e->lastUpdateTimestamp();
                 
-                if( DEBUG )
-                        std::cout << "Test 1  \t";
-                
                 // update rectangular properties
                 Eigen::MatrixXf QmRectangle = Eigen::MatrixXf::Zero( 8, 8 );
                 Eigen::MatrixXf RmRectangle = Eigen::MatrixXf::Zero( 5, 5 );
                 
-                if( DEBUG )
-                        std::cout << "Test 2 \t";
                 QmRectangle.diagonal() << Q, Q, Q, 20*Q, 20*Q, 20*Q, Q, Q; // Covariance on state = [x, y, rot, x vel, y Vel, rot Vel, width, depth]; Q increases, more emphasis on measurements     
                 RmRectangle.diagonal() << R, R, RVariable, R, R; // R decreases, more emphasis on measurements, info = [x, y, orient, width, depth]
                       
@@ -2248,7 +2247,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                 req.setProperty ( id, featureProperties_, entityProperties );
                 req.setPose ( id, new_pose );
                 
-                // Set timestamp
+                // Set timestamp               
                 req.setLastUpdateTimestamp ( id, scan->header.stamp.toSec() );
                 req.setExistenceProbability ( id, existenceProbability );
         }
@@ -2263,6 +2262,8 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
 // - - - - - - - - - - - - - - - - -
 
 //     std::cout << "tracking plugin: Total took " << t_total.getElapsedTimeInMilliSec() << " ms. \n\n\n" << std::endl;
+    
+//     std::cout << "End of tracking plugin" << std::endl;
 }
 
 // ----------------------------------------------------------------------------------------------------
