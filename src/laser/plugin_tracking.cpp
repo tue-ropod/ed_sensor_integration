@@ -801,6 +801,7 @@ void addEvidenceWIRE(wire_msgs::WorldEvidence& world_evidence, measuredPropertyI
                 z = measuredPropertyInformation.featureProperty.getRectangle().get_z();
         }
 
+        // TODO line below gives problems when publishing info
         pbl::PDFtoMsg(pbl::Gaussian(pbl::Vector3(x, y, z), pbl::Matrix3(0.0005, 0.0005, 0.0005)), posProp.pdf);
         obj_evidence.properties.push_back(posProp);
          
@@ -1933,7 +1934,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
         measuredProperty = measuredProperties[iProperties].featureProperty;
         
                     // TEMP publish measured properties to test with WIRE
-            addEvidenceWIRE(world_evidence, measuredProperties[iProperties] );
+      //      addEvidenceWIRE(world_evidence, measuredProperties[iProperties] );
         
         // temporary: pub measured properties in order to visualize the properties which are added
         markers.markers.push_back( getMarker(measuredProperty, ID++) ); // TEMP
