@@ -166,7 +166,7 @@ void renderWorld(const geo::Pose3D& sensor_pose, std::vector<double>& model_rang
     for(ed::WorldModel::const_iterator it = world.begin(); it != world.end(); ++it)
     {
         const ed::EntityConstPtr& e = *it;
- 
+        
         if (e->shape() && e->has_pose() && !(e->hasType("left_door") || e->hasType("door_left") || e->hasType("right_door") || e->hasType("door_right" ) || e->hasFlag("non-localizable")))
         {
             // Set render options
@@ -867,6 +867,8 @@ void LaserPluginTracking::initialize(ed::InitData& init)
 
     ros::NodeHandle nh;
     nh.setCallbackQueue(&cb_queue_);
+    
+    //std::cout << "Init plugin tracking: laser_topic = " << laser_topic << std::endl;
 
     // Communication
     unsigned int bufferSize = 1; // TODO increase to 3(?) in order to make it possible to process more laser data in 1 iteration. Set low for testing purposes now.
@@ -881,7 +883,7 @@ void LaserPluginTracking::initialize(ed::InitData& init)
     cornerPointModelled_pub_ = nh.advertise<visualization_msgs::Marker> ( "cornerPointModelled", 3 ); // TEMP
     cornerPointMeasured_pub_ = nh.advertise<visualization_msgs::Marker> ( "cornerPointMeasured", 3 ); // TEMP
     associatedPoints_pub_ = nh.advertise<sensor_msgs::LaserScan> ("ed/associatedPoints", 3); // TEMP
-    world_evidence_publisher_ = nh.advertise<wire_msgs::WorldEvidence>("/world_evidence", 100);
+  //  world_evidence_publisher_ = nh.advertise<wire_msgs::WorldEvidence>("/world_evidence", 100);
 
     tf_listener_ = new tf::TransformListener;
 
@@ -2257,7 +2259,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
     world_evidence.header.stamp =  scan->header.stamp;
     world_evidence.header.frame_id = "/map";
     
-    world_evidence_publisher_.publish( world_evidence );
+   // world_evidence_publisher_.publish( world_evidence );
     ObjectMarkers_pub_.publish(markers);
 
 // - - - - - - - - - - - - - - - - -
