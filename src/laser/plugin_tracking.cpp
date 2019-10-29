@@ -777,7 +777,7 @@ bool isInside(std::vector<T> Points, T& p)
     return segments;
 }            
 
-void addEvidenceWIRE(wire_msgs::WorldEvidence& world_evidence, measuredPropertyInfo measuredPropertyInformation)
+void addEvidenceWIRE(wire_msgs::WorldEvidence& world_evidence, measuredPropertyInfo measuredPropertyInformation) // Converter from measured properties to WIRE-info
 {
          wire_msgs::ObjectEvidence obj_evidence;
          
@@ -807,7 +807,7 @@ void addEvidenceWIRE(wire_msgs::WorldEvidence& world_evidence, measuredPropertyI
          
          // Set the discrete class label property
         wire_msgs::Property classProp;
-        classProp.attribute = "class_label";
+        classProp.attribute = "shape"; 
         pbl::PMF classPMF;
         
         // Probability of the class label
@@ -818,7 +818,10 @@ void addEvidenceWIRE(wire_msgs::WorldEvidence& world_evidence, measuredPropertyI
         obj_evidence.properties.push_back(classProp);
 
         world_evidence.object_evidence.push_back(obj_evidence);
+        
+        std::cout << "addEvidenceWIRE" << std::endl;
         // TODO delete objects??
+        
          
         return;
 }
@@ -842,7 +845,8 @@ void LaserPluginTracking::initialize(ed::InitData& init)
 {
     tue::Configuration& config = init.config;
 
-    std::string laser_topic;
+    std::string laser_topic, bufferName;
+    int MHTbufferSize = 100; // default buffersize
     config.value("laser_topic", laser_topic);
     config.value("world_association_distance", world_association_distance_);
     config.value("min_segment_size_pixels", min_segment_size_pixels_);
@@ -852,7 +856,9 @@ void LaserPluginTracking::initialize(ed::InitData& init)
     config.value("max_gap_size", max_gap_size_);
     config.value("min_gap_size_for_split", min_gap_size_for_split_);
     config.value("nominal_corridor_width", nominal_corridor_width_);    
-    config.value("dist_for_object_split", dist_for_object_split_);   
+    config.value("dist_for_object_split", dist_for_object_split_);
+    config.value("bufferName", bufferName, tue::REQUIRED);   
+    config.value("bufferSize", MHTbufferSize, tue::OPTIONAL); 
     
     int i_fit_entities = 0;
     config.value("fit_entities", i_fit_entities, tue::OPTIONAL);
@@ -885,9 +891,19 @@ void LaserPluginTracking::initialize(ed::InitData& init)
     associatedPoints_pub_ = nh.advertise<sensor_msgs::LaserScan> ("ed/associatedPoints", 3); // TEMP
   //  world_evidence_publisher_ = nh.advertise<wire_msgs::WorldEvidence>("/world_evidence", 100);
 
+  //  std::cout << "sub_scan_ topic = " << sub_scan_.getTopic() << std::endl;
+  //  std::cout << "ObjectMarkers_pub_ topic = " << ObjectMarkers_pub_.getTopic() << std::endl;
+    
     tf_listener_ = new tf::TransformListener;
 
     init.properties.registerProperty ( "Feature", featureProperties_, new FeaturPropertiesInfo ); 
+    
+    if(newBufferDesired( bufferName) )
+    {
+            std::cout << "Tracking plugin: new buffer desired. Current pointer = " << getDataBuffer() << std::endl;
+            createDatabuffer(boost::make_shared< wiredDataBuffer>(MHTbufferSize) , bufferName );
+            std::cout << "Buffer created. Pointer = " << getDataBuffer() << std::endl;
+    } 
 }
 
 // ----------------------------------------------------------------------------------------------------
@@ -1936,7 +1952,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
         measuredProperty = measuredProperties[iProperties].featureProperty;
         
                     // TEMP publish measured properties to test with WIRE
-      //      addEvidenceWIRE(world_evidence, measuredProperties[iProperties] );
+            addEvidenceWIRE(world_evidence, measuredProperties[iProperties] );
         
         // temporary: pub measured properties in order to visualize the properties which are added
         markers.markers.push_back( getMarker(measuredProperty, ID++) ); // TEMP
@@ -2257,8 +2273,18 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
     }
            
     world_evidence.header.stamp =  scan->header.stamp;
-    world_evidence.header.frame_id = "/map";
+    world_evidence.header.frame_id = "/map";   
     
+    std::cout << "Desired to put data in buffer. Pointer = " << getDataBuffer() << std::endl;
+    std::cout << "Buffer pointer: " << getDataBuffer() << std::endl;
+    boost::shared_ptr<wiredDataBuffer> buf = boost::static_pointer_cast<wiredDataBuffer>( getDataBuffer() );
+    std::cout << "n unread = " << buf->getDataDerived().numberUnread() <<  "Capacity = " << buf->getDataDerived().capacity() << std::endl;
+    
+    buf->getDataDerived().push_front(world_evidence);
+    
+    
+    //boost::static_pointer_cast<wiredDataBuffer>( getDataBuffer() )->getDataDerived().push_front(world_evidence);
+
    // world_evidence_publisher_.publish( world_evidence );
     ObjectMarkers_pub_.publish(markers);
 

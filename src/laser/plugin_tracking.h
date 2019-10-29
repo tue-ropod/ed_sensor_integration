@@ -19,6 +19,8 @@
 #include <visualization_msgs/MarkerArray.h>
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
 
+//#include <boost/circular_buffer/space_optimized.hpp>
+
 // Properties
 #include "feature_functions.h"
 #include "ed_sensor_integration/properties/featureProperties_info.h"
@@ -45,9 +47,10 @@
 
 //#include "../../../../dlib-19.16/dlib/optimization/max_cost_assignment.h" // TODO temp, improvement of lib-inclusion needed, see http://dlib.net/
 
-#include "wire_msgs/WorldEvidence.h" // TEMP for publishing WIRE-evidence
+#include "wire_msgs/WorldEvidence.h" // TEMP for publishing WIRE-evidence 
 #include "wire_msgs/ObjectEvidence.h" // TEMP for publishing WIRE-evidence
 #include "problib/conversions.h" // TEMP for publishing WIRE-evidence
+#include "wiredData.h"
 
 #define INF 10000
 

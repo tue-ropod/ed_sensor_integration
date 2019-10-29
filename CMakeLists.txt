@@ -18,6 +18,7 @@ find_package(catkin REQUIRED COMPONENTS
   message_generation
   visualization_msgs
   wire_msgs
+  wired
 )
 
 # ------------------------------------------------------------------------------------------------
