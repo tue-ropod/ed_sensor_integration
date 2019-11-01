@@ -788,6 +788,8 @@ void addEvidenceWIRE(wire_msgs::WorldEvidence& world_evidence, measuredPropertyI
         // Set position (x,y,z), set the covariance matrix as 0.005*identity_matrix
         double x, y, z;
         
+        measuredPropertyInformation.featureProperty.getRectangle().get_P();
+        
         if(measuredPropertyInformation.featureProperty.getFeatureProbabilities().get_pCircle() > measuredPropertyInformation.featureProperty.getFeatureProbabilities().get_pRectangle() )
         {
                 x = measuredPropertyInformation.featureProperty.getCircle().get_x();
@@ -801,8 +803,11 @@ void addEvidenceWIRE(wire_msgs::WorldEvidence& world_evidence, measuredPropertyI
                 z = measuredPropertyInformation.featureProperty.getRectangle().get_z();
         }
 
-        // TODO line below gives problems when publishing info
-        pbl::PDFtoMsg(pbl::Gaussian(pbl::Vector3(x, y, z), pbl::Matrix3(0.0005, 0.0005, 0.0005)), posProp.pdf);
+        float Q = 0.4;
+        pbl::PDFtoMsg(pbl::Gaussian(pbl::Vector3(x, y, z), pbl::Matrix3(Q, Q, Q)), posProp.pdf);
+        
+       // std::cout << "evidence: posProp = " << posProp << std::endl;
+        
         obj_evidence.properties.push_back(posProp);
          
          // Set the discrete class label property
@@ -815,11 +820,12 @@ void addEvidenceWIRE(wire_msgs::WorldEvidence& world_evidence, measuredPropertyI
         classPMF.setProbability("Circle", measuredPropertyInformation.featureProperty.getFeatureProbabilities().get_pCircle() );
         classPMF.setProbability("Rectangle", measuredPropertyInformation.featureProperty.getFeatureProbabilities().get_pRectangle() );
         pbl::PDFtoMsg(classPMF, classProp.pdf);
+    //     std::cout << "evidence: classProp = " << classProp << std::endl;
         obj_evidence.properties.push_back(classProp);
 
         world_evidence.object_evidence.push_back(obj_evidence);
         
-        std::cout << "addEvidenceWIRE" << std::endl;
+     //   std::cout << "addEvidenceWIRE" << std::endl;
         // TODO delete objects??
         
          
@@ -889,7 +895,7 @@ void LaserPluginTracking::initialize(ed::InitData& init)
     cornerPointModelled_pub_ = nh.advertise<visualization_msgs::Marker> ( "cornerPointModelled", 3 ); // TEMP
     cornerPointMeasured_pub_ = nh.advertise<visualization_msgs::Marker> ( "cornerPointMeasured", 3 ); // TEMP
     associatedPoints_pub_ = nh.advertise<sensor_msgs::LaserScan> ("ed/associatedPoints", 3); // TEMP
-  //  world_evidence_publisher_ = nh.advertise<wire_msgs::WorldEvidence>("/world_evidence", 100);
+    world_evidence_publisher_ = nh.advertise<wire_msgs::WorldEvidence>("/world_evidence", 100);
 
   //  std::cout << "sub_scan_ topic = " << sub_scan_.getTopic() << std::endl;
   //  std::cout << "ObjectMarkers_pub_ topic = " << ObjectMarkers_pub_.getTopic() << std::endl;
@@ -900,9 +906,7 @@ void LaserPluginTracking::initialize(ed::InitData& init)
     
     if(newBufferDesired( bufferName) )
     {
-            std::cout << "Tracking plugin: new buffer desired. Current pointer = " << getDataBuffer() << std::endl;
             createDatabuffer(boost::make_shared< wiredDataBuffer>(MHTbufferSize) , bufferName );
-            std::cout << "Buffer created. Pointer = " << getDataBuffer() << std::endl;
     } 
 }
 
@@ -2275,17 +2279,10 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
     world_evidence.header.stamp =  scan->header.stamp;
     world_evidence.header.frame_id = "/map";   
     
-    std::cout << "Desired to put data in buffer. Pointer = " << getDataBuffer() << std::endl;
-    std::cout << "Buffer pointer: " << getDataBuffer() << std::endl;
-    boost::shared_ptr<wiredDataBuffer> buf = boost::static_pointer_cast<wiredDataBuffer>( getDataBuffer() );
-    std::cout << "n unread = " << buf->getDataDerived().numberUnread() <<  "Capacity = " << buf->getDataDerived().capacity() << std::endl;
-    
-    buf->getDataDerived().push_front(world_evidence);
-    
-    
-    //boost::static_pointer_cast<wiredDataBuffer>( getDataBuffer() )->getDataDerived().push_front(world_evidence);
+    boost::shared_ptr<wiredDataBuffer> buf = boost::static_pointer_cast<wiredDataBuffer>( getDataBuffer() );    
+    buf->getBuffer().push_front(world_evidence);
 
-   // world_evidence_publisher_.publish( world_evidence );
+    world_evidence_publisher_.publish( world_evidence );
     ObjectMarkers_pub_.publish(markers);
 
 // - - - - - - - - - - - - - - - - -

@@ -1235,21 +1235,9 @@ void FeatureProperties::updateCircleFeatures ( Eigen::MatrixXf Q_k, Eigen::Matri
                     0.0, 0.0, 0.0, 1.0;  // y vel
 
         float dt2 = std::pow(dt, 2.0);
-        
-/*        Eigen::MatrixXf F_PosVel ( 6, 6 );        
-        F_PosVel << 1.0, 0.0, dt,  0.0, 0.5*dt2, 0.0,   // x 
-                    0.0, 1.0, 0.0, dt,  0.0,     0.5*dt2,   // y 
-                    0.0, 0.0, 1.0, 0.0, dt,      0.0,       // x vel 
-                    0.0, 0.0, 0.0, 1.0, 0.0,     dt,       // y vel
-                    0.0, 0.0, 0.0, 0.0, 1.0,     0.0,       // x double
-                    0.0, 0.0, 0.0, 0.0, 0.0,     1.0;      // y double   */             
                     
         Eigen::MatrixXf Fdim ( 1, 1 );    
         Fdim <<     1.0;               // radius
-                
-//         Eigen::MatrixXf H_PosVel ( 2, 6 );
-//         H_PosVel << 1.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-//                     0.0, 1.0, 0.0, 0.0, 0.0, 0.0;
                     
         Eigen::MatrixXf H_PosVel ( 2, 4 );
         H_PosVel << 1.0, 0.0, 0.0, 0.0,
@@ -1277,8 +1265,6 @@ void FeatureProperties::updateCircleFeatures ( Eigen::MatrixXf Q_k, Eigen::Matri
         circle_.set_y ( x_k_k_PosVel ( y_PosVelRef ) );
         circle_.set_xVel ( x_k_k_PosVel ( xVel_PosVelRef ) );
         circle_.set_yVel ( x_k_k_PosVel ( yVel_PosVelRef ) );
-  //    circle_.set_xAccel ( x_k_k_PosVel ( xAccel_PosVelRef ) );
-  //    circle_.set_yAccel ( x_k_k_PosVel ( yAccel_PosVelRef ) );
         circle_.set_radius ( x_k_k_dim( r_dimRef ) );
         circle_.set_P ( P_PosVel );
         circle_.set_Pdim ( Pdim );
@@ -1332,109 +1318,35 @@ void FeatureProperties::updateRectangleFeatures ( Eigen::MatrixXf Q_k, Eigen::Ma
         // dim update
         Eigen::MatrixXf x_k_k_dim = kalmanUpdate(Fdim, Hdim, &Pdim, x_k_1_k_1_dim, z_k_dim, Q_k.block<2, 2>( 6, 6 ), R_k.block<2, 2>( 3, 3 ) );
         
-        // Correct position for changes caused by a change in dimension
-//         float deltaWidth = x_k_k_dim( width_dimRef ) - x_k_1_k_1_dim ( width_dimRef );
-//         float deltaDepth = x_k_k_dim( depth_dimRef ) - x_k_1_k_1_dim ( depth_dimRef );
-        
         float deltaWidth = x_k_1_k_1_dim ( width_dimRef ) - x_k_k_dim( width_dimRef );
         float deltaDepth = x_k_1_k_1_dim ( depth_dimRef ) - x_k_k_dim( depth_dimRef );
         
-//        std::cout << "deltaWidth, deltaDepth model = " << deltaWidth << ", " << deltaDepth << std::endl;
-        
-      /* 
-        float deltaX_dim, deltaY_dim;
-        correctPosForDimDiff(deltaWidth, deltaDepth, &deltaX_dim, &deltaY_dim, dt );
-        
-        // What would the previous position of the measurement be given the velocities already estimated?
-        float ZPrevX = z_k( x_zRef ) - rectangle_.get_xVel()*dt;
-        float ZPrevY = z_k( y_zRef ) - rectangle_.get_yVel()*dt;
-        
-        // Determine the direction of the correction based on an estimation of the position of the measurement at the previous timestamp
-        int signX = ( std::fabs( rectangle_.get_x() + deltaX_dim - ZPrevX ) < std::fabs( rectangle_.get_x() - deltaX_dim - ZPrevX ) ) ? 1 : -1;
-        int signY = ( std::fabs( rectangle_.get_y() + deltaY_dim - ZPrevY ) < std::fabs( rectangle_.get_y() - deltaY_dim - ZPrevY ) ) ? 1 : -1;
-        rectangle_.set_x ( rectangle_.get_x() + deltaX_dim );
-        rectangle_.set_y ( rectangle_.get_y() + deltaY_dim );
-       */
-        
        float deltaX = 0.0, deltaY = 0.0;
        correctForDimensions( deltaWidth, deltaDepth, &deltaX, &deltaY, z_k( x_zRef ), z_k( y_zRef ), rectangle_.get_x(), rectangle_.get_y(), dt );
-//        std::cout << "Delta x meas dim = " << deltaWidth << " Delta y dim = " << deltaDepth << " deltaX, Y = " << deltaX << ", " << deltaY << std::endl;
-      
-//        std::cout << "Rect pos before first update = " << rectangle_.get_x() << ", " << rectangle_.get_y() << std::endl;
-//        std::cout << "Delta x dim = " << deltaX << "Delta y dim = " << deltaY << std::endl;
         
        // Correct position due to updated pos
-        rectangle_.set_x ( rectangle_.get_x() + deltaX );
-        rectangle_.set_y ( rectangle_.get_y() + deltaY );
-  //      std::cout << "Rect pos after first update = " << rectangle_.get_x() << ", " << rectangle_.get_y() << std::endl;
-  //      std::cout << "Rect dim before first update = " << rectangle_.get_w() << ", " << rectangle_.get_d() << std::endl;
+       rectangle_.set_x ( rectangle_.get_x() + deltaX );
+       rectangle_.set_y ( rectangle_.get_y() + deltaY );
         
-        rectangle_.set_w ( x_k_k_dim ( width_dimRef ) );
-        rectangle_.set_d ( x_k_k_dim ( depth_dimRef ) );
-        
-   //     std::cout << "Rect dim after first update = " << rectangle_.get_w() << ", " << rectangle_.get_d() << std::endl;
+       rectangle_.set_w ( x_k_k_dim ( width_dimRef ) );
+       rectangle_.set_d ( x_k_k_dim ( depth_dimRef ) );
         
         // Correct measured position caused by differences in modelled and measured dimensions
         deltaWidth = z_k ( width_zRef ) - rectangle_.get_w();
         deltaDepth = z_k ( depth_zRef ) - rectangle_.get_d();
         
-        // Correct measured pos due to diff in model & measurement
-//        std::cout << "z_k( x_zRef ), z_k( y_zRef ) before = " << z_k( x_zRef ) << ", " << z_k( y_zRef );// << std::endl;
-//        std::cout << " deltaWidth, deltaDepth = " << deltaWidth << ", " << deltaDepth << std::endl;
-        
         deltaX = 0.0; deltaY = 0.0;
         correctForDimensions( deltaWidth, deltaDepth, &deltaX, &deltaY, z_k( x_zRef ), z_k( y_zRef ), rectangle_.get_x(), rectangle_.get_y(), dt );
-//         std::cout << "Delta x meas dim = " << deltaWidth << " Delta y dim = " << deltaDepth << " deltaX, Y = " << deltaX << ", " << deltaY << std::endl;
- //       std::cout << "Out of func: deltaX, deltaY = " << deltaX << ", " << deltaY << std::endl;
         
         z_k( x_zRef ) = z_k( x_zRef ) - deltaX;
         z_k( y_zRef ) = z_k( y_zRef ) - deltaY;
- //       std::cout << "z_k( x_zRef ), z_k( y_zRef ) after = " << z_k( x_zRef ) << ", " << z_k( y_zRef ) << std::endl;
-        
-        
-//         std::cout << "signWidth = " << signWidth << " signWidth = " << signDepth << std::endl;
-//         std::cout << "deltaX_VelWidth = " << deltaX_VelWidth << " deltaX_VelWidth = " << deltaX_VelWidth << std::endl;
-//         std::cout << "deltaX_VelDepth = " << deltaX_VelDepth << " deltaY_VelDepth = " << deltaY_VelDepth << std::endl;
-        
-        /*
-        float deltaX_VelWidth, deltaY_VelWidth, deltaX_VelDepth, deltaY_VelDepth;
-        correctPosForDimDiff(deltaWidth, 0, &deltaX_VelWidth, &deltaY_VelWidth, dt, z_k( yaw_zRef ) );
-        correctPosForDimDiff(0, deltaDepth, &deltaX_VelDepth, &deltaY_VelDepth, dt, z_k( yaw_zRef ) );
-        
-        // Strategy previously tested: do a prediction of the position and check which (correction + measurement) is closest to the this prediction
-        // Problem: wrong estimation of velocity can lead to measurements being corrected into the wrong direction, reflecting a position which can not be measured! (i.e., the position is closer
-        // to the sensor than the measurement obtained )        
-        float distPosWidth2 = pow( sensor_pose.getOrigin().getX() - ( z_k( x_zRef ) + deltaX_VelWidth), 2.0 ) + pow( sensor_pose.getOrigin().getY() - ( z_k( y_zRef ) + deltaY_VelWidth), 2.0 );
-        float distNegWidth2 = pow( sensor_pose.getOrigin().getX() - ( z_k( x_zRef ) - deltaX_VelWidth), 2.0 ) + pow( sensor_pose.getOrigin().getY() - ( z_k( y_zRef ) - deltaY_VelWidth), 2.0 );
-        
-        float distPosDepth2 = pow( sensor_pose.getOrigin().getX() - ( z_k( x_zRef ) + deltaX_VelDepth), 2.0 ) + pow( sensor_pose.getOrigin().getY() - ( z_k( y_zRef ) + deltaY_VelDepth), 2.0 );
-        float distNegDepth2 = pow( sensor_pose.getOrigin().getX() - ( z_k( x_zRef ) - deltaX_VelDepth), 2.0 ) + pow( sensor_pose.getOrigin().getY() - ( z_k( y_zRef ) - deltaY_VelDepth), 2.0 );
-        
-        bool largerDistanceDesiredWidth = deltaWidth > 0 ? 1 : 0 ;
-        bool largerDistanceDesiredDepth = deltaDepth > 0 ? 1 : 0 ;
-        
-        int signWidth =  largerDistanceDesiredWidth && distPosWidth2 > distNegWidth2 || !largerDistanceDesiredWidth && distPosWidth2 <  distNegWidth2 ? 1 : -1;
-        int signDepth =  largerDistanceDesiredDepth && distPosDepth2 > distNegDepth2 || !largerDistanceDesiredDepth && distPosDepth2 <  distNegDepth2 ? 1 : -1;
-        
-        z_k ( x_zRef ) += signWidth*deltaX_VelWidth + signDepth*deltaX_VelDepth;
-        z_k ( y_zRef ) += signWidth*deltaY_VelWidth + signDepth*deltaY_VelDepth;
-        /*
-        /*std::cout << "Delta x meas dim = " << signWidth*deltaX_VelWidth + signDepth*deltaX_VelDepth << " Delta y dim = " << signWidth*deltaY_VelWidth + signDepth*deltaY_VelDepth<< std::endl;
-        std::cout << "signWidth = " << signWidth << " signWidth = " << signDepth << std::endl;
-        std::cout << "deltaX_VelWidth = " << deltaX_VelWidth << " deltaX_VelWidth = " << deltaX_VelWidth << std::endl;
-        std::cout << "deltaX_VelDepth = " << deltaX_VelDepth << " deltaY_VelDepth = " << deltaY_VelDepth << std::endl;
-        */
         
         Eigen::MatrixXf P = rectangle_.get_P();
         Eigen::MatrixXf x_k_1_k_1_PosVel( 6, 1 ), z_k_posVel( 3, 1 );
         x_k_1_k_1_PosVel << rectangle_.get_x(), rectangle_.get_y(), rectangle_.get_yaw(), rectangle_.get_xVel(), rectangle_.get_yVel(), rectangle_.get_yawVel();
         z_k_posVel <<       z_k ( x_zRef ),     z_k ( y_zRef ),     z_k ( yaw_zRef );
         
-   //     std::cout << "x_k_1_k_1_PosVel = " << x_k_1_k_1_PosVel << " z_k_posVel = " << z_k_posVel << std::endl;
-        
         Eigen::MatrixXf x_k_k_PosVel = kalmanUpdate(F_PosVel, H_PosVel, &P, x_k_1_k_1_PosVel, z_k_posVel, Q_k.block< 6, 6 >( 0, 0 ), R_k.block< 3, 3 >( 0, 0 ));
-        
-  //      std::cout << "x_k_k_PosVel = " << x_k_k_PosVel << std::endl;
         
         rectangle_.set_x ( x_k_k_PosVel ( x_PosVelRef ) );
         rectangle_.set_y ( x_k_k_PosVel ( y_PosVelRef ) );
@@ -1471,8 +1383,6 @@ void FeatureProperties::correctPosForDimDiff(float deltaWidth, float deltaDepth,
 {
         float thetaPred = rectangle_.get_yaw() + dt*rectangle_.get_yawVel();
         
-    //    std::cout << "rectangle_.get_yaw() = " << rectangle_.get_yaw() << " thetaPred = " << thetaPred << std::endl;
-        
         float pred_st = std::sin( thetaPred );
         float pred_ct = std::cos( thetaPred );
                 
@@ -1489,10 +1399,9 @@ void FeatureProperties::printProperties()
         std::cout << "\t";
         rectangle_.printProperties();
         circle_.printProperties();
-        std::cout << "Probability circle = " ;
-        std:: cout << featureProbabilities_.get_pCircle();
-        std::cout << "Probability rectangle = " ;
-        std::cout << featureProbabilities_.get_pRectangle() << std::endl;
+        std::cout << 
+        "Probability circle = "    << featureProbabilities_.get_pCircle() << 
+        "Probability rectangle = " << featureProbabilities_.get_pRectangle() << std::endl;
 }
 
 }
