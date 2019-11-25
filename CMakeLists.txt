@@ -19,6 +19,7 @@ find_package(catkin REQUIRED COMPONENTS
   visualization_msgs
   wire_msgs
   wired
+  wire_state_estimators
 )
 
 # ------------------------------------------------------------------------------------------------
@@ -49,10 +50,10 @@ generate_messages(
 # ------------------------------------------------------------------------------------------------
 
 catkin_package(
-  INCLUDE_DIRS include
+  INCLUDE_DIRS include 
   LIBRARIES ed_kinect
   # DEPENDS
-  CATKIN_DEPENDS geometry_msgs message_runtime
+  CATKIN_DEPENDS geometry_msgs message_runtime wire_state_estimators
 )
 
 #add_subdirectory(../../dlib-19.16 dlib_build)
@@ -127,6 +128,9 @@ add_library(ed_laser_plugin_tracking
     src/laser/feature_functions.h
 )
 target_link_libraries(ed_laser_plugin_tracking ed_association ${catkin_LIBRARIES})
+#add_dependencies(ed_laser_plugin_tracking wire_state_estimators ${PROJECT_NAME}_gencpp ${${PROJECT_NAME}_EXPORTED_TARGETS})
+add_dependencies(ed_laser_plugin_tracking wire_state_estimators ${PROJECT_NAME}_gencpp ${${PROJECT_NAME}_EXPORTED_TARGETS})
+
 
 #add_library(ed_laser_plugin_tracking2
 #    src/laser/plugin_tracking.cpp

@@ -4,6 +4,8 @@
 #include <ed/property_info.h>
 //#include <ed>
 #include "../../../src/laser/feature_functions.h"
+
+//#include <wire_state_estimators/include/featureProperties.h>
 //#include <ed_laser_plugin_tracking/feature_functions.h>
 
 // #include <problib/include/problib.h>
@@ -16,7 +18,7 @@ public:
 
     void serialize ( const ed::Variant& v, ed::io::Writer& w ) const {
 
-        const ed::tracking::FeatureProperties& p = v.getValue<ed::tracking::FeatureProperties>();
+        const tracking::FeatureProperties& p = v.getValue<tracking::FeatureProperties>();
 
         std::string serializedData;
         p.featureProbabilities_.pmf_->serialize ( serializedData );
@@ -50,7 +52,7 @@ public:
 
     bool deserialize ( ed::io::Reader& r, ed::Variant& v ) const {
 
-        ed::tracking::FeatureProperties p;
+        tracking::FeatureProperties p;
 	
 	std::string serializedData;
 	

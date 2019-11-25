@@ -53,7 +53,7 @@ struct EntityProperty
 
 struct measuredPropertyInfo
 {
-       ed::tracking::FeatureProperties featureProperty;
+       tracking::FeatureProperties featureProperty;
        bool propertiesDescribed;
        bool confidenceCircle;
        bool confidenceRectangleWidth;// confidence of entire side
@@ -62,13 +62,13 @@ struct measuredPropertyInfo
        bool confidenceRectangleDepth; 
        bool confidenceRectangleDepthLow;
        bool confidenceRectangleDepthHigh;
-       ed::tracking::FITTINGMETHOD methodRectangle; //
+       tracking::FITTINGMETHOD methodRectangle; //
        float fittingErrorCircle;
        float fittingErrorRectangle;
        std::vector<geo::Vec2f> measuredCorners;
 };
 
-visualization_msgs::Marker getMarker ( ed::tracking::FeatureProperties& featureProp, int ID) // TODO move to ed_rviz_plugins?
+visualization_msgs::Marker getMarker ( tracking::FeatureProperties& featureProp, int ID) // TODO move to ed_rviz_plugins?
 // ############################## TEMP ############################
 {
     visualization_msgs::Marker marker;
@@ -81,12 +81,12 @@ visualization_msgs::Marker getMarker ( ed::tracking::FeatureProperties& featureP
 
         if ( featureProp.getFeatureProbabilities().get_pCircle() > featureProp.getFeatureProbabilities().get_pRectangle() )
         {
-            ed::tracking::Circle circle = featureProp.getCircle();
+            tracking::Circle circle = featureProp.getCircle();
             circle.setMarker ( marker , ID, color );
         }
         else
         {
-            ed::tracking::Rectangle rectangle = featureProp.getRectangle();
+            tracking::Rectangle rectangle = featureProp.getRectangle();
             rectangle.setMarker ( marker , ID, color );
         }
         
@@ -777,38 +777,51 @@ bool isInside(std::vector<T> Points, T& p)
     return segments;
 }            
 
-void addEvidenceWIRE(wire_msgs::WorldEvidence& world_evidence, measuredPropertyInfo measuredPropertyInformation) // Converter from measured properties to WIRE-info
+void addEvidenceWIRE(wire_msgs::WorldEvidence& world_evidence, 
+                     tracking::FeatureProperties measuredProperty, 
+       //              Eigen::MatrixXf QmRectangle, 
+                     Eigen::MatrixXf RmRectangle, 
+       //              Eigen::MatrixXf QmCircle, 
+                     Eigen::MatrixXf RmCircle ) // Converter from measured properties to WIRE-info
 {
-         wire_msgs::ObjectEvidence obj_evidence;
-         
-        // Set the position property
-        wire_msgs::Property posProp;
-        posProp.attribute = "position";
+        // Set position (x,y,z)
+     /*   double x, y, z, yaw;
+        double Rz = 0.1;
         
-        // Set position (x,y,z), set the covariance matrix as 0.005*identity_matrix
-        double x, y, z;
+        // Why separate?! Measurements are coupled!!!
         
-        measuredPropertyInformation.featureProperty.getRectangle().get_P();
-        
-        if(measuredPropertyInformation.featureProperty.getFeatureProbabilities().get_pCircle() > measuredPropertyInformation.featureProperty.getFeatureProbabilities().get_pRectangle() )
-        {
-                x = measuredPropertyInformation.featureProperty.getCircle().get_x();
-                y = measuredPropertyInformation.featureProperty.getCircle().get_y();
-                z = measuredPropertyInformation.featureProperty.getCircle().get_z();
-        }
-        else
-        {
-                x = measuredPropertyInformation.featureProperty.getRectangle().get_x();
-                y = measuredPropertyInformation.featureProperty.getRectangle().get_y();
-                z = measuredPropertyInformation.featureProperty.getRectangle().get_z();
-        }
+        // Set the position property of the rectangle model
+        wire_msgs::Property posPropRect;
+        posPropRect.attribute = "position_rectangle";
 
-        float Q = 0.4;
-        pbl::PDFtoMsg(pbl::Gaussian(pbl::Vector3(x, y, z), pbl::Matrix3(Q, Q, Q)), posProp.pdf);
+        x = measuredPropertyInformation.featureProperty.getRectangle().get_x();
+        y = measuredPropertyInformation.featureProperty.getRectangle().get_y();
+        z = measuredPropertyInformation.featureProperty.getRectangle().get_z();
+        yaw = measuredPropertyInformation.featureProperty.getRectangle().get_yaw();
+        //  R info = [x, y, orient, width, depth] // TODO more intuitive
+        pbl::PDFtoMsg(pbl::Gaussian(pbl::Vector4(x, y, z), pbl::Matrix3(RmRectangle(0), RmRectangle(1), Rz, RmRectangle(2))), posPropRect.pdf);
         
-       // std::cout << "evidence: posProp = " << posProp << std::endl;
+        wire_msgs::Property dimPropRect;
+        dimPropRect.attribute = "dimension_rectangle";
+        double width = measuredPropertyInformation.featureProperty.getRectangle().get_w();
+        double depth = measuredPropertyInformation.featureProperty.getRectangle().get_d();
+        pbl::PDFtoMsg(pbl::Gaussian(pbl::Vector2(width, depth), pbl::Matrix3(RmRectangle(3), RmRectangle(4))), posPropRect.pdf);
         
-        obj_evidence.properties.push_back(posProp);
+        // Set the position property of the circular model
+        wire_msgs::Property posPropCirc;
+        posPropCirc.attribute = "position_circle;
+        x = measuredPropertyInformation.featureProperty.getCircle().get_x();
+        y = measuredPropertyInformation.featureProperty.getCircle().get_y();
+        z = measuredPropertyInformation.featureProperty.getCircle().get_z();
+        pbl::PDFtoMsg(pbl::Gaussian(pbl::Vector3(x, y, z), pbl::Matrix3(QmCircle(0,0), QmCircle(1,1), Rz)), posPropCirc.pdf);
+        
+        wire_msgs::Property dimPropCirc;
+        dimPropRect.attribute = "dimension_circle";
+        double width = measuredPropertyInformation.featureProperty.getRectangle().get_w();
+        double depth = measuredPropertyInformation.featureProperty.getRectangle().get_d();
+        pbl::PDFtoMsg(pbl::Gaussian(pbl::Vector2(width, depth), pbl::Matrix3(RmRectangle(3), RmRectangle(4))), posPropRect.pdf);
+        
+        
          
          // Set the discrete class label property
         wire_msgs::Property classProp;
@@ -816,18 +829,23 @@ void addEvidenceWIRE(wire_msgs::WorldEvidence& world_evidence, measuredPropertyI
         pbl::PMF classPMF;
         
         // Probability of the class label
-        classPMF.setDomainSize(100);
+        classPMF.setDomainSize(2);
         classPMF.setProbability("Circle", measuredPropertyInformation.featureProperty.getFeatureProbabilities().get_pCircle() );
         classPMF.setProbability("Rectangle", measuredPropertyInformation.featureProperty.getFeatureProbabilities().get_pRectangle() );
         pbl::PDFtoMsg(classPMF, classProp.pdf);
     //     std::cout << "evidence: classProp = " << classProp << std::endl;
+        
+        wire_msgs::ObjectEvidence obj_evidence;
+        obj_evidence.properties.push_back(posPropRect);
+        obj_evidence.properties.push_back(dimPropRect);
+        obj_evidence.properties.push_back(posPropCirc);
         obj_evidence.properties.push_back(classProp);
 
         world_evidence.object_evidence.push_back(obj_evidence);
         
      //   std::cout << "addEvidenceWIRE" << std::endl;
         // TODO delete objects??
-        
+        */
          
         return;
 }
@@ -895,7 +913,7 @@ void LaserPluginTracking::initialize(ed::InitData& init)
     cornerPointModelled_pub_ = nh.advertise<visualization_msgs::Marker> ( "cornerPointModelled", 3 ); // TEMP
     cornerPointMeasured_pub_ = nh.advertise<visualization_msgs::Marker> ( "cornerPointMeasured", 3 ); // TEMP
     associatedPoints_pub_ = nh.advertise<sensor_msgs::LaserScan> ("ed/associatedPoints", 3); // TEMP
-    world_evidence_publisher_ = nh.advertise<wire_msgs::WorldEvidence>("/world_evidence", 100);
+    //world_evidence_publisher_ = nh.advertise<wire_msgs::WorldEvidence>("/world_evidence", 100);
 
   //  std::cout << "sub_scan_ topic = " << sub_scan_.getTopic() << std::endl;
   //  std::cout << "ObjectMarkers_pub_ topic = " << ObjectMarkers_pub_.getTopic() << std::endl;
@@ -1152,7 +1170,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
            std::vector<geo::Vec2f>::iterator it_end = points.begin(); std::advance( it_end, finalElement );
            
            possibleCorners.clear();
-           bool cornersFoundMeasured = ed::tracking::findPossibleCorners (points, &possibleCorners, MIN_DISTANCE_CORNER_DETECTION_LARGE, min_segment_size_pixels_  );
+           bool cornersFoundMeasured = tracking::findPossibleCorners (points, &possibleCorners, MIN_DISTANCE_CORNER_DETECTION_LARGE, min_segment_size_pixels_  );
           
            if( !cornersFoundMeasured && ! angleCorrectionFound) // beause we want to correct based on a straight line.
            {
@@ -1237,16 +1255,16 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                 Eigen::VectorXf lineFitParamsMeasured( 2 ), lineFitParamsModdelled( 2 );
                 std::vector<geo::Vec2f>::iterator it_start = measuredPoints.begin();
                 std::vector<geo::Vec2f>::iterator it_end = measuredPoints.end();
-                float fitErrorMeasured =  ed::tracking::fitLine ( measuredPoints, lineFitParamsMeasured, &it_start , &it_end );
+                float fitErrorMeasured =  tracking::fitLine ( measuredPoints, lineFitParamsMeasured, &it_start , &it_end );
                 
                 it_start = modelledPoints.begin();
                 it_end = modelledPoints.end();
-                float fitErrorModelled =  ed::tracking::fitLine ( modelledPoints, lineFitParamsModdelled, &it_start , &it_end );
+                float fitErrorModelled =  tracking::fitLine ( modelledPoints, lineFitParamsModdelled, &it_start , &it_end );
         
                 double measuredAngle = atan2 ( lineFitParamsMeasured ( 1 ), 1 );
                 double modelledAngle = atan2 ( lineFitParamsModdelled ( 1 ), 1 );
                 
-                ed::tracking::unwrap(&modelledAngle, measuredAngle, 2*M_PI);
+                tracking::unwrap(&modelledAngle, measuredAngle, 2*M_PI);
                 diffAngle = measuredAngle - modelledAngle;
                 
                 if(diffAngle < MAX_DEVIATION_ANGLE_CORRECTION ) // Only correct if localization partially leads to problems
@@ -1272,7 +1290,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
     if( angleCorrectionFound )
     {
             yawSensor -= diffAngle;
-            ed::tracking::wrap2Interval(&yawSensor, (double) 0.0, (double) 2*M_PI);
+            tracking::wrap2Interval(&yawSensor, (double) 0.0, (double) 2*M_PI);
             
             sensor_poseCorrected = sensor_pose;
             sensor_poseCorrected.setRPY(rollSensor, pitchSensor, yawSensor );
@@ -1353,7 +1371,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
         {
             it_laserEntities.push_back ( e_it );
 
-            ed::tracking::FeatureProperties featureProperties;
+            tracking::FeatureProperties featureProperties;
 
 
 	if( !e->property( featureProperties_) )
@@ -1377,7 +1395,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
         // For the entities which already exist in the WM, determine the relevant properties in order to determine which entities _might_ associate to which clusters
         if ( featureProperties.getFeatureProbabilities().get_pCircle() > featureProperties.getFeatureProbabilities().get_pRectangle() )
         {
-                ed::tracking::Circle circle = featureProperties.getCircle();
+                tracking::Circle circle = featureProperties.getCircle();
                 circle.predictAndUpdatePos(dt);
              
                 currentProperty.entity_min.x = circle.get_x() - ( 0.5*ASSOCIATION_DISTANCE + circle.get_radius() );
@@ -1387,7 +1405,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
         }
         else
         {
-                ed::tracking::Rectangle rectangle = featureProperties.getRectangle();
+                tracking::Rectangle rectangle = featureProperties.getRectangle();
                 rectangle.predictAndUpdatePos(dt);
                 
                 std::vector<geo::Vec2f> corners = rectangle.determineCorners ( ASSOCIATION_DISTANCE );
@@ -1492,7 +1510,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                         continue;
                 }
                 
-                ed::tracking::FeatureProperties featureProperties = e->property ( featureProperties_ );
+                tracking::FeatureProperties featureProperties = e->property ( featureProperties_ );
 
                 float dist;
                 float dt = scan->header.stamp.toSec() - e->lastUpdateTimestamp();
@@ -1515,13 +1533,13 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
 
                 if ( prob1 > prob2 )  // entity is considered to be a circle
                 {
-                    ed::tracking::Circle circle = featureProperties.getCircle();  
+                    tracking::Circle circle = featureProperties.getCircle();  
                     circle.predictAndUpdatePos( dt ); // TODO Do this update once at initialisation
                     dist = std::abs ( std::sqrt ( std::pow ( p.x - circle.get_x(), 2.0 ) + std::pow ( p.y - circle.get_y(), 2.0 ) ) - circle.get_radius() ); // Distance of a point to a circle, see https://www.varsitytutors.com/hotmath/hotmath_help/topics/shortest-distance-between-a-point-and-a-circle
                 }
                 else     // entity is considered to be a rectangle. Check if point is inside the rectangle
                 {
-                    ed::tracking::Rectangle rectangle = featureProperties.getRectangle();
+                    tracking::Rectangle rectangle = featureProperties.getRectangle();
                     rectangle.predictAndUpdatePos( dt );// TODO Do this update once at initialisation
 
                     std::vector<geo::Vec2f> corners = rectangle.determineCorners ( 0.0 );
@@ -1720,7 +1738,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
            std::vector<geo::Vec2f>::iterator it_end = points.end();
            unsigned int cornerIndex = std::numeric_limits<unsigned int>::quiet_NaN();
           
-          if( ed::tracking::findPossibleCorner ( points, &cornerIndices, &it_start, &it_end, MIN_DISTANCE_CORNER_DETECTION, (unsigned int) min_segment_size_pixels_ ) )
+          if( tracking::findPossibleCorner ( points, &cornerIndices, &it_start, &it_end, MIN_DISTANCE_CORNER_DETECTION, (unsigned int) min_segment_size_pixels_ ) )
           {
                   cornerIndex = cornerIndices[0];
           }
@@ -1730,17 +1748,17 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                 const unsigned int& index = *it_in;
           }
 
-          ed::tracking::Circle circle;   
-          ed::tracking::Rectangle rectangle;    
+          tracking::Circle circle;   
+          tracking::Rectangle rectangle;    
           std::vector<geo::Vec2f>::iterator it_low, it_high;
         
-          ed::tracking::FITTINGMETHOD method = ed::tracking::CIRCLE;
-          float errorCircle = ed::tracking::fitObject ( points, method, &cornerIndex, &rectangle, &circle, &it_low, &it_high, sensor_pose, (unsigned int) min_segment_size_pixels_ );
+          tracking::FITTINGMETHOD method = tracking::CIRCLE;
+          float errorCircle = tracking::fitObject ( points, method, &cornerIndex, &rectangle, &circle, &it_low, &it_high, sensor_pose, (unsigned int) min_segment_size_pixels_ );
           unsigned int elementLow = associatedPointsInfo[iList].laserIDs[0];
           unsigned int elementHigh = associatedPointsInfo[iList].laserIDs.back();
 
-          method = ed::tracking::determineCase ( points, &cornerIndex, &it_low, &it_high, sensor_pose, (unsigned int) min_segment_size_pixels_); // chose to fit a single line or a rectangle (2 lines)
-          float errorRectangle = ed::tracking::fitObject ( points, method,  &cornerIndex, &rectangle, &circle, &it_low, &it_high,  sensor_pose, (unsigned int) min_segment_size_pixels_ );
+          method = tracking::determineCase ( points, &cornerIndex, &it_low, &it_high, sensor_pose, (unsigned int) min_segment_size_pixels_); // chose to fit a single line or a rectangle (2 lines)
+          float errorRectangle = tracking::fitObject ( points, method,  &cornerIndex, &rectangle, &circle, &it_low, &it_high,  sensor_pose, (unsigned int) min_segment_size_pixels_ );
 
           measuredProperties[iList].confidenceRectangleWidth = false;
           measuredProperties[iList].confidenceRectangleWidthLow = false;
@@ -1761,7 +1779,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
           unsigned int IDLowWidth = 0, IDHighWidth = 0, IDLowDepth = 0, IDHighDepth = 0;
           unsigned int PointIDLowWidth = 0, PointIDHighWidth = 0, PointIDLowDepth = 0, PointIDHighDepth = 0;
         
-          if( method == ed::tracking::LINE )
+          if( method == tracking::LINE )
           {       
                   IDLowWidth = associatedPointsInfo[iList].laserIDs[0];
                   IDHighWidth = associatedPointsInfo[iList].laserIDs.back();     
@@ -1769,7 +1787,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                   PointIDLowWidth = 0;
                   PointIDHighWidth = associatedPointsInfo[iList].laserIDs.size() - 1;
           }
-          else if ( method == ed::tracking::RECTANGLE )
+          else if ( method == tracking::RECTANGLE )
           {
                   // For width-information
                   IDLowWidth = associatedPointsInfo[iList].laserIDs[0];
@@ -1825,11 +1843,11 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                  
                  if(determineWidthConfidence)
                  {
-                         ed::tracking::unwrap (&avgAngle, rectangle.get_yaw(), (float) M_PI);
+                         tracking::unwrap (&avgAngle, rectangle.get_yaw(), (float) M_PI);
                  }
                  else if (determineDepthConfidence)
                  {
-                          ed::tracking::unwrap (&avgAngle, rectangle.get_yaw() + (float) M_PI_2, (float) M_PI);
+                          tracking::unwrap (&avgAngle, rectangle.get_yaw() + (float) M_PI_2, (float) M_PI);
                  }
                  
                  if ( (std::fabs(rectangle.get_yaw() - avgAngle) < ANGLE_MARGIN_FITTING && determineWidthConfidence) || (std::fabs(rectangle.get_yaw() + M_PI_2 - avgAngle) < ANGLE_MARGIN_FITTING && determineDepthConfidence) )
@@ -1841,7 +1859,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                          {
                                  measuredProperties[iList].confidenceRectangleWidth = false;
                                  measuredProperties[iList].confidenceRectangleWidthLow = false;
-                                 measuredProperties[iList].confidenceRectangleWidthHigh = ed::tracking::determineCornerConfidence ( scan, elementHigh, false);
+                                 measuredProperties[iList].confidenceRectangleWidthHigh = tracking::determineCornerConfidence ( scan, elementHigh, false);
                                  
                                  if( measuredProperties[iList].confidenceRectangleWidthHigh )
                                  {
@@ -1854,7 +1872,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                          if (determineDepthConfidence)
                          {
                                  measuredProperties[iList].confidenceRectangleDepth = false;
-                                 measuredProperties[iList].confidenceRectangleDepthLow = ed::tracking::determineCornerConfidence ( scan, elementLow, true); 
+                                 measuredProperties[iList].confidenceRectangleDepthLow = tracking::determineCornerConfidence ( scan, elementLow, true); 
                                  measuredProperties[iList].confidenceRectangleDepthHigh = false;
                                  
                                  if( measuredProperties[iList].confidenceRectangleDepthLow )
@@ -1868,8 +1886,8 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                  {
                          if(determineWidthConfidence)
                          {
-                                 measuredProperties[iList].confidenceRectangleWidthLow = ed::tracking::determineCornerConfidence ( scan, elementLow, true);
-                                 measuredProperties[iList].confidenceRectangleWidthHigh = ed::tracking::determineCornerConfidence ( scan, elementHigh, false); 
+                                 measuredProperties[iList].confidenceRectangleWidthLow = tracking::determineCornerConfidence ( scan, elementLow, true);
+                                 measuredProperties[iList].confidenceRectangleWidthHigh = tracking::determineCornerConfidence ( scan, elementHigh, false); 
                                  measuredProperties[iList].confidenceRectangleWidth = (measuredProperties[iList].confidenceRectangleWidthLow && measuredProperties[iList].confidenceRectangleWidthHigh );
                                  
                                  if( measuredProperties[iList].confidenceRectangleWidthLow )
@@ -1886,8 +1904,8 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                          
                           if (determineDepthConfidence)
                           {
-                                 measuredProperties[iList].confidenceRectangleDepthLow = ed::tracking::determineCornerConfidence ( scan, elementLow, true) ;
-                                 measuredProperties[iList].confidenceRectangleDepthHigh = ed::tracking::determineCornerConfidence ( scan, elementHigh, false) ; 
+                                 measuredProperties[iList].confidenceRectangleDepthLow = tracking::determineCornerConfidence ( scan, elementLow, true) ;
+                                 measuredProperties[iList].confidenceRectangleDepthHigh = tracking::determineCornerConfidence ( scan, elementHigh, false) ; 
                                  measuredProperties[iList].confidenceRectangleDepth = (measuredProperties[iList].confidenceRectangleDepthLow && measuredProperties[iList].confidenceRectangleDepthHigh );
                                  
                                  if( measuredProperties[iList].confidenceRectangleDepthLow )
@@ -1905,11 +1923,11 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                   }    
         }
          
-        ed::tracking::FeatureProbabilities prob;
+        tracking::FeatureProbabilities prob;
         if ( prob.setMeasurementProbabilities ( errorRectangle, errorCircle, 2*circle.get_radius() , nominal_corridor_width_ ) )
         {
 
-            ed::tracking::FeatureProperties properties;
+            tracking::FeatureProperties properties;
             properties.setFeatureProbabilities ( prob );
             properties.setCircle ( circle );
             properties.setRectangle ( rectangle );
@@ -1940,7 +1958,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
     
     unsigned int marker_ID = 0; // To Do: After tracking, the right ID's should be created. The ID's are used to have multiple markers.
 
-    ed::tracking::FeatureProperties measuredProperty, entityProperties; // Measured properties and updated properties
+    tracking::FeatureProperties measuredProperty, entityProperties; // Measured properties and updated properties
     ed::UUID id;
     
     visualization_msgs::MarkerArray markers;
@@ -1955,12 +1973,31 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
             
         measuredProperty = measuredProperties[iProperties].featureProperty;
         
-                    // TEMP publish measured properties to test with WIRE
-            addEvidenceWIRE(world_evidence, measuredProperties[iProperties] );
+        // TEMP publish measured properties to test with WIRE
+        //  addEvidenceWIRE(world_evidence, measuredProperties[iProperties] );
         
         // temporary: pub measured properties in order to visualize the properties which are added
         markers.markers.push_back( getMarker(measuredProperty, ID++) ); // TEMP
 
+        float Q = 0.4; // Measurement noise covariance. TODO: let it depend on if an object is partially occluded. Now, objects are assumed to be completely visible
+        float R = 0.1; // Process noise covariance
+        float RVariable = 1000000*R*pow(measuredProperties[iProperties].fittingErrorRectangle, 2.0);
+        float largeCovariance = 100000.0;
+        float mediumDimensionCovariance = 2.0;
+    //    float dt = scan->header.stamp.toSec() - e->lastUpdateTimestamp();        
+
+ //       Eigen::MatrixXf QmRectangle = Eigen::MatrixXf::Zero( 8, 8 );
+        Eigen::MatrixXf RmRectangle = Eigen::MatrixXf::Zero( 5, 5 );
+
+  //      QmRectangle.diagonal() << Q, Q, Q, 20*Q, 20*Q, 20*Q, Q, Q; // Covariance on state = [x, y, rot, x vel, y Vel, rot Vel, width, depth]; Q increases, more emphasis on measurements     
+        RmRectangle.diagonal() << R, R, RVariable, R, R; // R decreases, more emphasis on measurements, info = [x, y, orient, width, depth]
+        
+    //    Eigen::MatrixXf QmCircle = Eigen::MatrixXf::Zero( 5, 5 );
+        Eigen::MatrixXf RmCircle = Eigen::MatrixXf::Zero( 3, 3 );
+                
+      //  QmCircle.diagonal() << Q, Q, Q, Q, Q; // xPos, yPos, xVel, yVel, radius
+        RmCircle.diagonal() << R, R, R;
+        
         double existenceProbability;
         if ( iProperties < it_laserEntities.size() )
         {
@@ -1985,30 +2022,21 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                 }
                 continue;
             }
+            
+
 
             if ( !e->hasFlag ( "locked" ) )
             {
                 entityProperties = e->property ( featureProperties_ );
-                ed::tracking::Rectangle entityRectangle = entityProperties.getRectangle();
-                ed::tracking::Circle entityCircle = entityProperties.getCircle();
+                tracking::Rectangle entityRectangle = entityProperties.getRectangle();
+                tracking::Circle entityCircle = entityProperties.getCircle();
                 
-                float Q = 0.4; // Measurement noise covariance. TODO: let it depend on if an object is partially occluded. Now, objects are assumed to be completely visible
-                float R = 0.1; // Process noise covariance
-                float RVariable = 1000000*R*pow(measuredProperties[iProperties].fittingErrorRectangle, 2.0);
-                float largeCovariance = 100000.0;
-                float mediumDimensionCovariance = 2.0;
-                float dt = scan->header.stamp.toSec() - e->lastUpdateTimestamp();
-                
-                // update rectangular properties
-                Eigen::MatrixXf QmRectangle = Eigen::MatrixXf::Zero( 8, 8 );
-                Eigen::MatrixXf RmRectangle = Eigen::MatrixXf::Zero( 5, 5 );
-                
-                QmRectangle.diagonal() << Q, Q, Q, 20*Q, 20*Q, 20*Q, Q, Q; // Covariance on state = [x, y, rot, x vel, y Vel, rot Vel, width, depth]; Q increases, more emphasis on measurements     
-                RmRectangle.diagonal() << R, R, RVariable, R, R; // R decreases, more emphasis on measurements, info = [x, y, orient, width, depth]
+              
                       
                 // TODO what to do with position information if there is low confidence in with and depth? Position information should be updated with respect to an anchor point!
                 // This is the problem of fusing multiple sensors
-
+                
+                // update rectangular properties
                 if( !measuredProperties[iProperties].confidenceRectangleWidth && !measuredProperties[iProperties].confidenceRectangleDepth )
                 {
                         // if there is uncertainty about the positions based on the dimensional check, first check if there are relevant features (corners!) which can give you a better estimation
@@ -2057,7 +2085,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                                 deltaX /= cornersMeasured.size();
                                 deltaY /= cornersMeasured.size();
                                 
-                                ed::tracking::Rectangle updatedRectangle = measuredProperty.getRectangle(); // TODO correct? Should we take measured dimensions into account? TEST
+                                tracking::Rectangle updatedRectangle = measuredProperty.getRectangle(); // TODO correct? Should we take measured dimensions into account? TEST
                                 
                                 float updatedX = updatedRectangle.get_x() + deltaX;
                                 float updatedY = updatedRectangle.get_y() + deltaY;
@@ -2099,7 +2127,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                                 
                                 C( 1, 1) = smallPositionCovariance; // TODO right dim set??
                                         
-                                if( measuredProperties[iProperties].methodRectangle == ed::tracking::RECTANGLE )
+                                if( measuredProperties[iProperties].methodRectangle == tracking::RECTANGLE )
                                 {
                                         C( 0, 0) = smallPositionCovariance;
                                 }
@@ -2163,22 +2191,21 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                 {
                         // In case it is hard to determine the yaw-angle, which might be when the object is almost in line with the sensor, a NaN can be produced
                         zmRectangle(2) = entityRectangle.get_yaw();
-                        QmRectangle(2, 2) = largeCovariance;
+                        //QmRectangle(2, 2) = largeCovariance;
+                        RmRectangle(2, 2) = largeCovariance;
                 }
-                
-                entityProperties.updateRectangleFeatures(QmRectangle, RmRectangle, zmRectangle, dt, sensor_pose);
+              
+              // TODO: do calculations in WIRE
+            //    entityProperties.updateRectangleFeatures(QmRectangle, RmRectangle, zmRectangle, dt);
                
                 // update circular properties
-                Eigen::MatrixXf QmCircle = Eigen::MatrixXf::Zero( 5, 5 );
-                Eigen::MatrixXf RmCircle = Eigen::MatrixXf::Zero( 3, 3 );
-                
-                 QmCircle.diagonal() << Q, Q, Q, Q, Q; // xPos, yPos, xVel, yVel, radius
-                RmCircle.diagonal() << R, R, R;
+
                 
                 // TODO what to do with position information if there is low confidence in with and depth? Position information should be updated with respect to an anchor point!
                 if( measuredProperties[iProperties].confidenceRectangleDepth == false )
                 {
-                        QmCircle( 4, 4 ) = largeCovariance;
+                        RmCircle( 4, 4 ) = largeCovariance;
+                        //QmCircle( 4, 4 ) = largeCovariance;
                 } 
 
                 Eigen::VectorXf zmCircle( 3 );
@@ -2187,10 +2214,12 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                 measuredProperty.getCircle().get_y(),
                 measuredProperty.getCircle().get_radius();
 
-                ed::tracking::FeatureProbabilities measuredProb = measuredProperty.getFeatureProbabilities(); 
+                // TODO: do calculations in WIRE
+              /*  tracking::FeatureProbabilities measuredProb = measuredProperty.getFeatureProbabilities(); 
 
                 entityProperties.updateCircleFeatures(QmCircle, RmCircle, zmCircle, dt);
                 entityProperties.updateProbabilities ( measuredProb );
+                */
             }
 
             // Update existence probability
@@ -2235,18 +2264,19 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
             }
 
         }
+        
         geo::Pose3D new_pose;
 
         if ( entityProperties.getFeatureProbabilities().get_pCircle() < entityProperties.getFeatureProbabilities().get_pRectangle() )
         {
             // determine corners
-            ed::tracking::Rectangle rectangle = entityProperties.getRectangle();
+            tracking::Rectangle rectangle = entityProperties.getRectangle();
             new_pose = rectangle.getPose();
         }
         else
         {
             // determine cilinder-properties
-            ed::tracking::Circle circle = entityProperties.getCircle();
+            tracking::Circle circle = entityProperties.getCircle();
             new_pose = circle.getPose();
         }
 
@@ -2265,6 +2295,8 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
         // Set feature properties en publish geometries
         if ( check )
         {
+                // TODO These computations must take place in WIRED
+                /*
                 int nMeasurements = entityProperties.getNMeasurements() + 1;
                 entityProperties.setNMeasurements(  nMeasurements );
                 req.setProperty ( id, featureProperties_, entityProperties );
@@ -2273,6 +2305,10 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                 // Set timestamp               
                 req.setLastUpdateTimestamp ( id, scan->header.stamp.toSec() );
                 req.setExistenceProbability ( id, existenceProbability );
+                */
+                
+                
+                addEvidenceWIRE(world_evidence, measuredProperty, RmRectangle, RmCircle );
         }
     }
            
@@ -2282,7 +2318,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
     boost::shared_ptr<wiredDataBuffer> buf = boost::static_pointer_cast<wiredDataBuffer>( getDataBuffer() );    
     buf->getBuffer().push_front(world_evidence);
 
-    world_evidence_publisher_.publish( world_evidence );
+    //world_evidence_publisher_.publish( world_evidence );
     ObjectMarkers_pub_.publish(markers);
 
 // - - - - - - - - - - - - - - - - -

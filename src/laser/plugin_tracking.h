@@ -108,7 +108,7 @@ private:
     ros::Subscriber initializedPose_sub_;
    
     // Publisher used to send evidence to world model
-    ros::Publisher world_evidence_publisher_; // ############################## TEMP ############################
+    //ros::Publisher world_evidence_publisher_; // ############################## TEMP ############################
 
     std::queue<sensor_msgs::LaserScan::ConstPtr> scan_buffer_;
     
@@ -149,7 +149,7 @@ private:
     std::map<ed::UUID,geo::Pose3D> pose_cache;
 
     // 'Feature' property key
-    ed::PropertyKey<ed::tracking::FeatureProperties> featureProperties_; 
+    ed::PropertyKey<tracking::FeatureProperties> featureProperties_; 
 };
 
 
