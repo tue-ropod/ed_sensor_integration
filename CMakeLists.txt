@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.8.12)
 project(ed_sensor_integration)
 
-#set(CMAKE_BUILD_TYPE "RelWithDebInfo")
+set(CMAKE_BUILD_TYPE "RelWithDebInfo")
 #set(CMAKE_BUILD_TYPE Debug)
 
 include(CheckCXXCompilerFlag)
@@ -129,7 +129,7 @@ add_library(ed_laser_plugin_tracking
 )
 target_link_libraries(ed_laser_plugin_tracking ed_association ${catkin_LIBRARIES})
 #add_dependencies(ed_laser_plugin_tracking wire_state_estimators ${PROJECT_NAME}_gencpp ${${PROJECT_NAME}_EXPORTED_TARGETS})
-add_dependencies(ed_laser_plugin_tracking wire_state_estimators ${PROJECT_NAME}_gencpp ${${PROJECT_NAME}_EXPORTED_TARGETS})
+add_dependencies(ed_laser_plugin_tracking ${PROJECT_NAME}_gencpp ${${PROJECT_NAME}_EXPORTED_TARGETS})
 
 
 #add_library(ed_laser_plugin_tracking2

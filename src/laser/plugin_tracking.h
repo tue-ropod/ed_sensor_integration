@@ -23,7 +23,8 @@
 
 // Properties
 #include "feature_functions.h"
-#include "ed_sensor_integration/properties/featureProperties_info.h"
+//#include "ed_sensor_integration/properties/featureProperties_info.h"
+#include "featureProperties_info.h"
 
 #define ASSOCIATION_DISTANCE 0.5                        // [m] For the entities which already exist in the WM, determine the relevant properties in order to determine which entities _might_ associate to which clusters Association distance 
 #define MIN_ASSOCIATION_DISTANCE 0.3                    // [m] Maximum distance to reassociate consecutive segments

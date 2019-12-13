@@ -780,10 +780,85 @@ bool isInside(std::vector<T> Points, T& p)
 void addEvidenceWIRE(wire_msgs::WorldEvidence& world_evidence, 
                      tracking::FeatureProperties measuredProperty, 
        //              Eigen::MatrixXf QmRectangle, 
-                     Eigen::MatrixXf RmRectangle, 
+                     pbl::Matrix RmRectangle, 
        //              Eigen::MatrixXf QmCircle, 
-                     Eigen::MatrixXf RmCircle ) // Converter from measured properties to WIRE-info
+                     pbl::Matrix RmCircle ) // Converter from measured properties to WIRE-info
 {
+        wire_msgs::Property properties;
+        properties.attribute = "positionAndDimension";  
+        std::cout << "measuredProperty.rectangle_.get_H() = " << measuredProperty.rectangle_.get_H() << " measuredProperty.rectangle_.getState() = " << measuredProperty.rectangle_.getState() << std::endl;
+        
+        
+        std::shared_ptr<pbl::Gaussian> zRectangle = std::make_shared<pbl::Gaussian>(RECTANGLE_MEASURED_STATE_SIZE + RECTANGLE_MEASURED_DIM_STATE_SIZE);
+        zRectangle->setMean(measuredProperty.rectangle_.get_H()* measuredProperty.rectangle_.getState());
+        zRectangle->setCovariance(RmRectangle);
+        
+        std::cout << "RmRectangle = " << RmRectangle << std::endl;
+        
+         std::cout << "tracking plugin: measuredProperty.rectangle_.get_H() = " << measuredProperty.rectangle_.get_H() << std::endl;
+         std::cout << "tracking plugin:  measuredProperty.rectangle_.getState() = " <<  measuredProperty.rectangle_.getState() << std::endl;
+        
+        std::shared_ptr<pbl::Gaussian> zCircle = std::make_shared<pbl::Gaussian>(CIRCLE_MEASURED_STATE_SIZE + CIRCLE_MEASURED_DIM_STATE_SIZE);
+        zCircle->setMean(measuredProperty.circle_.get_H()* measuredProperty.circle_.getState());
+        zCircle->setCovariance(RmCircle);
+        
+//          std::cout << "tracking plugin: measuredProperty.circle_.get_H() = " << measuredProperty.circle_.get_H() << std::endl;
+//         std::cout << "tracking plugin:  measuredProperty.circle_.getState() = " <<  measuredProperty.circle_.getState() << std::endl;
+        
+        // Probability of the class label
+    //     std::shared_ptr<pbl::PMF> classPMF = std::make_shared<pbl::PMF>();
+    //    classPMF->setDomainSize(2);
+    //    classPMF->setProbability("Circle", measuredProperty.getFeatureProbabilities().get_pCircle() );
+    //    classPMF->setProbability("Rectangle", measuredProperty.getFeatureProbabilities().get_pRectangle() );
+        
+        // TODO Actually not completely what a mixture model is used for :)
+     //   double unitWeight = 1.0; 
+        pbl::Hybrid  hyb;// = std::make_shared<pbl::Hybrid>();
+        
+        std::cout << "zRectangle = " << zRectangle->toString() << std::endl;
+        std::cout << "zCircle = " << zCircle->toString() << std::endl;
+        
+        hyb.addPDF(*zRectangle,measuredProperty.getFeatureProbabilities().get_pRectangle());
+        hyb.addPDF(*zCircle, measuredProperty.getFeatureProbabilities().get_pCircle());
+     //   hyb.addPDF(*classPMF, unitWeight);
+        
+        /*mix->addComponent(zRectangle,unitWeight);
+        mix->addComponent(zCircle, unitWeight);
+        mix->addComponent(classPMF, unitWeight);
+        */
+      /*  pbl::Gaussian z( RECTANGLE_MEASURED_STATE_SIZE + RECTANGLE_MEASURED_DIM_STATE_SIZE + CIRCLE_MEASURED_STATE_SIZE + CIRCLE_MEASURED_DIM_STATE_SIZE);
+        z.setMean(arma::join_cols(measuredProperty.rectangle_.get_H()* measuredProperty.rectangle_.getState(),
+                                  measuredProperty.circle_.get_H()* measuredProperty.circle_.getState()));
+        */
+      //  pbl::Matrix zeroMatrix(RmRectangle.n_rows,RmCircle.n_cols);
+       // zeroMatrix.zeros();
+       // z.setCovariance( arma::join_cols(arma::join_rows(RmRectangle,zeroMatrix),arma::join_rows(zeroMatrix.t(), RmCircle)) );
+
+        
+  /*      std::cout << "RmRectangle, RmCirlce = \n" << RmRectangle << ", " << RmCircle << std::endl;
+        
+        pbl::Matrix zeroMatrix(RmRectangle.n_rows,RmCircle.n_cols);
+        pbl::Matrix zeroMatrix2(RmCircle.n_rows, RmRectangle.n_cols);
+    
+        zeroMatrix.zeros();
+        zeroMatrix2.zeros();
+*/
+  //      z.setCovariance(arma::join_cols(arma::join_rows(RmRectangle,zeroMatrix),arma::join_rows(zeroMatrix2, RmCircle))); 
+        
+        //std::cout << "add evidence wire: cov z = " << z.getCovariance() << std::endl;
+
+         std::cout << "add evidence wire: measurement = " << hyb.toString() << std::endl;
+         measuredProperty.printProperties();
+        
+        pbl::PDFtoMsg(hyb, properties.pdf);
+        wire_msgs::ObjectEvidence obj_evidence;
+        obj_evidence.properties.push_back(properties);
+        
+        world_evidence.object_evidence.push_back(obj_evidence);
+        
+        
+        // TODO add probabilities
+        
         // Set position (x,y,z)
      /*   double x, y, z, yaw;
         double Rz = 0.1;
@@ -1473,8 +1548,13 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
         // After the properties of each segment are determined, check which clusters and entities might associate
         std::vector< int > possibleSegmentEntityAssociations;
         
+//         std::cout << "pluging tracking @1535: it_laserEntities.size() = " << it_laserEntities.size() << std::endl;
+//         std::cout << "EntityPropertiesForAssociation.size() = " << EntityPropertiesForAssociation.size() << std::endl;
+        
+        
         for ( unsigned int jj = 0; jj < it_laserEntities.size(); ++jj )
-        {
+        { 
+//                 std::cout << "jj = " << std::endl;
             // check if 1 of the extrema of the segment might be related to the exploded entity
             bool check1 =  seg_min.x > EntityPropertiesForAssociation[jj].entity_min.x && seg_min.x < EntityPropertiesForAssociation[jj].entity_max.x ;
             bool check2 =  seg_max.x > EntityPropertiesForAssociation[jj].entity_min.x && seg_max.x < EntityPropertiesForAssociation[jj].entity_max.x ;
@@ -1487,6 +1567,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                 const ed::EntityConstPtr& e = *it_laserEntities[jj];
             }           
         }
+// std::cout << "\n";
 
         // If a cluster could be associated to a (set of) entities, determine for each point to which entitiy it belongs based on a shortest distance criterion. 
         // If the distance is too large, initiate a new entity
@@ -1979,24 +2060,37 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
         // temporary: pub measured properties in order to visualize the properties which are added
         markers.markers.push_back( getMarker(measuredProperty, ID++) ); // TEMP
 
-        float Q = 0.4; // Measurement noise covariance. TODO: let it depend on if an object is partially occluded. Now, objects are assumed to be completely visible
+        //float Q = 0.4; // Measurement noise covariance. TODO: let it depend on if an object is partially occluded. Now, objects are assumed to be completely visible
         float R = 0.1; // Process noise covariance
-        float RVariable = 1000000*R*pow(measuredProperties[iProperties].fittingErrorRectangle, 2.0);
+        float RVariable = 1000000*R*pow(measuredProperties[iProperties].fittingErrorRectangle, 2.0); // TODO why this strange number!?
         float largeCovariance = 100000.0;
         float mediumDimensionCovariance = 2.0;
+        
+        std::cout << "RVariable = " << RVariable  << " measuredProperties[iProperties].fittingErrorRectangle = " << measuredProperties[iProperties].fittingErrorRectangle << std::endl;
+        
     //    float dt = scan->header.stamp.toSec() - e->lastUpdateTimestamp();        
 
  //       Eigen::MatrixXf QmRectangle = Eigen::MatrixXf::Zero( 8, 8 );
-        Eigen::MatrixXf RmRectangle = Eigen::MatrixXf::Zero( 5, 5 );
+        pbl::Matrix RmRectangle;
+        RmRectangle.zeros(RECTANGLE_MEASURED_STATE_SIZE + RECTANGLE_MEASURED_DIM_STATE_SIZE, RECTANGLE_MEASURED_STATE_SIZE + RECTANGLE_MEASURED_DIM_STATE_SIZE );//= Eigen::MatrixXf::Zero( 5, 5 );
 
   //      QmRectangle.diagonal() << Q, Q, Q, 20*Q, 20*Q, 20*Q, Q, Q; // Covariance on state = [x, y, rot, x vel, y Vel, rot Vel, width, depth]; Q increases, more emphasis on measurements     
-        RmRectangle.diagonal() << R, R, RVariable, R, R; // R decreases, more emphasis on measurements, info = [x, y, orient, width, depth]
+  //      RmRectangle.diagonal() << R, R, RVariable, R, R; // R decreases, more emphasis on measurements, info = [x, y, orient, width, depth]
+       // RmRectangle.diagonal() = {R, R, RVariable, R, R}; // R decreases, more emphasis on measurements, info = [x, y, orient, width, depth]
+       pbl::Vector RRectdiag = {R, R, RVariable, R, R};
+        RmRectangle.diag() = RRectdiag;
         
+        std::cout << "Just after initialization: RmRectangle = " << RmRectangle << std::endl;
     //    Eigen::MatrixXf QmCircle = Eigen::MatrixXf::Zero( 5, 5 );
-        Eigen::MatrixXf RmCircle = Eigen::MatrixXf::Zero( 3, 3 );
+  //      Eigen::MatrixXf RmCircle = Eigen::MatrixXf::Zero( 3, 3 );
                 
       //  QmCircle.diagonal() << Q, Q, Q, Q, Q; // xPos, yPos, xVel, yVel, radius
-        RmCircle.diagonal() << R, R, R;
+     //   RmCircle.diagonal() << R, R, R;
+        
+         pbl::Matrix RmCircle;
+        RmCircle.zeros(CIRCLE_MEASURED_STATE_SIZE + CIRCLE_MEASURED_DIM_STATE_SIZE, CIRCLE_MEASURED_STATE_SIZE + CIRCLE_MEASURED_DIM_STATE_SIZE );
+        pbl::Vector RCircdiag = {R, R, R};
+        RmCircle.diag() = RCircdiag;
         
         double existenceProbability;
         if ( iProperties < it_laserEntities.size() )
@@ -2104,9 +2198,12 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                                 // width is always measured, as that is the first part in the measured properties)
                                 
                                 float largePositionCovariance = 25.0; // TODO small covariance when the entity described does not reflect a part which is detected
-                                float smallPositionCovariance = Q;
-                                Eigen::MatrixXf C = Eigen::MatrixXf::Zero( 2, 2 ); // Covariance Matrix in the entity-coordinates
-                                C.diagonal() << largePositionCovariance, largePositionCovariance;
+                                float smallPositionCovariance = R; // was Q
+                                pbl::Matrix C;
+                                C << largePositionCovariance << 0.0 << arma::endr 
+                                  << 0.0 << largePositionCovariance << arma::endr;
+                               // C.zeros(2, 2 ); // Covariance Matrix in the entity-coordinates
+                                //C.diagonal() << largePositionCovariance, largePositionCovariance;
                                 
                                 float rot = 0.0;
                                 if( entityProperties.getRectangle().get_yaw() == entityProperties.getRectangle().get_yaw() )
@@ -2133,10 +2230,12 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                                 }
                                 
                                 // Give certainties in terms of the world frame
-                                Eigen::MatrixXf Rot = Eigen::MatrixXf::Zero( 2, 2 );
-                                Rot << std::cos( rot ), -std::sin( rot ), std::sin( rot ),  std::cos( rot);
-                        
-                                RmRectangle.block< 2, 2 >( 0, 0 ) = Rot*C*Rot.transpose();
+                                pbl::Matrix Rot = arma::eye( 2, 2 );
+                                Rot << std::cos( rot ) << -std::sin( rot ) << arma::endr
+                                << std::sin( rot ) <<  std::cos( rot) << arma::endr;
+                                std::cout << "Rot*C*Rot.t() = " << Rot*C*Rot.t() << std::endl;
+                                RmRectangle.submat(0, 0, 1, 1) = Rot*C*Rot.t();
+                                std::cout << "Rm rectangle after rot = " << RmRectangle << std::endl;
                         }
                 }
                 
@@ -2157,6 +2256,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                 // set confidence for the dimensions
                 if( measuredProperties[iProperties].confidenceRectangleWidth == false ) // when we do an update, we always measured in the width direction
                 {
+                        // TODO use defines for state dimensions
                         if( measuredProperty.getRectangle().get_w() > modelledWidth )
                         {
                                 RmRectangle( 3, 3 ) = mediumDimensionCovariance; // as it it safer to estimate the dimensions too high than too low
@@ -2165,6 +2265,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                         {
                                 RmRectangle( 3, 3 ) = largeCovariance;
                         }
+                        std::cout << "easuredProperty.getRectangle().get_w() > modelledWidth : RmRectangle = " << RmRectangle << std::endl;
                 }
                         
                 if( measuredProperties[iProperties].confidenceRectangleDepth == false )
@@ -2177,6 +2278,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                           {
                                   RmRectangle( 4, 4 ) = largeCovariance;
                           }
+                          std::cout << "measuredProperties[iProperties].confidenceRectangleDepth == false : RmRectangle = " << RmRectangle << std::endl;
                 } 
                
                 Eigen::VectorXf zmRectangle( 5 );
@@ -2193,6 +2295,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                         zmRectangle(2) = entityRectangle.get_yaw();
                         //QmRectangle(2, 2) = largeCovariance;
                         RmRectangle(2, 2) = largeCovariance;
+                        std::cout << "measuredProperty.getRectangle().get_yaw() != measuredProperty.getRectangle().get_yaw(): RmRectangle = " << RmRectangle << std::endl;
                 }
               
               // TODO: do calculations in WIRE
@@ -2307,7 +2410,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                 req.setExistenceProbability ( id, existenceProbability );
                 */
                 
-                
+                std::cout << "Before add evidence wire: RmRectangle = " << RmRectangle << std::endl;
                 addEvidenceWIRE(world_evidence, measuredProperty, RmRectangle, RmCircle );
         }
     }
