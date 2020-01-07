@@ -786,17 +786,17 @@ void addEvidenceWIRE(wire_msgs::WorldEvidence& world_evidence,
 {
         wire_msgs::Property properties;
         properties.attribute = "positionAndDimension";  
-        std::cout << "measuredProperty.rectangle_.get_H() = " << measuredProperty.rectangle_.get_H() << " measuredProperty.rectangle_.getState() = " << measuredProperty.rectangle_.getState() << std::endl;
+//         std::cout << "measuredProperty.rectangle_.get_H() = " << measuredProperty.rectangle_.get_H() << " measuredProperty.rectangle_.getState() = " << measuredProperty.rectangle_.getState() << std::endl;
         
         
         std::shared_ptr<pbl::Gaussian> zRectangle = std::make_shared<pbl::Gaussian>(RECTANGLE_MEASURED_STATE_SIZE + RECTANGLE_MEASURED_DIM_STATE_SIZE);
         zRectangle->setMean(measuredProperty.rectangle_.get_H()* measuredProperty.rectangle_.getState());
         zRectangle->setCovariance(RmRectangle);
         
-        std::cout << "RmRectangle = " << RmRectangle << std::endl;
+//         std::cout << "RmRectangle = " << RmRectangle << std::endl;
         
-         std::cout << "tracking plugin: measuredProperty.rectangle_.get_H() = " << measuredProperty.rectangle_.get_H() << std::endl;
-         std::cout << "tracking plugin:  measuredProperty.rectangle_.getState() = " <<  measuredProperty.rectangle_.getState() << std::endl;
+//          std::cout << "tracking plugin: measuredProperty.rectangle_.get_H() = " << measuredProperty.rectangle_.get_H() << std::endl;
+//          std::cout << "tracking plugin:  measuredProperty.rectangle_.getState() = " <<  measuredProperty.rectangle_.getState() << std::endl;
         
         std::shared_ptr<pbl::Gaussian> zCircle = std::make_shared<pbl::Gaussian>(CIRCLE_MEASURED_STATE_SIZE + CIRCLE_MEASURED_DIM_STATE_SIZE);
         zCircle->setMean(measuredProperty.circle_.get_H()* measuredProperty.circle_.getState());
@@ -815,8 +815,8 @@ void addEvidenceWIRE(wire_msgs::WorldEvidence& world_evidence,
      //   double unitWeight = 1.0; 
         pbl::Hybrid  hyb;// = std::make_shared<pbl::Hybrid>();
         
-        std::cout << "zRectangle = " << zRectangle->toString() << std::endl;
-        std::cout << "zCircle = " << zCircle->toString() << std::endl;
+//         std::cout << "zRectangle = " << zRectangle->toString() << std::endl;
+//         std::cout << "zCircle = " << zCircle->toString() << std::endl;
         
         hyb.addPDF(*zRectangle,measuredProperty.getFeatureProbabilities().get_pRectangle());
         hyb.addPDF(*zCircle, measuredProperty.getFeatureProbabilities().get_pCircle());
@@ -847,8 +847,8 @@ void addEvidenceWIRE(wire_msgs::WorldEvidence& world_evidence,
         
         //std::cout << "add evidence wire: cov z = " << z.getCovariance() << std::endl;
 
-         std::cout << "add evidence wire: measurement = " << hyb.toString() << std::endl;
-         measuredProperty.printProperties();
+//          std::cout << "add evidence wire: measurement = " << hyb.toString() << std::endl;
+//          measuredProperty.printProperties();
         
         pbl::PDFtoMsg(hyb, properties.pdf);
         wire_msgs::ObjectEvidence obj_evidence;
@@ -2066,7 +2066,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
         float largeCovariance = 100000.0;
         float mediumDimensionCovariance = 2.0;
         
-        std::cout << "RVariable = " << RVariable  << " measuredProperties[iProperties].fittingErrorRectangle = " << measuredProperties[iProperties].fittingErrorRectangle << std::endl;
+//         std::cout << "RVariable = " << RVariable  << " measuredProperties[iProperties].fittingErrorRectangle = " << measuredProperties[iProperties].fittingErrorRectangle << std::endl;
         
     //    float dt = scan->header.stamp.toSec() - e->lastUpdateTimestamp();        
 
@@ -2080,7 +2080,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
        pbl::Vector RRectdiag = {R, R, RVariable, R, R};
         RmRectangle.diag() = RRectdiag;
         
-        std::cout << "Just after initialization: RmRectangle = " << RmRectangle << std::endl;
+//         std::cout << "Just after initialization: RmRectangle = " << RmRectangle << std::endl;
     //    Eigen::MatrixXf QmCircle = Eigen::MatrixXf::Zero( 5, 5 );
   //      Eigen::MatrixXf RmCircle = Eigen::MatrixXf::Zero( 3, 3 );
                 
@@ -2265,7 +2265,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                         {
                                 RmRectangle( 3, 3 ) = largeCovariance;
                         }
-                        std::cout << "easuredProperty.getRectangle().get_w() > modelledWidth : RmRectangle = " << RmRectangle << std::endl;
+//                         std::cout << "easuredProperty.getRectangle().get_w() > modelledWidth : RmRectangle = " << RmRectangle << std::endl;
                 }
                         
                 if( measuredProperties[iProperties].confidenceRectangleDepth == false )
@@ -2278,7 +2278,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                           {
                                   RmRectangle( 4, 4 ) = largeCovariance;
                           }
-                          std::cout << "measuredProperties[iProperties].confidenceRectangleDepth == false : RmRectangle = " << RmRectangle << std::endl;
+//                           std::cout << "measuredProperties[iProperties].confidenceRectangleDepth == false : RmRectangle = " << RmRectangle << std::endl;
                 } 
                
                 Eigen::VectorXf zmRectangle( 5 );
@@ -2295,7 +2295,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                         zmRectangle(2) = entityRectangle.get_yaw();
                         //QmRectangle(2, 2) = largeCovariance;
                         RmRectangle(2, 2) = largeCovariance;
-                        std::cout << "measuredProperty.getRectangle().get_yaw() != measuredProperty.getRectangle().get_yaw(): RmRectangle = " << RmRectangle << std::endl;
+//                         std::cout << "measuredProperty.getRectangle().get_yaw() != measuredProperty.getRectangle().get_yaw(): RmRectangle = " << RmRectangle << std::endl;
                 }
               
               // TODO: do calculations in WIRE
