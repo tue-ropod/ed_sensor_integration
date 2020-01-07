@@ -131,7 +131,7 @@ add_library(ed_laser_plugin_tracking
     src/laser/feature_functions.h
     ${HEADER_FILES}
 )
-target_link_libraries(ed_laser_plugin_tracking ed_association wire_state_estimators wired ${catkin_LIBRARIES})
+target_link_libraries(ed_laser_plugin_tracking ed_association wire_state_estimators ed_multiple_hypothesis_plugin ${catkin_LIBRARIES})
 #add_dependencies(ed_laser_plugin_tracking wire_state_estimators ${PROJECT_NAME}_gencpp ${${PROJECT_NAME}_EXPORTED_TARGETS})
 add_dependencies(ed_laser_plugin_tracking ${PROJECT_NAME}_gencpp ${${PROJECT_NAME}_EXPORTED_TARGETS})
 
