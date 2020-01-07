@@ -73,6 +73,9 @@ include_directories(
 #                                         LIBRARIES
 # ------------------------------------------------------------------------------------------------
 
+# Get all the headers
+file(GLOB_RECURSE HEADER_FILES include/*.h)
+
 add_library(ed_association
   src/association_matrix.cpp
   include/ed_sensor_integration/association_matrix.h
@@ -126,11 +129,11 @@ add_library(ed_laser_plugin_tracking
     src/laser/plugin_tracking.h
     src/laser/feature_functions.cpp
     src/laser/feature_functions.h
+    ${HEADER_FILES}
 )
-target_link_libraries(ed_laser_plugin_tracking ed_association ${catkin_LIBRARIES})
+target_link_libraries(ed_laser_plugin_tracking ed_association wire_state_estimators wired ${catkin_LIBRARIES})
 #add_dependencies(ed_laser_plugin_tracking wire_state_estimators ${PROJECT_NAME}_gencpp ${${PROJECT_NAME}_EXPORTED_TARGETS})
 add_dependencies(ed_laser_plugin_tracking ${PROJECT_NAME}_gencpp ${${PROJECT_NAME}_EXPORTED_TARGETS})
-
 
 #add_library(ed_laser_plugin_tracking2
 #    src/laser/plugin_tracking.cpp

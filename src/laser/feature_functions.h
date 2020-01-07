@@ -20,7 +20,7 @@
 #include <sensor_msgs/LaserScan.h>
 #include <geolib/sensors/LaserRangeFinder.h>
 
-#include <featureProperties.h>
+#include "wire_state_estimators/featureProperties.h"
 
 //#include "wiredData.h"
 
