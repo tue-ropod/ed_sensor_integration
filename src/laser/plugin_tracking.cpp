@@ -143,7 +143,7 @@ void pubPoints ( visualization_msgs::MarkerArray *markerArray, std::vector<geo::
     marker.color.b = COLORS[i_color][2];
     marker.color.a = ( float ) 1.0;
 
-    marker.lifetime = ros::Duration ( TIMEOUT_TIME );
+    marker.lifetime = ros::Duration ( MARKER_TIMEOUT_TIME );
 
     for ( unsigned int ii = 0; ii < points.size(); ii++ )
     {
@@ -793,8 +793,9 @@ void addEvidenceWIRE(wire_msgs::WorldEvidence& world_evidence,
         zRectangle->setMean(measuredProperty.rectangle_.get_H()* measuredProperty.rectangle_.getState());
         zRectangle->setCovariance(RmRectangle);
         
-//         std::cout << "RmRectangle = " << RmRectangle << std::endl;
-        
+//          std::cout << "ed_sensor_integration, zRectangle = " << zRectangle->toString() << std::endl;
+//          std::cout << "measuredProperty.rectangle_.get_H() = " << measuredProperty.rectangle_.get_H() << std::endl;
+//         std::cout << "measuredProperty.rectangle_.getState() transpose = " << measuredProperty.rectangle_.getState().t() << std::endl;
 //          std::cout << "tracking plugin: measuredProperty.rectangle_.get_H() = " << measuredProperty.rectangle_.get_H() << std::endl;
 //          std::cout << "tracking plugin:  measuredProperty.rectangle_.getState() = " <<  measuredProperty.rectangle_.getState() << std::endl;
         
@@ -847,8 +848,9 @@ void addEvidenceWIRE(wire_msgs::WorldEvidence& world_evidence,
         
         //std::cout << "add evidence wire: cov z = " << z.getCovariance() << std::endl;
 
-//          std::cout << "add evidence wire: measurement = " << hyb.toString() << std::endl;
-//          measuredProperty.printProperties();
+//         std::cout << "add evidence wire: measurement = " << hyb.toString() << std::endl;
+//         measuredProperty.printProperties();
+//         std::cout << "add evidence wire, measured properties printed." << std::endl;
         
         pbl::PDFtoMsg(hyb, properties.pdf);
         wire_msgs::ObjectEvidence obj_evidence;
@@ -856,9 +858,7 @@ void addEvidenceWIRE(wire_msgs::WorldEvidence& world_evidence,
         
         world_evidence.object_evidence.push_back(obj_evidence);
         
-        
         // TODO add probabilities
-        
         // Set position (x,y,z)
      /*   double x, y, z, yaw;
         double Rz = 0.1;
@@ -1007,6 +1007,7 @@ void LaserPluginTracking::initialize(ed::InitData& init)
 
 void LaserPluginTracking::process(const ed::WorldModel& world, ed::UpdateRequest& req)
 {    
+//         std::cout << "Laser pluging tracking: process start." << std::endl;
     cb_queue_.callAvailable();
 
     while(!scan_buffer_.empty())
@@ -1057,6 +1058,7 @@ void LaserPluginTracking::process(const ed::WorldModel& world, ed::UpdateRequest
             scan_buffer_.pop();
         }
     }
+//     std::cout << "Laser pluging tracking: process finished." << std::endl;
 }
 
 // ----------------------------------------------------------------------------------------------------
@@ -1286,7 +1288,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                 pointsModelled.color.g = 0.0;
                 pointsModelled.color.b = 1.0;
                 pointsModelled.color.a = 1.0; 
-                pointsModelled.lifetime = ros::Duration( TIMEOUT_TIME );
+                pointsModelled.lifetime = ros::Duration( MARKER_TIMEOUT_TIME );
                         
                 for(int iPoints = 0; iPoints < modelledPoints.size(); iPoints++)
                 {
@@ -1314,7 +1316,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                pointsMeasured.color.g = 1.0;
                pointsMeasured.color.b = 0.0;
                pointsMeasured.color.a = 1.0; 
-               pointsMeasured.lifetime = ros::Duration( TIMEOUT_TIME );
+               pointsMeasured.lifetime = ros::Duration( MARKER_TIMEOUT_TIME );
                         
                 for(int iPoints = 0; iPoints < measuredPoints.size(); iPoints++)
                 {
@@ -2005,6 +2007,10 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
         }
          
         tracking::FeatureProbabilities prob;
+//         std::cout << "ed_sensor_integration: going to set probabilities." << std::endl;
+//         std::cout << "errorRectangle = " << errorRectangle << " errorCircle = " << errorCircle << std::endl;
+//         std::cout << "circle.get_radius = " << circle.get_radius() << std::endl;
+         
         if ( prob.setMeasurementProbabilities ( errorRectangle, errorCircle, 2*circle.get_radius() , nominal_corridor_width_ ) )
         {
 
@@ -2077,7 +2083,8 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
   //      QmRectangle.diagonal() << Q, Q, Q, 20*Q, 20*Q, 20*Q, Q, Q; // Covariance on state = [x, y, rot, x vel, y Vel, rot Vel, width, depth]; Q increases, more emphasis on measurements     
   //      RmRectangle.diagonal() << R, R, RVariable, R, R; // R decreases, more emphasis on measurements, info = [x, y, orient, width, depth]
        // RmRectangle.diagonal() = {R, R, RVariable, R, R}; // R decreases, more emphasis on measurements, info = [x, y, orient, width, depth]
-       pbl::Vector RRectdiag = {R, R, RVariable, R, R};
+//        pbl::Vector RRectdiag = {R, R, RVariable, R, R};
+        pbl::Vector RRectdiag = {R, R, R, R, R};
         RmRectangle.diag() = RRectdiag;
         
 //         std::cout << "Just after initialization: RmRectangle = " << RmRectangle << std::endl;
@@ -2281,18 +2288,23 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
 //                           std::cout << "measuredProperties[iProperties].confidenceRectangleDepth == false : RmRectangle = " << RmRectangle << std::endl;
                 } 
                
-                Eigen::VectorXf zmRectangle( 5 );
+/*                Eigen::VectorXf zmRectangle( 5 );
                 zmRectangle <<  
                 measuredProperty.getRectangle().get_x(),
                 measuredProperty.getRectangle().get_y(), 
                 measuredProperty.getRectangle().get_yaw(),  
                 measuredProperty.getRectangle().get_w(), 
                 measuredProperty.getRectangle().get_d();
-                
+  */              
                 if (measuredProperty.getRectangle().get_yaw() != measuredProperty.getRectangle().get_yaw())
                 {
                         // In case it is hard to determine the yaw-angle, which might be when the object is almost in line with the sensor, a NaN can be produced
-                        zmRectangle(2) = entityRectangle.get_yaw();
+                        
+                       // zmRectangle(2) = entityRectangle.get_yaw();
+                        measuredProperty.rectangle_.set_yaw( entityRectangle.get_yaw() );
+                        
+//                         std::cout << "ed sensor integration zmRectangle = " << zmRectangle << " entityRectangle.get_yaw() = " << entityRectangle.get_yaw() << std::endl;
+                        
                         //QmRectangle(2, 2) = largeCovariance;
                         RmRectangle(2, 2) = largeCovariance;
 //                         std::cout << "measuredProperty.getRectangle().get_yaw() != measuredProperty.getRectangle().get_yaw(): RmRectangle = " << RmRectangle << std::endl;
@@ -2311,12 +2323,12 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                         //QmCircle( 4, 4 ) = largeCovariance;
                 } 
 
-                Eigen::VectorXf zmCircle( 3 );
+              /*  Eigen::VectorXf zmCircle( 3 );
                 zmCircle <<
                 measuredProperty.getCircle().get_x(),
                 measuredProperty.getCircle().get_y(),
                 measuredProperty.getCircle().get_radius();
-
+*/
                 // TODO: do calculations in WIRE
               /*  tracking::FeatureProbabilities measuredProb = measuredProperty.getFeatureProbabilities(); 
 
@@ -2410,7 +2422,8 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                 req.setExistenceProbability ( id, existenceProbability );
                 */
                 
-                std::cout << "Before add evidence wire: RmRectangle = " << RmRectangle << std::endl;
+//                    std::cout << "Before add evidence wire: measuredProperty = "; measuredProperty.printProperties();
+//                    std::cout << "Before add evidence wire: zm rectangle = " << zmRectangle << std::endl;
                 addEvidenceWIRE(world_evidence, measuredProperty, RmRectangle, RmCircle );
         }
     }
