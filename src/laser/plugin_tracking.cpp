@@ -787,7 +787,11 @@ void addEvidenceWIRE(wire_msgs::WorldEvidence& world_evidence,
         wire_msgs::Property properties;
         properties.attribute = "positionAndDimension";  
 //         std::cout << "measuredProperty.rectangle_.get_H() = " << measuredProperty.rectangle_.get_H() << " measuredProperty.rectangle_.getState() = " << measuredProperty.rectangle_.getState() << std::endl;
-        
+//         std::cout << "ed_sensor_integration: measuredProperty.rectangle_.getState().t() = " << measuredProperty.rectangle_.getState().t() << std::endl;
+//          std::cout << "ed_sensor_integration: measuredProperty.circle_.getState().t() = " << measuredProperty.circle_.getState().t() << std::endl;
+//         
+//         std::cout << "ed_sensor_integration: RmRectangle = " << RmRectangle << std::endl;
+//         std::cout << "ed_sensor_integration: RmCircle = " << RmCircle << std::endl;
         
         std::shared_ptr<pbl::Gaussian> zRectangle = std::make_shared<pbl::Gaussian>(RECTANGLE_MEASURED_STATE_SIZE + RECTANGLE_MEASURED_DIM_STATE_SIZE);
         zRectangle->setMean(measuredProperty.rectangle_.get_H()* measuredProperty.rectangle_.getState());
@@ -816,8 +820,8 @@ void addEvidenceWIRE(wire_msgs::WorldEvidence& world_evidence,
      //   double unitWeight = 1.0; 
         pbl::Hybrid  hyb;// = std::make_shared<pbl::Hybrid>();
         
-//         std::cout << "zRectangle = " << zRectangle->toString() << std::endl;
-//         std::cout << "zCircle = " << zCircle->toString() << std::endl;
+//          std::cout << "ed_sensor_integration: zRectangle = " << zRectangle->toString() << std::endl;
+//          std::cout << "ed_sensor_integration: zCircle = " << zCircle->toString() << std::endl;
         
         hyb.addPDF(*zRectangle,measuredProperty.getFeatureProbabilities().get_pRectangle());
         hyb.addPDF(*zCircle, measuredProperty.getFeatureProbabilities().get_pCircle());
