@@ -94,11 +94,6 @@ visualization_msgs::Marker getMarker ( tracking::FeatureProperties& featureProp,
              marker.pose.orientation.x !=  marker.pose.orientation.x || marker.pose.orientation.y !=  marker.pose.orientation.y || marker.pose.orientation.z !=  marker.pose.orientation.z ||
              marker.pose.orientation.w !=  marker.pose.orientation.w || marker.scale.x != marker.scale.x || marker.scale.y != marker.scale.y || marker.scale.z != marker.scale.z )
      {
-                std::cout << 
-                "ed_sensor_integration: marker.pose.position.x  = " << marker.pose.position.x  << 
-                " marker.pose.position.y = " << marker.pose.position.y << 
-                " marker.pose.position.z = " << marker.pose.position.z << std::endl;
-
                 ROS_WARN( "Publishing of object with nan" ); 
                 std::cout << "Publishing of object with nan!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
                 featureProp.printProperties();
@@ -802,6 +797,7 @@ void addEvidenceWIRE(wire_msgs::WorldEvidence& world_evidence,
 {
         wire_msgs::Property properties;
         properties.attribute = "positionAndDimension";  
+        
 //         std::cout << "measuredProperty.rectangle_.get_H() = " << measuredProperty.rectangle_.get_H() << " measuredProperty.rectangle_.getState() = " << measuredProperty.rectangle_.getState() << std::endl;
 //         std::cout << "ed_sensor_integration: measuredProperty.rectangle_.getState().t() = " << measuredProperty.rectangle_.getState().t() << std::endl;
 //          std::cout << "ed_sensor_integration: measuredProperty.circle_.getState().t() = " << measuredProperty.circle_.getState().t() << std::endl;
@@ -1951,9 +1947,10 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                  else if (determineDepthConfidence)
                  {
                           tracking::unwrap (&avgAngle, rectangle.get_yaw() + (float) M_PI_2, (float) M_PI);
-                 }
+                 }               
                  
-                 if ( (std::fabs(rectangle.get_yaw() - avgAngle) < ANGLE_MARGIN_FITTING && determineWidthConfidence) || (std::fabs(rectangle.get_yaw() + M_PI_2 - avgAngle) < ANGLE_MARGIN_FITTING && determineDepthConfidence) )
+                 if ( (std::fabs(rectangle.get_yaw() - avgAngle) < ANGLE_MARGIN_FITTING && determineWidthConfidence) || 
+                      (std::fabs(rectangle.get_yaw() + M_PI_2 - avgAngle) < ANGLE_MARGIN_FITTING && determineDepthConfidence) )
                  {
                          // Make sure you have a good view on the relevant side. If you are measuring almost parallel, the distance between points might be larger than the criterion, meaning you 
                          // measure a shorter length. In this case, you are uncertain about the dimension.
@@ -2083,8 +2080,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
         // TEMP publish measured properties to test with WIRE
         //  addEvidenceWIRE(world_evidence, measuredProperties[iProperties] );
         
-        // temporary: pub measured properties in order to visualize the properties which are added
-        markers.markers.push_back( getMarker(measuredProperty, ID++) ); // TEMP
+       
 
         //float Q = 0.4; // Measurement noise covariance. TODO: let it depend on if an object is partially occluded. Now, objects are assumed to be completely visible
         float R = 0.1; // Process noise covariance
@@ -2296,7 +2292,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
 //                         std::cout << "ed_sensor_integration: measuredProperties[iProperties].confidenceRectangleDepth = " << measuredProperties[iProperties].confidenceRectangleDepth << std::endl;
                         
                 if( measuredProperties[iProperties].confidenceRectangleDepth == false )
-                {                        
+                {             
                           if( measuredProperty.getRectangle().get_d() > modelledDepth )
                           {
                                   RmRectangle( 4, 4 ) = mediumDimensionCovariance;
@@ -2495,6 +2491,8 @@ measuredProperty.featureProbabilities_.get_pCircle() != measuredProperty.feature
 //std::cout << "ed_sensor_integration: measuredProperty.printProperties(); "; 
 // measuredProperty.printProperties();
 //                    std::cout << "Before add evidence wire: zm rectangle = " << zmRectangle << std::endl;
+ // temporary: pub measured properties in order to visualize the properties which are added
+                markers.markers.push_back( getMarker(measuredProperty, ID++) ); // TEMP
                 addEvidenceWIRE(world_evidence, measuredProperty, RmRectangle, RmCircle );
         }
     }
