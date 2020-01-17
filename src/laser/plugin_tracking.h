@@ -75,9 +75,6 @@ public:
     void process(const ed::WorldModel& world, ed::UpdateRequest& req);
 
 private:
-
-    //
-
     ros::CallbackQueue cb_queue_;
 
     ros::Subscriber sub_scan_;
@@ -107,9 +104,6 @@ private:
     ros::Subscriber amclPose_sub_;
     
     ros::Subscriber initializedPose_sub_;
-   
-    // Publisher used to send evidence to world model
-    //ros::Publisher world_evidence_publisher_; // ############################## TEMP ############################
 
     std::queue<sensor_msgs::LaserScan::ConstPtr> scan_buffer_;
     
@@ -127,13 +121,11 @@ private:
     
     void PoseWithCovarianceStampedInitCallback(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr& msg);
 
-    void update(const ed::WorldModel& world, const sensor_msgs::LaserScan::ConstPtr& scan,
-                geo::Pose3D& sensor_pose, ed::UpdateRequest& req);
+    void update(const ed::WorldModel& world, const sensor_msgs::LaserScan::ConstPtr& scan, geo::Pose3D& sensor_pose, ed::UpdateRequest& req);
 
 
 
     // PARAMETERS
-
     int min_segment_size_pixels_;
     float world_association_distance_;
     float segment_depth_threshold_;
