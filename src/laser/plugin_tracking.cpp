@@ -90,6 +90,22 @@ visualization_msgs::Marker getMarker ( tracking::FeatureProperties& featureProp,
             rectangle.setMarker ( marker , ID, color );
         }
         
+         if(marker.pose.position.x != marker.pose.position.x || marker.pose.position.y != marker.pose.position.y || marker.pose.position.z != marker.pose.position.z ||
+             marker.pose.orientation.x !=  marker.pose.orientation.x || marker.pose.orientation.y !=  marker.pose.orientation.y || marker.pose.orientation.z !=  marker.pose.orientation.z ||
+             marker.pose.orientation.w !=  marker.pose.orientation.w || marker.scale.x != marker.scale.x || marker.scale.y != marker.scale.y || marker.scale.z != marker.scale.z )
+     {
+                std::cout << 
+                "ed_sensor_integration: marker.pose.position.x  = " << marker.pose.position.x  << 
+                " marker.pose.position.y = " << marker.pose.position.y << 
+                " marker.pose.position.z = " << marker.pose.position.z << std::endl;
+
+                ROS_WARN( "Publishing of object with nan" ); 
+                std::cout << "Publishing of object with nan!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
+                featureProp.printProperties();
+                
+                exit (EXIT_FAILURE);
+        }
+        
     return marker;
 }
 
@@ -399,7 +415,7 @@ void splitSegmentsWhenGapDetected( std::vector< PointsInfo >& associatedPointsIn
                                     avgRangeHigh /= nHighElements;
                             }
                             
-                            std::cout << "avgRangeLow = " << avgRangeLow << " avgRangeHigh = " << avgRangeHigh << std::endl;
+//                             std::cout << "avgRangeLow = " << avgRangeLow << " avgRangeHigh = " << avgRangeHigh << std::endl;
 
                             float maxReference = std::max(avgRangeLow, avgRangeHigh);
                             unsigned int nLargerRanges = 0;
@@ -2106,6 +2122,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
         double existenceProbability;
         if ( iProperties < it_laserEntities.size() )
         {
+//             std::cout << "ed_sensor_integration:  iProperties < it_laserEntities.size() " << std::endl;
             const ed::EntityConstPtr& e = * ( it_laserEntities[iProperties] );
 
             // check if new properties are measured.
@@ -2127,17 +2144,13 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                 }
                 continue;
             }
-            
 
-
-            if ( !e->hasFlag ( "locked" ) )
-            {
+//             if ( !e->hasFlag ( "locked" ) )
+//             {
                 entityProperties = e->property ( featureProperties_ );
                 tracking::Rectangle entityRectangle = entityProperties.getRectangle();
                 tracking::Circle entityCircle = entityProperties.getCircle();
                 
-              
-                      
                 // TODO what to do with position information if there is low confidence in with and depth? Position information should be updated with respect to an anchor point!
                 // This is the problem of fusing multiple sensors
                 
@@ -2279,6 +2292,9 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
 //                         std::cout << "easuredProperty.getRectangle().get_w() > modelledWidth : RmRectangle = " << RmRectangle << std::endl;
                 }
                         
+                        
+//                         std::cout << "ed_sensor_integration: measuredProperties[iProperties].confidenceRectangleDepth = " << measuredProperties[iProperties].confidenceRectangleDepth << std::endl;
+                        
                 if( measuredProperties[iProperties].confidenceRectangleDepth == false )
                 {                        
                           if( measuredProperty.getRectangle().get_d() > modelledDepth )
@@ -2339,7 +2355,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                 entityProperties.updateCircleFeatures(QmCircle, RmCircle, zmCircle, dt);
                 entityProperties.updateProbabilities ( measuredProb );
                 */
-            }
+//             }
 
             // Update existence probability
             double p_exist = e->existenceProbability();
@@ -2349,10 +2365,37 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
         }
         else
         {
-            // create a new entity
+                 // create a new entity
+//                 std::cout << "ed_sensor_integration:  iProperties > it_laserEntities.size() " << std::endl;
+                
+//                 std::cout << "Measured Properties: confidences = " << 
+                
+//                 measuredProperties[iProperties].confidenceRectangleWidth << ", " <<
+//                 measuredProperties[iProperties].confidenceRectangleWidthLow << ", " <<
+//                 measuredProperties[iProperties].confidenceRectangleWidthHigh << ", " <<
+//                 measuredProperties[iProperties].confidenceRectangleDepth << ", " <<
+//                 measuredProperties[iProperties].confidenceRectangleDepthLow << ", " <<
+//                 measuredProperties[iProperties].confidenceRectangleDepthHigh << std::endl;
+          
+                if( measuredProperties[iProperties].confidenceRectangleWidth == false ) // when we do an update, we always measured in the width direction
+                {
+                                RmRectangle( 3, 3 ) = largeCovariance;
+                }
+
+                if( measuredProperties[iProperties].confidenceRectangleDepth == false )
+                {                        
+                                  RmRectangle( 4, 4 ) = largeCovariance;
+                } 
+               
+                if (measuredProperty.getRectangle().get_yaw() != measuredProperty.getRectangle().get_yaw())
+                {
+                        // In case it is hard to determine the yaw-angle, which might be when the object is almost in line with the sensor, a NaN can be produced. Alternative: skip?
+                        measuredProperty.rectangle_.set_yaw( 0.0 );
+                        RmRectangle(2, 2) = largeCovariance;
+                }
                 
             // Generate unique ID
-            id = ed::Entity::generateID().str() + "-laserTracking";
+//             id = ed::Entity::generateID().str() + "-laserTracking";
             
             // Update existence probability
             existenceProbability = 1.0; // TODO magic number
@@ -2427,6 +2470,30 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                 */
                 
 //                    std::cout << "Before add evidence wire: measuredProperty = "; measuredProperty.printProperties();
+
+if(
+measuredProperty.circle_.get_x() != measuredProperty.circle_.get_x() || 
+measuredProperty.circle_.get_y() != measuredProperty.circle_.get_y() || 
+measuredProperty.circle_.get_xVel() != measuredProperty.circle_.get_xVel() ||
+measuredProperty.circle_.get_yVel() != measuredProperty.circle_.get_yVel() ||
+measuredProperty.circle_.get_radius() != measuredProperty.circle_.get_radius() ||
+measuredProperty.rectangle_.get_x() != measuredProperty.rectangle_.get_x() || 
+measuredProperty.rectangle_.get_y() != measuredProperty.rectangle_.get_y() || 
+measuredProperty.rectangle_.get_xVel() != measuredProperty.rectangle_.get_xVel() ||
+measuredProperty.rectangle_.get_yVel() != measuredProperty.rectangle_.get_yVel() ||
+measuredProperty.rectangle_.get_w() != measuredProperty.rectangle_.get_w() ||
+measuredProperty.rectangle_.get_d() != measuredProperty.rectangle_.get_d() ||
+measuredProperty.featureProbabilities_.get_pRectangle() != measuredProperty.featureProbabilities_.get_pRectangle() ||
+measuredProperty.featureProbabilities_.get_pCircle() != measuredProperty.featureProbabilities_.get_pCircle() 
+)
+{
+        measuredProperty.printProperties();
+        ROS_FATAL  ( "ed_sensor_integration: problems!!!!!!!!!" );
+         exit (EXIT_FAILURE);
+}
+
+//std::cout << "ed_sensor_integration: measuredProperty.printProperties(); "; 
+// measuredProperty.printProperties();
 //                    std::cout << "Before add evidence wire: zm rectangle = " << zmRectangle << std::endl;
                 addEvidenceWIRE(world_evidence, measuredProperty, RmRectangle, RmCircle );
         }
