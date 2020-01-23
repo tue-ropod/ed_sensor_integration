@@ -773,8 +773,8 @@ void addEvidenceWIRE(wire_msgs::WorldEvidence& world_evidence, tracking::Feature
         
         std::shared_ptr<pbl::Gaussian> zRectangle = std::make_shared<pbl::Gaussian>(RECTANGLE_MEASURED_STATE_SIZE + RECTANGLE_MEASURED_DIM_STATE_SIZE);
         zRectangle->setMean(measuredProperty.rectangle_.get_H()* measuredProperty.rectangle_.getState());
-        zRectangle->setCovariance(RmRectangle);
-
+        zRectangle->setCovariance(RmRectangle); 
+        
         std::shared_ptr<pbl::Gaussian> zCircle = std::make_shared<pbl::Gaussian>(CIRCLE_MEASURED_STATE_SIZE + CIRCLE_MEASURED_DIM_STATE_SIZE);
         zCircle->setMean(measuredProperty.circle_.get_H()* measuredProperty.circle_.getState());
         zCircle->setCovariance(RmCircle);
@@ -869,7 +869,7 @@ void LaserPluginTracking::initialize(ed::InitData& init)
 // ----------------------------------------------------------------------------------------------------
 
 void LaserPluginTracking::process(const ed::WorldModel& world, ed::UpdateRequest& req)
-{    
+{            
     cb_queue_.callAvailable();
 
     while(!scan_buffer_.empty())
@@ -920,7 +920,6 @@ void LaserPluginTracking::process(const ed::WorldModel& world, ed::UpdateRequest
             scan_buffer_.pop();
         }
     }
-//     std::cout << "Laser pluging tracking: process finished." << std::endl;
 }
 
 // ----------------------------------------------------------------------------------------------------
@@ -1279,14 +1278,13 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                 continue;
 	}
 
-
         featureProperties = e->property ( featureProperties_ );
-        if(featureProperties.getFeatureProbabilities().getDomainSize() != 2 ) // TODO ugly! What causes that the domainsize !=2 ?
-        {
-                req.removeEntity ( e->id() );
-                        continue;
-
-        }
+//         if(featureProperties.getFeatureProbabilities().getDomainSize() != 2 ) // TODO ugly! What causes that the domainsize !=2 ?
+//         {
+//                 ROS_WARN(" ed_sensor_integration: featureProperties.getFeatureProbabilities().getDomainSize() != 2, 1st version");
+//                 req.removeEntity ( e->id() );
+//                         continue;
+//         }
 
         EntityProperty currentProperty;
         float dt = scan->header.stamp.toSec() - e->lastUpdateTimestamp();
@@ -1403,34 +1401,36 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
             {
                 const ed::EntityConstPtr& e = *it_laserEntities[ possibleSegmentEntityAssociations[jj] ];
 
-                if( !e-> property ( featureProperties_) )
-                {
-                        req.removeEntity ( e->id() );
-                        continue;
-                }
+//                 if( !e-> property ( featureProperties_) )
+//                 {
+//                         ROS_WARN(" ed_sensor_integration:  !e-> property ( featureProperties_)");
+//                         req.removeEntity ( e->id() );
+//                         continue;
+//                 }
                 
                 tracking::FeatureProperties featureProperties = e->property ( featureProperties_ );
 
                 float dist;
                 float dt = scan->header.stamp.toSec() - e->lastUpdateTimestamp();
                 
-		if(featureProperties.getFeatureProbabilities().getDomainSize() != 2 )// TODO ugly!
-		{
-			req.removeEntity ( e->id() );
-                        continue;
-		}	
-
-                double prob1 = featureProperties.getFeatureProbabilities().get_pCircle();
-                double prob2 = featureProperties.getFeatureProbabilities().get_pRectangle();
-                bool test = featureProperties.getFeatureProbabilities().get_pCircle() > featureProperties.getFeatureProbabilities().get_pRectangle();
+//                 std::cout << std::setprecision(5) << "dt = " << dt << " scan->header.stamp.toSec() = " << scan->header.stamp.toSec() << " e->lastUpdateTimestamp() = " << e->lastUpdateTimestamp() << std::endl;
                 
-                if(prob1 == -1.0 || prob2 == -1.0 ) // TODO ugly!
-                {
-                        req.removeEntity ( e->id() );
-                        continue;
-                }
+// 		if(featureProperties.getFeatureProbabilities().getDomainSize() != 2 )// TODO ugly!
+// 		{
+//                         ROS_WARN(" ed_sensor_integration: featureProperties.getFeatureProbabilities().getDomainSize() != 2, 2nd version");
+// 			req.removeEntity ( e->id() );
+//                         continue;
+// 		}	
+                
+//                 if(featureProperties.getFeatureProbabilities().get_pCircle() == -1.0 || featureProperties.getFeatureProbabilities().get_pRectangle() == -1.0 ) // TODO ugly!
+//                 {
+//                         ROS_WARN(" ed_sensor_integration: pCircle == -1.0 || pRectangle == -1.0");
+//                         
+//                         req.removeEntity ( e->id() );
+//                         continue;
+//                 }
 
-                if ( prob1 > prob2 )  // entity is considered to be a circle
+                if ( featureProperties.getFeatureProbabilities().get_pCircle() > featureProperties.getFeatureProbabilities().get_pRectangle() ) 
                 {
                     tracking::Circle circle = featureProperties.getCircle();  
                     circle.predictAndUpdatePos( dt ); // TODO Do this update once at initialisation
@@ -1507,13 +1507,14 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                         shortestDistance = dist;
                         id_shortestEntity = jj;
                 }
-                
             }
-            
+
+//             std::cout << "shortestDistance for point " << points[i_points] << " = " << shortestDistance << " to entity = " << id_shortestEntity << std::endl;
+
             distances[i_points] = shortestDistance;
             IDs[i_points] = id_shortestEntity;
         }
-        
+
         unsigned int IDtoCheck = IDs[0];
         unsigned int firstElement = 0;
         bool previousSegmentAssociated = false;
@@ -1574,7 +1575,6 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                                 
                         }                             
                 }
-
             
                 if ( !associated && previousSegmentAssociated) 
                 {
@@ -1595,7 +1595,6 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                 if ( associated )  // add all points to associated entity
                 {
                         previousSegmentAssociated = true;
-//                    const ed::EntityConstPtr& entityToTest = *it_laserEntities[ possibleSegmentEntityAssociations[IDtoCheck] ];
                         append( associatedPointsInfo.at ( possibleSegmentEntityAssociations[IDtoCheck] ).points, points, firstElement, iDistances );
                         append( associatedPointsInfo.at ( possibleSegmentEntityAssociations[IDtoCheck] ).laserIDs, segmentIDs, firstElement, iDistances );
                 }
@@ -1658,7 +1657,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
 
           method = tracking::determineCase ( points, &cornerIndex, &it_low, &it_high, sensor_pose, (unsigned int) min_segment_size_pixels_); // chose to fit a single line or a rectangle (2 lines)
           float errorRectangle = tracking::fitObject ( points, method,  &cornerIndex, &rectangle, &circle, &it_low, &it_high,  sensor_pose, (unsigned int) min_segment_size_pixels_ );
-
+          
           measuredProperties[iList].confidenceRectangleWidth = false;
           measuredProperties[iList].confidenceRectangleWidthLow = false;
           measuredProperties[iList].confidenceRectangleWidthHigh = false;
@@ -1868,11 +1867,11 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
             
         measuredProperty = measuredProperties[iProperties].featureProperty;
         
-        float R = 0.1; // Process noise covariance. R decreases, more emphasis on measurements, info = [x, y, orient, width, depth]
-        float RVariable = 1000000*R*pow(measuredProperties[iProperties].fittingErrorRectangle, 2.0); // TODO why this strange number!?
-        float largeCovariance = 100000.0;
+        float R = DEFAULT_MEASUREMENT_UNCERTAINTY; // Process noise covariance. R decreases, more emphasis on measurements, info = [x, y, orient, width, depth]
+//         float RVariable = 1000000*R*pow(measuredProperties[iProperties].fittingErrorRectangle, 2.0); // TODO why this strange number!?
+        float largeCovariance = 10.0;
         float mediumDimensionCovariance = 2.0;
-               
+       
         pbl::Matrix RmRectangle;
         RmRectangle.zeros(RECTANGLE_MEASURED_STATE_SIZE + RECTANGLE_MEASURED_DIM_STATE_SIZE, RECTANGLE_MEASURED_STATE_SIZE + RECTANGLE_MEASURED_DIM_STATE_SIZE );
 
@@ -2048,7 +2047,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                         }
                         else
                         {
-                                RmRectangle( 3, 3 ) = largeCovariance;
+                                RmRectangle( 3, 3 ) = largeCovariance; // do not update
                         }
                 }
                         
@@ -2060,14 +2059,13 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                           }
                           else
                           {
-                                  RmRectangle( 4, 4 ) = largeCovariance;
+                                  RmRectangle( 4, 4 ) = largeCovariance; // do not update
                           }
                 } 
 
                 if (measuredProperty.getRectangle().get_yaw() != measuredProperty.getRectangle().get_yaw())
                 {
                         // In case it is hard to determine the yaw-angle, which might be when the object is almost in line with the sensor, a NaN can be produced
-                        
                         measuredProperty.rectangle_.set_yaw( entityRectangle.get_yaw() );
                         RmRectangle(2, 2) = largeCovariance;
                 }
@@ -2075,7 +2073,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                 // TODO what to do with position information if there is low confidence in with and depth? Position information should be updated with respect to an anchor point!
                 if( measuredProperties[iProperties].confidenceRectangleDepth == false )
                 {
-                        RmCircle( 4, 4 ) = largeCovariance;
+                        RmRectangle( 4, 4 ) = largeCovariance;
                 } 
 
             // Update existence probability
@@ -2183,7 +2181,6 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
     buf->getBuffer().push_front(world_evidence);
 
     ObjectMarkers_pub_.publish(markers);
-
 // - - - - - - - - - - - - - - - - -
 
 //     std::cout << "tracking plugin: Total took " << t_total.getElapsedTimeInMilliSec() << " ms. \n\n\n" << std::endl;
