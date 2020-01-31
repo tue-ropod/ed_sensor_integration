@@ -94,9 +94,9 @@ visualization_msgs::Marker getMarker ( tracking::FeatureProperties& featureProp,
              marker.pose.orientation.x !=  marker.pose.orientation.x || marker.pose.orientation.y !=  marker.pose.orientation.y || marker.pose.orientation.z !=  marker.pose.orientation.z ||
              marker.pose.orientation.w !=  marker.pose.orientation.w || marker.scale.x != marker.scale.x || marker.scale.y != marker.scale.y || marker.scale.z != marker.scale.z )
      {
-                ROS_WARN( "Publishing of object with nan" ); 
-                std::cout << "Publishing of object with nan!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
+             
                 featureProp.printProperties();
+                ROS_WARN( "Publishing of object with nan" ); 
                 
                 exit (EXIT_FAILURE);
         }
@@ -765,7 +765,7 @@ bool isInside(std::vector<T> Points, T& p)
     return segments;
 }            
 
-void addEvidenceWIRE(wire_msgs::WorldEvidence& world_evidence, tracking::FeatureProperties measuredProperty, pbl::Matrix RmRectangle, pbl::Matrix RmCircle )
+void addEvidenceWIRE(wire_msgs::WorldEvidence& world_evidence, tracking::FeatureProperties measuredProperty )
 // Converter from measured properties to WIRE-info
 {
         wire_msgs::Property properties;
@@ -773,11 +773,13 @@ void addEvidenceWIRE(wire_msgs::WorldEvidence& world_evidence, tracking::Feature
         
         std::shared_ptr<pbl::Gaussian> zRectangle = std::make_shared<pbl::Gaussian>(RECTANGLE_MEASURED_STATE_SIZE + RECTANGLE_MEASURED_DIM_STATE_SIZE);
         zRectangle->setMean(measuredProperty.rectangle_.get_H()* measuredProperty.rectangle_.getState());
-        zRectangle->setCovariance(RmRectangle); 
+        zRectangle->setCovariance(measuredProperty.rectangle_.get_H()* measuredProperty.rectangle_.getCovariance()*measuredProperty.rectangle_.get_H().t());
+        
+       
         
         std::shared_ptr<pbl::Gaussian> zCircle = std::make_shared<pbl::Gaussian>(CIRCLE_MEASURED_STATE_SIZE + CIRCLE_MEASURED_DIM_STATE_SIZE);
         zCircle->setMean(measuredProperty.circle_.get_H()* measuredProperty.circle_.getState());
-        zCircle->setCovariance(RmCircle);
+        zCircle->setCovariance(measuredProperty.circle_.get_H()* measuredProperty.circle_.getCovariance()*measuredProperty.circle_.get_H().t());
 
         pbl::Hybrid  hyb;
         hyb.addPDF(*zRectangle,measuredProperty.getFeatureProbabilities().get_pRectangle());
@@ -788,8 +790,6 @@ void addEvidenceWIRE(wire_msgs::WorldEvidence& world_evidence, tracking::Feature
         obj_evidence.properties.push_back(properties);
         
         world_evidence.object_evidence.push_back(obj_evidence);
-         
-        return;
 }
 
 // ----------------------------------------------------------------------------------------------------
@@ -1869,19 +1869,24 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
         
         float R = DEFAULT_MEASUREMENT_UNCERTAINTY; // Process noise covariance. R decreases, more emphasis on measurements, info = [x, y, orient, width, depth]
 //         float RVariable = 1000000*R*pow(measuredProperties[iProperties].fittingErrorRectangle, 2.0); // TODO why this strange number!?
-        float largeCovariance = 10.0;
-        float mediumDimensionCovariance = 2.0;
+        float largeCovariance = 1.0;
+        float mediumDimensionCovariance = 0.5;
        
-        pbl::Matrix RmRectangle;
-        RmRectangle.zeros(RECTANGLE_MEASURED_STATE_SIZE + RECTANGLE_MEASURED_DIM_STATE_SIZE, RECTANGLE_MEASURED_STATE_SIZE + RECTANGLE_MEASURED_DIM_STATE_SIZE );
-
-        pbl::Vector RRectdiag = {R, R, R, R, R};
-        RmRectangle.diag() = RRectdiag;
+//         double* RmRectanglePosVel = measuredProperty.rectangle_.get_p_P_PosVel();
+        measuredProperty.rectangle_.P_PosVel_.at(tracking::RM.x_PosVelRef, tracking::RM.x_PosVelRef) = R;
+        measuredProperty.rectangle_.P_PosVel_.at(tracking::RM.y_PosVelRef, tracking::RM.y_PosVelRef) = R;
+        measuredProperty.rectangle_.P_PosVel_.at(tracking::RM.yaw_PosVelRef, tracking::RM.yaw_PosVelRef) = R;
         
-        pbl::Matrix RmCircle;
-        RmCircle.zeros(CIRCLE_MEASURED_STATE_SIZE + CIRCLE_MEASURED_DIM_STATE_SIZE, CIRCLE_MEASURED_STATE_SIZE + CIRCLE_MEASURED_DIM_STATE_SIZE );
-        pbl::Vector RCircdiag = {R, R, R};
-        RmCircle.diag() = RCircdiag;
+//         double* RmRectangleDim = measuredProperty.rectangle_.get_p_Pdim();
+        measuredProperty.rectangle_.Pdim_.at(tracking::RM.width_dimRef, tracking::RM.width_dimRef) = R;
+        measuredProperty.rectangle_.Pdim_.at(tracking::RM.depth_dimRef, tracking::RM.depth_dimRef) = R;        
+        
+//         double* RmCirclePosVel = measuredProperty.circle_.get_p_P_PosVel();
+        measuredProperty.circle_.P_PosVel_.at(tracking::CM.x_PosVelRef, tracking::CM.x_PosVelRef) = R;
+        measuredProperty.circle_.P_PosVel_.at(tracking::CM.y_PosVelRef, tracking::CM.y_PosVelRef) = R;
+        
+//         double* RmCircleDim = measuredProperty.circle_.get_p_Pdim();
+         measuredProperty.circle_.Pdim_.at(tracking::CM.r_dimRef, tracking::CM.r_dimRef) = R;
         
         double existenceProbability;
         if ( iProperties < it_laserEntities.size() )
@@ -1983,7 +1988,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                                 // Measuring one side, but not the corners, gives accurate position information in one direction (the lateral direction of the 
                                 // width is always measured, as that is the first part in the measured properties)
                                 
-                                float largePositionCovariance = 25.0; // TODO small covariance when the entity described does not reflect a part which is detected
+                                float largePositionCovariance = 2.0; // TODO small covariance when the entity described does not reflect a part which is detected
                                 float smallPositionCovariance = R; // was Q
                                 pbl::Matrix C;
                                 C << largePositionCovariance << 0.0 << arma::endr 
@@ -2018,8 +2023,8 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                                 Rot << std::cos( rot ) << -std::sin( rot ) << arma::endr
                                 << std::sin( rot ) <<  std::cos( rot) << arma::endr;
                                 std::cout << "Rot*C*Rot.t() = " << Rot*C*Rot.t() << std::endl;
-                                RmRectangle.submat(0, 0, 1, 1) = Rot*C*Rot.t();
-                                std::cout << "Rm rectangle after rot = " << RmRectangle << std::endl;
+                                measuredProperty.rectangle_.P_PosVel_.submat(0, 0, 1, 1) = Rot*C*Rot.t();
+                                std::cout << "Rm rectangle after rot = " <<  measuredProperty.rectangle_.P_PosVel_ << std::endl;
                         }
                 }
                 
@@ -2043,11 +2048,12 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                         // TODO use defines for state dimensions
                         if( measuredProperty.getRectangle().get_w() > modelledWidth )
                         {
-                                RmRectangle( 3, 3 ) = mediumDimensionCovariance; // as it it safer to estimate the dimensions too high than too low
+                                // as it it safer to estimate the dimensions too high than too low
+                                measuredProperty.rectangle_.Pdim_.at( tracking::RM.width_dimRef, tracking::RM.width_dimRef ) = mediumDimensionCovariance;
                         }
                         else
-                        {
-                                RmRectangle( 3, 3 ) = largeCovariance; // do not update
+                        {       // do not update
+                                measuredProperty.rectangle_.Pdim_.at( tracking::RM.width_dimRef, tracking::RM.width_dimRef ) = largeCovariance; 
                         }
                 }
                         
@@ -2055,25 +2061,27 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                 {             
                           if( measuredProperty.getRectangle().get_d() > modelledDepth )
                           {
-                                  RmRectangle( 4, 4 ) = mediumDimensionCovariance;
+                                  measuredProperty.rectangle_.Pdim_.at( tracking::RM.depth_dimRef, tracking::RM.depth_dimRef ) = mediumDimensionCovariance;
                           }
                           else
                           {
-                                  RmRectangle( 4, 4 ) = largeCovariance; // do not update
+                                   // do not update
+                                  measuredProperty.rectangle_.Pdim_.at( tracking::RM.depth_dimRef, tracking::RM.depth_dimRef ) = largeCovariance;
                           }
                 } 
 
                 if (measuredProperty.getRectangle().get_yaw() != measuredProperty.getRectangle().get_yaw())
                 {
                         // In case it is hard to determine the yaw-angle, which might be when the object is almost in line with the sensor, a NaN can be produced
+                        ROS_WARN("Yaw measurement of rectangle artificially set to associated entity.");
                         measuredProperty.rectangle_.set_yaw( entityRectangle.get_yaw() );
-                        RmRectangle(2, 2) = largeCovariance;
+                        measuredProperty.rectangle_.P_PosVel_.at(tracking::RM.yaw_PosVelRef, tracking::RM.yaw_PosVelRef) = largeCovariance;
                 }
                 
                 // TODO what to do with position information if there is low confidence in with and depth? Position information should be updated with respect to an anchor point!
                 if( measuredProperties[iProperties].confidenceRectangleDepth == false )
                 {
-                        RmRectangle( 4, 4 ) = largeCovariance;
+                       measuredProperty.rectangle_.Pdim_.at( tracking::RM.depth_dimRef, tracking::RM.depth_dimRef ) = largeCovariance;
                 } 
 
             // Update existence probability
@@ -2087,19 +2095,20 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                  // create a new entity          
             if( measuredProperties[iProperties].confidenceRectangleWidth == false ) // when we do an update, we always measured in the width direction
             {
-                            RmRectangle( 3, 3 ) = largeCovariance;
+                            measuredProperty.rectangle_.Pdim_.at( tracking::RM.width_dimRef, tracking::RM.width_dimRef  ) = largeCovariance;
             }
 
             if( measuredProperties[iProperties].confidenceRectangleDepth == false )
             {                        
-                              RmRectangle( 4, 4 ) = largeCovariance;
+                              measuredProperty.rectangle_.Pdim_.at( tracking::RM.width_dimRef, tracking::RM.width_dimRef ) = largeCovariance;
             } 
    
             if (measuredProperty.getRectangle().get_yaw() != measuredProperty.getRectangle().get_yaw())
             {
+                    ROS_WARN("Yaw measurement of rectangle artificially set to 0. v2");
                     // In case it is hard to determine the yaw-angle, which might be when the object is almost in line with the sensor, a NaN can be produced. Alternative: skip?
                     measuredProperty.rectangle_.set_yaw( 0.0 );
-                    RmRectangle(2, 2) = largeCovariance;
+                    measuredProperty.rectangle_.P_PosVel_.at(tracking::RM.yaw_PosVelRef, tracking::RM.yaw_PosVelRef) = largeCovariance;
             }
             
             // Update existence probability
@@ -2170,7 +2179,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                 }
 
                 markers.markers.push_back( getMarker(measuredProperty, ID++) ); // TEMP
-                addEvidenceWIRE(world_evidence, measuredProperty, RmRectangle, RmCircle );
+                addEvidenceWIRE(world_evidence, measuredProperty );
         }
     }
            
