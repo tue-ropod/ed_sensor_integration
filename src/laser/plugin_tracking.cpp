@@ -307,9 +307,10 @@ geo::Pose3D fitEntity(const ed::Entity& e, const geo::Pose3D& sensor_pose, const
     return best_pose;
 }
 
-void splitSegmentsWhenGapDetected( std::vector< PointsInfo >& associatedPointsInfo, int min_gap_size_for_split,int min_segment_size_pixels, float dist_for_object_split, 
+bool splitSegmentsWhenGapDetected( std::vector< PointsInfo >& associatedPointsInfo, int min_gap_size_for_split,int min_segment_size_pixels, float dist_for_object_split, 
                                    std::vector<float>& sensor_ranges, const sensor_msgs::LaserScan::ConstPtr& scan)
 {
+        bool segmentSplitted = false;
         for ( unsigned int iList = 0; iList < associatedPointsInfo.size(); iList++ )
         {           
             std::vector<unsigned int> IDs = associatedPointsInfo[iList].laserIDs;
@@ -425,6 +426,10 @@ void splitSegmentsWhenGapDetected( std::vector< PointsInfo >& associatedPointsIn
                                             associatedPointsInfo.push_back( splittedInfo );
                                             associatedPointsInfo[iList].laserIDs.erase (associatedPointsInfo[iList].laserIDs.begin() + iIDs, associatedPointsInfo[iList].laserIDs.end() );
                                             associatedPointsInfo[iList].points.erase (associatedPointsInfo[iList].points.begin() + iIDs, associatedPointsInfo[iList].points.end() );
+                                            
+                                            ROS_WARN("Segment splitted based on min_gap_size_for_split-criterion. ");
+                                            segmentSplitted = true;
+                                            
                                             goto endOfLoop;
                                     }
                             }
@@ -485,7 +490,10 @@ void splitSegmentsWhenGapDetected( std::vector< PointsInfo >& associatedPointsIn
                         
                         associatedPointsInfo[iList].laserIDs.erase (associatedPointsInfo[iList].laserIDs.begin() + position2Split, associatedPointsInfo[iList].laserIDs.end() );
                         associatedPointsInfo[iList].points.erase (associatedPointsInfo[iList].points.begin() + position2Split, associatedPointsInfo[iList].points.end() );
+                        segmentSplitted = true;
                         splitFound = true;
+                        
+                        ROS_WARN("Segment splitted based on dist_for_object_split-criterion (v1). ");
                 }
              }
 
@@ -524,6 +532,9 @@ void splitSegmentsWhenGapDetected( std::vector< PointsInfo >& associatedPointsIn
                                      associatedPointsInfo[iList].laserIDs.erase (associatedPointsInfo[iList].laserIDs.begin() + position2Split, associatedPointsInfo[iList].laserIDs.end() );
                                      associatedPointsInfo[iList].points.erase (associatedPointsInfo[iList].points.begin() + position2Split, associatedPointsInfo[iList].points.end() );
                                      splitFound = true;
+                                     
+                                     ROS_WARN("Segment splitted based on dist_for_object_split-criterion (v2). ");
+                                     segmentSplitted = true;
                                        
                                      for(unsigned int iPrint = 0; iPrint < associatedPointsInfo[iList].laserIDs.size(); iPrint++)
                                      {       
@@ -546,6 +557,7 @@ void splitSegmentsWhenGapDetected( std::vector< PointsInfo >& associatedPointsIn
                     }
             }
     }
+    return segmentSplitted;
 }
 
 // ----------------------------------------------------------------------------------------------------
