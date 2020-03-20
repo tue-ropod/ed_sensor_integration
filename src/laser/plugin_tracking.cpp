@@ -22,7 +22,6 @@
 #include <iterator>
 #include <boost/graph/graph_concepts.hpp>
 
-// 
 namespace
 {
 
@@ -387,7 +386,6 @@ bool splitSegmentsWhenGapDetected( std::vector< PointsInfo >& associatedPointsIn
                                             ROS_WARN("Potential Problem in ED tracking plugin: IDs[iIDs + iAvgHigh] >= sensor_ranges.size(). iIDs = %u iAvgHigh = %u IDs.size() = %lu IDs[iIDs + iAvgHigh] = %u nHighElements = %u min_gap_size_for_split = %u sensor_ranges.size() = %lu", iIDs, iAvgHigh, IDs.size(), IDs[iIDs + iAvgHigh], nHighElements, min_gap_size_for_split, sensor_ranges.size() );
                                     }
                                     
-                                    
                                     float range = sensor_ranges[IDs[iIDs + iAvgHigh]];
                                     if (range == 0.0 ) // ranges were set to zero if associated to world
                                             range = scan->range_max;
@@ -679,7 +677,9 @@ bool isInside(std::vector<T> Points, T& p)
     return count&1;  // Same as (count%2 == 1)
 }
 
- std::vector<ScanSegment> determineSegments(std::vector<float> sensor_ranges, int maxGapSize, int minSegmentSize, float segmentdepthThreshold, geo::LaserRangeFinder lrf_model, double minClusterSize, double maxClusterSize)
+ std::vector<ScanSegment> determineSegments(std::vector<float> sensor_ranges, int maxGapSize, int minSegmentSize, 
+                                                float segmentdepthThreshold, geo::LaserRangeFinder lrf_model, 
+                                                double minClusterSize, double maxClusterSize, bool checkMinSizeCriteria)
 {
         unsigned int num_beams = sensor_ranges.size();
         std::vector<ScanSegment> segments;
@@ -708,9 +708,10 @@ bool isInside(std::vector<T> Points, T& p)
         {
                 float rs = sensor_ranges[i];
 
-                if (rs == 0 || std::abs(rs - sensor_ranges[current_segment.back()]) > segmentdepthThreshold || i == num_beams - 1)
+                if (    rs == 0 || 
+                        (std::abs(rs - sensor_ranges[current_segment.back()]) > segmentdepthThreshold ) ||  // if there is a minimum number of points not associated
+                        i == num_beams - 1)
                 {
-            
                         // Found a gap
                         ++gap_size;
                         gapRanges.push_back ( rs );
@@ -719,33 +720,35 @@ bool isInside(std::vector<T> Points, T& p)
                         {
                                 i = current_segment.back() + 1;
 
-                                if (current_segment.size()  >= minSegmentSize )
+                                if (current_segment.size()  >= minSegmentSize || !checkMinSizeCriteria)
                                 {
                                         // calculate bounding box
                                         geo::Vec2 seg_min, seg_max;
+
                                         for(unsigned int k = 0; k <  current_segment.size(); ++k)
                                         {
                                                 geo::Vector3 p = lrf_model.rayDirections()[ current_segment[k]] * sensor_ranges[current_segment[k]];
 
                                                 if (k == 0)
                                                 {
-                                                seg_min = geo::Vec2(p.x, p.y);
-                                                seg_max = geo::Vec2(p.x, p.y);
+                                                        seg_min = geo::Vec2(p.x, p.y);
+                                                        seg_max = geo::Vec2(p.x, p.y);
                                                 }
                                                 else
                                                 {
-                                                seg_min.x = std::min(p.x, seg_min.x);
-                                                seg_min.y = std::min(p.y, seg_min.y);
-                                                seg_max.x = std::max(p.x, seg_max.x);
-                                                seg_max.y = std::max(p.y, seg_max.y);
+                                                        seg_min.x = std::min(p.x, seg_min.x);
+                                                        seg_min.y = std::min(p.y, seg_min.y);
+                                                        seg_max.x = std::max(p.x, seg_max.x);
+                                                        seg_max.y = std::max(p.y, seg_max.y);
                                                 }
                                         }
 
                                         geo::Vec2 bb = seg_max - seg_min;
-                                        if ( ( bb .x > minClusterSize || bb.y > minClusterSize ) && bb.x < maxClusterSize && bb.y < maxClusterSize )
+                                        if ( ( bb .x > minClusterSize || bb.y > minClusterSize || !checkMinSizeCriteria) && 
+                                                bb.x < maxClusterSize && bb.y < maxClusterSize )
                                         {
-                                                segments.push_back ( current_segment );       
-                                        }
+                                                segments.push_back ( current_segment );
+                                        } 
                                 }
 
                                 current_segment.clear();
@@ -754,7 +757,7 @@ bool isInside(std::vector<T> Points, T& p)
                                 // Find next good value
                                 while (i < num_beams &&  sensor_ranges[i] == 0)
                                 {
-                                ++i; // check for confidence left
+                                        ++i; // check for confidence left
                                 }
 
                                 int nPointsToCheck = POINTS_TO_CHECK_CONFIDENCE;
@@ -768,14 +771,14 @@ bool isInside(std::vector<T> Points, T& p)
                 }
                 else
                 {
-                gap_size = 0;
-                gapRanges.clear();
-                current_segment.push_back ( i );
+                        gap_size = 0;
+                        gapRanges.clear();
+                        current_segment.push_back ( i );
                 }
         }
-    
+        
     return segments;
-}            
+}
 
 void addEvidenceWIRE(wire_msgs::WorldEvidence& world_evidence, tracking::FeatureProperties measuredProperty )
 // Converter from measured properties to WIRE-info
@@ -786,8 +789,6 @@ void addEvidenceWIRE(wire_msgs::WorldEvidence& world_evidence, tracking::Feature
         std::shared_ptr<pbl::Gaussian> zRectangle = std::make_shared<pbl::Gaussian>(RECTANGLE_MEASURED_STATE_SIZE + RECTANGLE_MEASURED_DIM_STATE_SIZE);
         zRectangle->setMean(measuredProperty.rectangle_.get_H()* measuredProperty.rectangle_.getState());
         zRectangle->setCovariance(measuredProperty.rectangle_.get_H()* measuredProperty.rectangle_.getCovariance()*measuredProperty.rectangle_.get_H().t());
-        
-       
         
         std::shared_ptr<pbl::Gaussian> zCircle = std::make_shared<pbl::Gaussian>(CIRCLE_MEASURED_STATE_SIZE + CIRCLE_MEASURED_DIM_STATE_SIZE);
         zCircle->setMean(measuredProperty.circle_.get_H()* measuredProperty.circle_.getState());
@@ -1055,7 +1056,10 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
     }
 
     float segmentDepthThresholdSmall = segment_depth_threshold_;
-    std::vector<ScanSegment> staticSegments = determineSegments(modelRangesAssociatedRanges2StaticWorld, max_gap_size_, min_segment_size_pixels_, segmentDepthThresholdSmall, lrf_model_, min_cluster_size_, max_cluster_size_ );    
+    std::vector<ScanSegment> staticSegments = determineSegments(modelRangesAssociatedRanges2StaticWorld, max_gap_size_, 
+                                                                min_segment_size_pixels_, segmentDepthThresholdSmall, 
+                                                                lrf_model_, min_cluster_size_, max_cluster_size_, true );
+
     std::sort(staticSegments.begin(), staticSegments.end(), sortBySegmentSize);
 
     geo::Vec2f cornerPointMeasured, cornerPointModelled;
@@ -1107,7 +1111,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
            std::vector<geo::Vec2f>::iterator it_end = points.begin(); std::advance( it_end, finalElement );
            
            possibleCorners.clear();
-           bool cornersFoundMeasured = tracking::findPossibleCorners (points, &possibleCorners, MIN_DISTANCE_CORNER_DETECTION_LARGE, min_segment_size_pixels_  );
+           bool cornersFoundMeasured = tracking::findPossibleCorners (points, &possibleCorners, MIN_DISTANCE_CORNER_DETECTION_LARGE, min_segment_size_pixels_);
           
            if( !cornersFoundMeasured && ! angleCorrectionFound) // beause we want to correct based on a straight line.
            {
@@ -1258,9 +1262,11 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                 {
                         sensor_ranges[i] = 0;
                 }
-    }   
+     }
     
-     std::vector<ScanSegment> segments = determineSegments(sensor_ranges, max_gap_size_, min_segment_size_pixels_, segment_depth_threshold_, lrf_model_, min_cluster_size_, max_cluster_size_ );         
+     std::vector<ScanSegment> segments = determineSegments(sensor_ranges, max_gap_size_, min_segment_size_pixels_, 
+                                                                segment_depth_threshold_, lrf_model_, min_cluster_size_, 
+                                                                max_cluster_size_, false );
     
     // Try to associate remaining laser points to specific entities
     std::vector<ed::WorldModel::const_iterator> it_laserEntities;
@@ -1532,106 +1538,99 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
         bool previousSegmentAssociated = false;
    
         // check groups of segments associated to a specific entity
-        for ( unsigned int iDistances = 1; iDistances < distances.size(); iDistances++ )
+        for (unsigned int iDistances = 1; iDistances < distances.size(); iDistances++)
         {
-            if ( IDs[iDistances] == IDtoCheck && iDistances != distances.size() - 1 ) // ID similar and not at final reading, check if next element is associated to same entity or not
-            {
-                continue;
-            }
+                if (IDs[iDistances] == IDtoCheck && iDistances != distances.size() - 1) // ID similar and not at final reading, check if next element is associated to same entity or not
+                {
+                        continue;
+                }
 
-            unsigned int length = iDistances - firstElement;
+                unsigned int length = iDistances - firstElement + 1;
 
-            if ( length >= min_segment_size_pixels_ )
-            {
                 float minDistance = distances[firstElement];
 
-                for ( unsigned int iiDistances = 1; iiDistances < iDistances; iiDistances++ )
+                for (unsigned int iiDistances = 1; iiDistances < iDistances; iiDistances++)
                 {
-                    if ( distances[iiDistances] < minDistance )
-                    {
-                        minDistance = distances[iiDistances];
-                    }
+                        if (distances[iiDistances] < minDistance)
+                        {
+                                minDistance = distances[iiDistances];
+                        }
                 }
-                
-                bool associated = minDistance < MIN_ASSOCIATION_DISTANCE; // TODO Sufficient? Make it dependent on the covariance/time as long as we did not see it? 
-                
-                if( associated && !previousSegmentAssociated && firstElement > 0 ) // check for possibility to reassociate previous section
-                {
 
-                         geo::Vec2f lastPointPreviousSegment = points[firstElement - 1];
+                bool associated = minDistance < MIN_ASSOCIATION_DISTANCE; // TODO Sufficient? Make it dependent on the covariance/time as long as we did not see it?
+
+                if (associated && !previousSegmentAssociated && firstElement > 0) // check for possibility to reassociate previous section
+                {
+                        geo::Vec2f lastPointPreviousSegment = points[firstElement - 1];
                         geo::Vec2f firstPointCurrentSegment = points[firstElement];
 
-                        float interSegmentDistance = std::sqrt( std::pow(lastPointPreviousSegment.x-firstPointCurrentSegment.x, 2.0) + std::pow(lastPointPreviousSegment.y-firstPointCurrentSegment.y, 2.0) );
-                        
-                        if( interSegmentDistance < MIN_ASSOCIATION_DISTANCE_SEGMENTS)  // reassociate previous section
+                        float interSegmentDistance = std::sqrt(std::pow(lastPointPreviousSegment.x - firstPointCurrentSegment.x, 2.0) + std::pow(lastPointPreviousSegment.y - firstPointCurrentSegment.y, 2.0));
+
+                        if (interSegmentDistance < MIN_ASSOCIATION_DISTANCE_SEGMENTS) // reassociate previous section
                         {
                                 previousSegmentAssociated = true;
                                 unsigned int previousID = IDs[iDistances - 1];
-                                
-                                const ed::EntityConstPtr& e1 = *it_laserEntities[ possibleSegmentEntityAssociations[IDtoCheck] ];
-                                const ed::EntityConstPtr& e2 = *it_laserEntities[ possibleSegmentEntityAssociations[previousID] ];                                                                
-                                
-                                append(associatedPointsInfo.at ( possibleSegmentEntityAssociations[IDtoCheck] ).points, associatedPointsInfo.back().points);
-                                append(associatedPointsInfo.at ( possibleSegmentEntityAssociations[IDtoCheck] ).laserIDs, associatedPointsInfo.back().laserIDs);
 
-                                
-                                if( associatedPointsInfo.size() > it_laserEntities.size() ) // Unassociated points were added
+                                const ed::EntityConstPtr &e1 = *it_laserEntities[possibleSegmentEntityAssociations[IDtoCheck]];
+                                const ed::EntityConstPtr &e2 = *it_laserEntities[possibleSegmentEntityAssociations[previousID]];
+
+                                append(associatedPointsInfo.at(possibleSegmentEntityAssociations[IDtoCheck]).points, associatedPointsInfo.back().points);
+                                append(associatedPointsInfo.at(possibleSegmentEntityAssociations[IDtoCheck]).laserIDs, associatedPointsInfo.back().laserIDs);
+
+                                if (associatedPointsInfo.size() > it_laserEntities.size()) // Unassociated points were added
                                 {
-                                        associatedPointsInfo.erase ( associatedPointsInfo.end() );
+                                        associatedPointsInfo.erase(associatedPointsInfo.end());
                                 }
                                 else // keep the possibility to associate points to a specific entity
                                 {
-                                        associatedPointsInfo.at ( possibleSegmentEntityAssociations[IDtoCheck] ).points.clear();
-                                        associatedPointsInfo.at ( possibleSegmentEntityAssociations[IDtoCheck] ).laserIDs.clear();
+                                        associatedPointsInfo.at(possibleSegmentEntityAssociations[IDtoCheck]).points.clear();
+                                        associatedPointsInfo.at(possibleSegmentEntityAssociations[IDtoCheck]).laserIDs.clear();
                                 }
-                                
-                        }                             
+                        }
                 }
-            
-                if ( !associated && previousSegmentAssociated) 
+
+                if (!associated && previousSegmentAssociated)
                 {
-                        // boundaries for distance and that those boundaries are associated to a object                                
+                        // boundaries for distance and that those boundaries are associated to a object
                         geo::Vec2f lastPointPreviousSegment = points[firstElement - 1];
                         geo::Vec2f firstPointCurrentSegment = points[firstElement];
-                        
-                        float interSegmentDistance = std::sqrt( std::pow(lastPointPreviousSegment.x-firstPointCurrentSegment.x, 2.0) + std::pow(lastPointPreviousSegment.y-firstPointCurrentSegment.y, 2.0) );
-                        
-                        if( interSegmentDistance < MIN_ASSOCIATION_DISTANCE_SEGMENTS)
+
+                        float interSegmentDistance = std::sqrt(std::pow(lastPointPreviousSegment.x - firstPointCurrentSegment.x, 2.0) + std::pow(lastPointPreviousSegment.y - firstPointCurrentSegment.y, 2.0));
+
+                        if (interSegmentDistance < MIN_ASSOCIATION_DISTANCE_SEGMENTS)
                         {
                                 associated = true;
                                 unsigned int previousID = IDs[iDistances - 1];
                                 IDtoCheck = previousID;
-                        }           
+                        }
                 }
 
-                if ( associated )  // add all points to associated entity
+                if (associated) // add all points to associated entity
                 {
                         previousSegmentAssociated = true;
-                        append( associatedPointsInfo.at ( possibleSegmentEntityAssociations[IDtoCheck] ).points, points, firstElement, iDistances );
-                        append( associatedPointsInfo.at ( possibleSegmentEntityAssociations[IDtoCheck] ).laserIDs, segmentIDs, firstElement, iDistances );
+                        append(associatedPointsInfo.at(possibleSegmentEntityAssociations[IDtoCheck]).points, points, firstElement, iDistances);
+                        append(associatedPointsInfo.at(possibleSegmentEntityAssociations[IDtoCheck]).laserIDs, segmentIDs, firstElement, iDistances);
                 }
                 else
                 {
                         previousSegmentAssociated = false;
                         pointsNotAssociated = PointsInfo();
-                
-                        for ( unsigned int i_points = firstElement; i_points < iDistances; ++i_points )
-                        {
-                                pointsNotAssociated.points.push_back ( points[i_points] );
-                                pointsNotAssociated.laserIDs.push_back ( segmentIDs[i_points] );
-                        }
-                        associatedPointsInfo.push_back ( pointsNotAssociated );
-                }
-            }
-            
-            firstElement = iDistances;
-            IDtoCheck = IDs[iDistances];
-        }
 
+                        for (unsigned int i_points = firstElement; i_points < iDistances; ++i_points)
+                        {
+                                pointsNotAssociated.points.push_back(points[i_points]);
+                                pointsNotAssociated.laserIDs.push_back(segmentIDs[i_points]);
+                        }
+                        associatedPointsInfo.push_back(pointsNotAssociated);
+                }
+
+                firstElement = iDistances;
+                IDtoCheck = IDs[iDistances];
+        }
     }
-    
+
     associatedPoints_pub_.publish(test);
-   
+
     splitSegmentsWhenGapDetected( associatedPointsInfo, min_gap_size_for_split_, min_segment_size_pixels_, dist_for_object_split_, sensor_ranges, scan);
     std::vector<measuredPropertyInfo> measuredProperties ( associatedPointsInfo.size() ); // The first sequence in this vector (with the length of laser entitities) consits of the properties corresponding to existing entities
     
@@ -1640,8 +1639,8 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
            measuredProperties[iList].propertiesDescribed = false;
            std::vector<geo::Vec2f> points  = associatedPointsInfo[iList].points ;
 
-           if( points.size() < (unsigned int ) min_segment_size_pixels_ )
-                   continue;
+            if( points.size() < (unsigned int ) min_segment_size_pixels_ )
+                    continue;
        
            std::vector<unsigned int> cornerIndices;
            std::vector<geo::Vec2f>::iterator it_start = points.begin();
