@@ -17,7 +17,7 @@
 #include <sensor_msgs/LaserScan.h>
 #include <geolib/sensors/LaserRangeFinder.h>
 
-#include "wire_state_estimators/featureProperties.h"
+#include "featureProperties.h"
 
 // TODO: make many of variables below configurable/tunable in ED model descriptions?
 #define ARBITRARY_HEIGHT                0.03            // [m]

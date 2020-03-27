@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.8.12)
 project(ed_sensor_integration)
 
-set(CMAKE_BUILD_TYPE "RelWithDebInfo")
+#set(CMAKE_BUILD_TYPE "RelWithDebInfo")
 #set(CMAKE_BUILD_TYPE Debug)
 
 include(CheckCXXCompilerFlag)
@@ -19,7 +19,7 @@ find_package(catkin REQUIRED COMPONENTS
   visualization_msgs
   wire_msgs
   wired
-  wire_state_estimators
+  wire_features_lib
 )
 
 # ------------------------------------------------------------------------------------------------
@@ -53,7 +53,7 @@ catkin_package(
   INCLUDE_DIRS include 
   LIBRARIES ed_kinect
   # DEPENDS
-  CATKIN_DEPENDS geometry_msgs message_runtime wire_state_estimators
+  CATKIN_DEPENDS geometry_msgs message_runtime wire_features_lib
 )
 
 #add_subdirectory(../../dlib-19.16 dlib_build)
@@ -131,7 +131,8 @@ add_library(ed_laser_plugin_tracking
     src/laser/feature_functions.h
     ${HEADER_FILES}
 )
-target_link_libraries(ed_laser_plugin_tracking ed_association wire_state_estimators wired ${catkin_LIBRARIES})
+
+target_link_libraries(ed_laser_plugin_tracking ed_association wire_features_lib wired ${catkin_LIBRARIES})
 #add_dependencies(ed_laser_plugin_tracking wire_state_estimators ${PROJECT_NAME}_gencpp ${${PROJECT_NAME}_EXPORTED_TARGETS})
 add_dependencies(ed_laser_plugin_tracking ${PROJECT_NAME}_gencpp ${${PROJECT_NAME}_EXPORTED_TARGETS})
 
