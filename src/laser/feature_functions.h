@@ -10,14 +10,21 @@
 #include <algorithm>
 #include <Eigen/Dense>
 
+#include <ed/plugin.h>
+
 #include "problib/conversions.h"
 #include "problib/datatypes.h"
 #include "ed/termcolor.hpp"
 
 #include <sensor_msgs/LaserScan.h>
 #include <geolib/sensors/LaserRangeFinder.h>
+#include <geolib/Shape.h>
 
-#include "featureProperties.h"
+#include <ed/entity.h>
+#include <ed/world_model.h>
+
+#include "featureProperties.h" // TODO chosen properly?
+#include "generic_functions.h"
 
 // TODO: make many of variables below configurable/tunable in ED model descriptions?
 #define ARBITRARY_HEIGHT                0.03            // [m]
@@ -25,6 +32,8 @@
 #define POINTS_TO_CHECK_CONFIDENCE      3               // [-]
 #define EPSILON                         1e-4            // [m]
 #define LASER_ACCURACY                  0.05            // [m]
+
+#define N_POINTS_MARGIN_FOR_BEING_CONSECUTIVE 3    // [-] points must be consecutive for splitting if there is a proven gap. This is the margin for points being considered as consecutive
 
 namespace tracking
 {
@@ -36,37 +45,21 @@ enum FITTINGMETHOD {
     RECTANGLE =   8
 };
 
-class Point
-{
-
-public:
-    float x, y;
-
-    Point ( double x_in = 0.0, double y_in = 0.0 ) {
-        x = x_in;
-        y = y_in;
-    }
-
-};
-
-struct greater
-{
-    template<class T>
-    bool operator()(T const &a, T const &b) const { return a < b; }
-};
-
 struct laserSegments
 {
   std::vector<geo::Vec2f>::iterator begin;
   std::vector<geo::Vec2f>::iterator end;
 };
 
+typedef std::vector<unsigned int> ScanSegment;
+
+struct PointsInfo
+{
+    std::vector<geo::Vec2f> points;
+    ScanSegment laserIDs;
+};
+
 float fitCircle ( std::vector<geo::Vec2f>& points, tracking::Circle* cirlce, const geo::Pose3D& pose );
-
-void determineIAV(std::vector<float> ranges, float* mean, float* standardDeviation, geo::LaserRangeFinder lrf_model, unsigned int firstElement, unsigned int finalElement );
-
-int maxCrossCorrelation(std::vector<float>& measuredRanges, std::vector<unsigned int>::iterator measuredRangesStartElement,  std::vector<unsigned int>::iterator measuredRangesFinalElement,
-                        std::vector<float>& modelledRanges, std::vector<unsigned int>::iterator modelledRangesStartElement,  std::vector<unsigned int>::iterator modelledRangesFinalElement);
 
 float fitRectangle ( std::vector<geo::Vec2f>& points, tracking::Rectangle* rectangle, const geo::Pose3D& pose , unsigned int cornerIndex, unsigned int minPointsLine );
 
@@ -80,27 +73,6 @@ float fitLineLeastSq ( std::vector<geo::Vec2f>& points, Eigen::VectorXf& beta_ha
 
 float setRectangularParametersForLine ( std::vector<geo::Vec2f>& points,  std::vector<geo::Vec2f>::iterator* it_low, std::vector<geo::Vec2f>::iterator* it_high, tracking::Rectangle* rectangle, const geo::Pose3D& sensor_pose, unsigned int minPointsLine );
 
-template<typename T>
-void wrap2Interval ( T* alpha, T lowerBound, T upperBound )
-{
-    T delta = upperBound - lowerBound;
-
-    if ( *alpha < lowerBound )
-    {
-        while ( *alpha < lowerBound )
-        {
-            *alpha += delta;
-        }
-    }
-    else if ( *alpha >= upperBound )
-    {
-        while ( *alpha >= upperBound )
-        {
-            *alpha -= delta;
-        }
-    }
-}
-
 FITTINGMETHOD determineCase ( std::vector<geo::Vec2f>& points, unsigned int* cornerIndex, std::vector<geo::Vec2f>::iterator* it_low, std::vector<geo::Vec2f>::iterator* it_high, const geo::Pose3D& sensor_pose,   unsigned int minPointsLine );
 
 float fitObject ( std::vector<geo::Vec2f>& points, int FITTINGMETHOD, unsigned int* cornerIndex, tracking::Rectangle* rectangle, tracking::Circle* circle, std::vector<geo::Vec2f>::iterator* it_low, std::vector<geo::Vec2f>::iterator* it_high, const geo::Pose3D& sensor_pose, unsigned int minPointsLine);
@@ -111,7 +83,17 @@ geo::Vec2f avg ( std::vector<geo::Vec2f>& points, std::vector<geo::Vec2f>::const
 
 geo::Vec2f projectPointOnLine(geo::Vec2f p1Line, geo::Vec2f p2Line, geo::Vec2f point2Project);
 
-}
+double getFittingError(const ed::Entity& e, const geo::LaserRangeFinder& lrf, const geo::Pose3D& rel_pose,
+                       const std::vector<float>& sensor_ranges, const std::vector<double>& model_ranges,
+                       int& num_model_points);
 
+bool splitSegmentsWhenGapDetected( std::vector< PointsInfo >& associatedPointsInfo, int min_gap_size_for_split,
+                                   int min_segment_size_pixels, float dist_for_object_split, std::vector<float>& sensor_ranges, 
+                                   const sensor_msgs::LaserScan::ConstPtr& scan);
+
+std::vector<tracking::ScanSegment> determineSegments(std::vector<float> sensor_ranges, int maxGapSize, int minSegmentSize, 
+                                                float segmentdepthThreshold, geo::LaserRangeFinder lrf_model, 
+                                                double minClusterSize, double maxClusterSize, bool checkMinSizeCriteria);
+}
 
 #endif

@@ -10,6 +10,8 @@ if(HAS_STD_CPP11_FLAG)
   add_compile_options(-std=c++11)
 endif()
 
+add_compile_options(-Wno-ignored-attributes)
+
 find_package(catkin REQUIRED COMPONENTS
   cb_planner_msgs_srvs
   ed
@@ -129,6 +131,12 @@ add_library(ed_laser_plugin_tracking
     src/laser/plugin_tracking.h
     src/laser/feature_functions.cpp
     src/laser/feature_functions.h
+    src/laser/plugin_support_functions.cpp
+    src/laser/plugin_support_functions.h
+    src/laser/generic_functions.cpp
+    src/laser/generic_functions.h
+    src/laser/visualization_functions.cpp
+    src/laser/visualization_functions.h
     ${HEADER_FILES}
 )
 

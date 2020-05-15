@@ -1,60 +1,7 @@
-
 #include "feature_functions.h"
 
 namespace tracking
 {
-// http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.75.5153&rep=rep1&type=pdf
-        
-void determineIAV(std::vector<float> ranges, float* mean, float* standardDeviation, geo::LaserRangeFinder lrf_model, unsigned int firstElement, unsigned int finalElement )
- // Internal Angle Variance
-// TODO used at the moment?
-{
-        geo::Vec2f A, C;
-        
-        float angle = lrf_model.getAngleMin() + lrf_model.getAngleIncrement()*firstElement;
-        A.x = ranges[firstElement]*cos(angle);
-        A.y = ranges[firstElement]*sin(angle);
-        
-        angle = lrf_model.getAngleMin() + lrf_model.getAngleIncrement()*finalElement;
-        C.x = ranges[finalElement]*cos(angle);
-        C.y = ranges[finalElement]*sin(angle);
-        
-        std::vector <float> inscribedAngles(finalElement - firstElement - 2, 0.0);
-        unsigned int counter = 0;
-        *mean = 0.0;
-        
-        for( unsigned int ii = firstElement + 1; ii < finalElement - 1; ii++ )
-        {
-                geo::Vec2f B;
-                
-                angle = lrf_model.getAngleMin() + lrf_model.getAngleIncrement()*ii;
-                B.x = ranges[ii]*cos(angle);
-                B.y = ranges[ii]*sin(angle);
-                
-                float a2 = pow( B.x-C.x, 2.0 ) + pow( B.y-C.y, 2.0 );
-                float b2 = pow( A.x-C.x, 2.0 ) + pow( A.y-C.y, 2.0 );
-                float c2 =  pow( A.x-B.x, 2.0 ) + pow( A.y-B.y, 2.0 );
-                
-                float a = sqrt ( a2 );
-                float c = sqrt ( c2 );
-                
-                inscribedAngles[counter] = acos( (b2 - a2 - c2) / (-2*a*c) );
-                *mean += inscribedAngles[counter];
-                counter++;    
-        }
-        *mean /= counter;
-        
-        counter = 0;
-        *standardDeviation = 0.0;
-        
-        for( unsigned int ii = firstElement + 1; ii < finalElement - 1; ii++ )
-        {
-                *standardDeviation += std::pow( inscribedAngles[counter] - *mean, 2.0 );
-                counter++;    
-        }
-        
-        *standardDeviation = std::sqrt( *standardDeviation / counter );
-}
 
 tracking::FITTINGMETHOD determineCase ( std::vector<geo::Vec2f>& points, unsigned int* cornerIndex, std::vector<geo::Vec2f>::iterator* it_low, std::vector<geo::Vec2f>::iterator* it_high, const geo::Pose3D& sensor_pose, unsigned int minPointsLine )
 {
@@ -187,69 +134,6 @@ bool determineCornerConfidence(const sensor_msgs::LaserScan::ConstPtr& scan, uns
                 }
                 return true; 
         }
-}
-
-int maxCrossCorrelation(std::vector<float>& measuredRanges, std::vector<unsigned int>::iterator measuredRangesStartElement,  std::vector<unsigned int>::iterator measuredRangesFinalElement,
-                        std::vector<float>& modelledRanges, std::vector<unsigned int>::iterator modelledRangesStartElement,  std::vector<unsigned int>::iterator modelledRangesFinalElement)
-{
-        unsigned int nModelledRanges = std::distance(modelledRangesStartElement, modelledRangesFinalElement);
-        unsigned int nIterations = 2*(nModelledRanges - 1);
-        int delta = -nModelledRanges + 1;
-        
-        float maxCorrelation = std::numeric_limits<float>::infinity();
-        int deltaOptimal = 0;
-        
-        for (unsigned int ii = 0; ii < nIterations; ii++)
-        {
-                float crossCorrelation = 0.0;
-                for(std::vector<unsigned int>::iterator it = measuredRangesStartElement; it != measuredRangesFinalElement; it++)
-                {
-                        float modelledRange, measuredRange;
-                        unsigned int element = *it;
-                        
-                        measuredRange = measuredRanges[element];
-                        int modelledElement = element + delta;
-                        if(modelledElement < 0 || modelledElement > measuredRanges.size() )
-                        {
-                                modelledRange = 0.0; 
-                        }
-                        else 
-                        {
-                            
-                            modelledRange = modelledRanges[modelledElement];
-                        }
-
-                        crossCorrelation += std::pow(modelledRange-measuredRange, 2.0);
-                }
-                
-                if( crossCorrelation < maxCorrelation )
-                {
-                        maxCorrelation = crossCorrelation;
-                        deltaOptimal = delta;
-                }
-                
-                delta++;
-        }
-        
-        return deltaOptimal;
-}
-
-geo::Vec2f avg ( std::vector<geo::Vec2f>& points, std::vector<geo::Vec2f>::const_iterator it_start, std::vector<geo::Vec2f>::const_iterator it_end )
-{
-    geo::Vec2f avg_point;
-    avg_point.x = avg_point.y= 0.0;
-
-    for ( std::vector<geo::Vec2f>::const_iterator it = it_start; it != it_end; ++it ) {
-        geo::Vec2f point = *it;
-        avg_point.x += point.x;
-        avg_point.y += point.y;
-    }
-
-    unsigned int nElements = std::distance ( it_start, it_end );
-    avg_point.x /= nElements;
-    avg_point.y /= nElements;
-
-    return ( avg_point );
 }
 
 geo::Vec2f projectPointOnLine(geo::Vec2f p1Line, geo::Vec2f p2Line, geo::Vec2f point2Project)
@@ -744,6 +628,411 @@ float setRectangularParametersForLine ( std::vector<geo::Vec2f>& points,  std::v
     rectangle->setValues ( center_x, center_y, sensor_pose.getOrigin().getZ(), width, ARBITRARY_DEPTH, ARBITRARY_HEIGHT, roll, pitch, yaw ); // Assumption: object-height identical to sensor-height
 
     return averageError;
+}
+
+double getFittingError(const ed::Entity& e, const geo::LaserRangeFinder& lrf, const geo::Pose3D& rel_pose,
+                       const std::vector<float>& sensor_ranges, const std::vector<double>& model_ranges,
+                       int& num_model_points)
+{
+    std::vector<double> test_model_ranges = model_ranges;
+
+    // Render the entity with the given relative pose
+    geo::LaserRangeFinder::RenderOptions opt;
+    opt.setMesh(e.shape()->getMesh(), rel_pose);
+
+    geo::LaserRangeFinder::RenderResult res(test_model_ranges);
+    lrf.render(opt, res);
+
+    int n = 0;
+    num_model_points = 0;
+    double total_error = 0;
+    for(unsigned int i = 0; i < test_model_ranges.size(); ++i)
+    {
+        double ds = sensor_ranges[i];
+        double dm = test_model_ranges[i];
+
+        if (ds <= 0)
+            continue;
+
+        ++n;
+
+        if (dm <= 0)
+        {
+            total_error += 0.1;
+            continue;
+        }
+
+        double diff = std::abs(ds - dm);
+        if (diff < 0.1)
+            total_error += diff;
+        else
+        {
+            if (ds > dm)
+                total_error += 1;
+            else
+                total_error += 0.1;
+        }
+
+        ++num_model_points;
+    }
+
+    return total_error / (n+1); // to be sure to never divide by zero.
+}
+
+bool splitSegmentsWhenGapDetected( std::vector< PointsInfo >& associatedPointsInfo, int min_gap_size_for_split,
+                                   int min_segment_size_pixels, float dist_for_object_split, std::vector<float>& sensor_ranges, 
+                                   const sensor_msgs::LaserScan::ConstPtr& scan)
+{
+        bool segmentSplitted = false;
+        for ( unsigned int iList = 0; iList < associatedPointsInfo.size(); iList++ )
+        {           
+            std::vector<unsigned int> IDs = associatedPointsInfo[iList].laserIDs;
+      
+            if( IDs.size() == 0 )
+                    continue;
+            
+            for(unsigned int iIDs = 1; iIDs < IDs.size(); iIDs++)
+            {
+                    unsigned int idLow = iIDs - 1;
+                    unsigned int gapSize = IDs[iIDs] - IDs[iIDs - 1];
+                    
+                    if( gapSize >= min_gap_size_for_split )
+                    {
+                        // check ranges in gap
+                        // if there is a set of consecutive ranges (min_gap_size_for_split) which is significantly larger than ranges before gap and after gap, this implies that there is free space
+                        // instead of an object which blocks the view on the object. The entities are splitted and treated as 2 separate ones.
+                            
+                            unsigned int nLowElements, nHighElements;
+                            if (idLow < min_gap_size_for_split)
+                            {
+                                    if ((2 * idLow) > IDs.size())
+                                        nLowElements = IDs.size() - idLow;
+                                    else
+                                        nLowElements = idLow;
+                            }
+                            else
+                            {
+                                    if ((idLow + min_gap_size_for_split) > IDs.size())
+                                        nLowElements = IDs.size() - idLow;
+                                    else
+                                        nLowElements = min_gap_size_for_split;
+                            }                           
+                            
+                            if (iIDs > (IDs.size() - (unsigned int)  min_gap_size_for_split))
+                            {
+                                    nHighElements = IDs.size() - iIDs;
+                            }
+                            else
+                            {
+                                    nHighElements = min_gap_size_for_split;
+                            }
+                            
+                            float avgRangeLow = 0.0, avgRangeHigh = 0.0;
+                            for(unsigned int iAvgLow = 0; iAvgLow < nLowElements; iAvgLow++)
+                            {
+                                    float range = sensor_ranges[IDs[idLow + iAvgLow]];
+                                    if (range == 0.0 ) // ranges were set to zero if associated to world
+                                            range = scan->range_max;
+                                    
+                                    avgRangeLow += range;
+                            }
+                            avgRangeLow /= nLowElements;
+
+                            for(unsigned int iAvgHigh = 0; iAvgHigh < nHighElements; iAvgHigh++)
+                            {
+                                    // Some checks just in case
+                                    if( iIDs + iAvgHigh >= IDs.size() )
+                                    {
+                                            bool check = iIDs > (IDs.size() - min_gap_size_for_split);
+                                            std::cout << "Test1: " << IDs.size() - min_gap_size_for_split << std::endl;
+                                            std::cout << "Test2: " << (unsigned int) IDs.size() - (unsigned int) min_gap_size_for_split << std::endl;
+                                            ROS_WARN("Potential Problem in ED tracking plugin: iIDs + iAvgHigh >= IDs.size(). iIDs = %u  iAvgHigh = %u IDs.size() = %lu  nHighElements = %u  min_gap_size_for_split = %u, check = %i", iIDs, iAvgHigh, IDs.size(), nHighElements, min_gap_size_for_split, check );
+                                            nHighElements = iAvgHigh - 1; // safety measure!
+                                            continue;
+                                            
+                                    }
+                                    
+                                    // Potential Problem in ED tracking plugin: iIDs + iAvgHigh >= IDs.size(). iIDs = 1  iAvgHigh = 1 IDs.size() = 2  nHighElements = 5  min_gap_size_for_split = 5
+                                    //[ WARN] [1559656004.524065310][/ed]: Potential Problem in ED tracking plugin: IDs[iIDs + iAvgHigh] >= sensor_ranges.size(). iIDs = 1 iAvgHigh = 1 IDs.size() = 2 IDs[iIDs + iAvgHigh] = 1111917452 nHighElements = 5 min_gap_size_for_split = 5 sensor_ranges.size() = 726
+
+                                    if( IDs[iIDs + iAvgHigh] >= sensor_ranges.size() )
+                                    {
+                                            ROS_WARN("Potential Problem in ED tracking plugin: IDs[iIDs + iAvgHigh] >= sensor_ranges.size(). iIDs = %u iAvgHigh = %u IDs.size() = %lu IDs[iIDs + iAvgHigh] = %u nHighElements = %u min_gap_size_for_split = %u sensor_ranges.size() = %lu", iIDs, iAvgHigh, IDs.size(), IDs[iIDs + iAvgHigh], nHighElements, min_gap_size_for_split, sensor_ranges.size() );
+                                    }
+                                    
+                                    float range = sensor_ranges[IDs[iIDs + iAvgHigh]];
+                                    if (range == 0.0 ) // ranges were set to zero if associated to world
+                                            range = scan->range_max;
+                                    
+                                    avgRangeHigh += range;
+                            }
+                            
+                            if(nHighElements <= 0)
+                            {
+                                    avgRangeHigh = scan->range_max;
+                            } else {
+                                    avgRangeHigh /= nHighElements;
+                            }
+
+                            float maxReference = std::max(avgRangeLow, avgRangeHigh);
+                            unsigned int nLargerRanges = 0;
+
+                            for(unsigned int iGap = IDs[idLow]; iGap < IDs[iIDs]; iGap++ )
+                            {       
+                                   if(  sensor_ranges[iGap] > maxReference ||  sensor_ranges[iGap] == 0.0 ) // as points associated to the world are set to 0
+                                    {
+                                            nLargerRanges++;
+                                    }
+                                    else
+                                    {
+                                            nLargerRanges = 0;
+                                    }
+
+                                    if(nLargerRanges >= min_gap_size_for_split)
+                                    {
+                                            PointsInfo splittedInfo;
+
+                                            std::vector<geo::Vec2f> points = associatedPointsInfo[iList].points;
+                                            std::copy( associatedPointsInfo[iList].laserIDs.begin() + iIDs, associatedPointsInfo[iList].laserIDs.end(), std::back_inserter(splittedInfo.laserIDs) );
+                                            std::copy( associatedPointsInfo[iList].points.begin() + iIDs, associatedPointsInfo[iList].points.end(),  std::back_inserter(splittedInfo.points) );
+                                            associatedPointsInfo.push_back( splittedInfo );
+                                            associatedPointsInfo[iList].laserIDs.erase (associatedPointsInfo[iList].laserIDs.begin() + iIDs, associatedPointsInfo[iList].laserIDs.end() );
+                                            associatedPointsInfo[iList].points.erase (associatedPointsInfo[iList].points.begin() + iIDs, associatedPointsInfo[iList].points.end() );
+                                            
+                                            ROS_WARN("Segment splitted based on min_gap_size_for_split-criterion. ");
+                                            segmentSplitted = true;
+                                            
+                                            goto endOfLoop;
+                                    }
+                            }
+                    }
+            }
+            endOfLoop:;  
+    }
+    
+    for ( unsigned int iList = 0; iList < associatedPointsInfo.size(); iList++ )
+    {
+            // As each point is associated to an object, it might happen that 2 objects close to each other can be seen as one. This results in large distances between consecutive points.
+            // Here it is checked if this is the case. If so, objects are being splitted.
+            
+            ScanSegment IDs = associatedPointsInfo[iList].laserIDs;
+            std::vector< geo::Vec2f > segmentPoints = associatedPointsInfo[iList].points;
+            
+            unsigned int nPointsForAvg;
+            min_segment_size_pixels % 2 == 0 ? nPointsForAvg = min_segment_size_pixels / 2 : nPointsForAvg = (min_segment_size_pixels - 1) / 2;
+            
+            if( IDs.size() < 2*nPointsForAvg ) // 2 times, because we have to determine the average for the lower and upper part
+            {
+                    continue;
+            }
+            
+            geo::Vec2f pointLowSum, pointHighSum;
+            pointLowSum.x = 0.0;
+            pointLowSum.y = 0.0;
+            pointHighSum.x = 0.0;
+            pointHighSum.y = 0.0;
+            
+            for(unsigned int iAvgLow = 0; iAvgLow < nPointsForAvg; iAvgLow++)
+            {                    
+                    pointLowSum += segmentPoints[iAvgLow];
+            }
+            
+            geo::Vec2f avgPointLow = pointLowSum / nPointsForAvg;
+             
+            for(unsigned int iAvgHigh = nPointsForAvg; iAvgHigh < 2*nPointsForAvg; iAvgHigh++)
+            {
+                    pointHighSum += segmentPoints [iAvgHigh];
+            }
+
+            geo::Vec2f avgPointHigh = pointHighSum / nPointsForAvg;
+            
+            bool splitFound = false;
+            
+             if( std::fabs( IDs[(2*nPointsForAvg) - 1] - IDs[0]) <=  2*nPointsForAvg + N_POINTS_MARGIN_FOR_BEING_CONSECUTIVE &&
+                 std::fabs( IDs[(2*nPointsForAvg) - 1] - IDs[0]) >=  2*nPointsForAvg - N_POINTS_MARGIN_FOR_BEING_CONSECUTIVE ) // points must be consecutive
+             {                     
+                if( avgPointHigh.dist( avgPointLow ) >  dist_for_object_split )
+                {
+                        PointsInfo splittedInfo;       
+                        unsigned int position2Split = nPointsForAvg;//IDs[nPointsForAvg];
+                        std::vector<geo::Vec2f> points = associatedPointsInfo[iList].points;             
+                        std::copy( associatedPointsInfo[iList].laserIDs.begin() + position2Split, associatedPointsInfo[iList].laserIDs.end(), std::back_inserter(splittedInfo.laserIDs) );
+                        std::copy( associatedPointsInfo[iList].points.begin() + position2Split, associatedPointsInfo[iList].points.end(),  std::back_inserter(splittedInfo.points) );
+                        associatedPointsInfo.push_back( splittedInfo );
+                        
+                        associatedPointsInfo[iList].laserIDs.erase (associatedPointsInfo[iList].laserIDs.begin() + position2Split, associatedPointsInfo[iList].laserIDs.end() );
+                        associatedPointsInfo[iList].points.erase (associatedPointsInfo[iList].points.begin() + position2Split, associatedPointsInfo[iList].points.end() );
+                        segmentSplitted = true;
+                        splitFound = true;
+                        
+                        ROS_WARN("Segment splitted based on dist_for_object_split-criterion (v1). ");
+                }
+             }
+
+            for(unsigned int iIDs = 0; iIDs < (IDs.size() - 2*nPointsForAvg - 1) && !splitFound && IDs.size() >= ( 2*nPointsForAvg + 1); iIDs++) // -1 because the first segment is already determined as above
+            { 
+                    pointLowSum -= segmentPoints[iIDs];
+                    pointLowSum += segmentPoints[iIDs + nPointsForAvg];
+                    
+                    pointHighSum -= segmentPoints[iIDs + nPointsForAvg];
+                    pointHighSum += segmentPoints[iIDs + 2*nPointsForAvg];
+
+                    if( IDs[iIDs + 2*nPointsForAvg] - IDs[iIDs] ==  2*nPointsForAvg) // points must be consecutive
+                    {
+                            avgPointLow = pointLowSum / nPointsForAvg;
+                            avgPointHigh = pointHighSum / nPointsForAvg;
+                        
+                            if( avgPointHigh.dist( avgPointLow ) >  dist_for_object_split )
+                            {
+                                    PointsInfo splittedInfo;       
+                                    unsigned int position2Split = iIDs;//IDs[nPointsForAvg];
+                                    std::vector<geo::Vec2f> points = associatedPointsInfo[iList].points;     
+                
+                                    for(unsigned int iPrint = 0; iPrint < associatedPointsInfo[iList].laserIDs.size(); iPrint++)
+                                    {
+                                            if(associatedPointsInfo[iList].laserIDs[iPrint]  > sensor_ranges.size())
+                                            {
+                                                    ROS_ERROR("BAD INFORMATION 0!!");
+                                                    exit(0);
+                                             }
+                                     }
+                                        
+                                     std::copy( associatedPointsInfo[iList].laserIDs.begin() + position2Split, associatedPointsInfo[iList].laserIDs.end(), std::back_inserter(splittedInfo.laserIDs) );
+                                     std::copy( associatedPointsInfo[iList].points.begin() + position2Split, associatedPointsInfo[iList].points.end(),  std::back_inserter(splittedInfo.points) );
+                                     associatedPointsInfo.push_back( splittedInfo );
+
+                                     associatedPointsInfo[iList].laserIDs.erase (associatedPointsInfo[iList].laserIDs.begin() + position2Split, associatedPointsInfo[iList].laserIDs.end() );
+                                     associatedPointsInfo[iList].points.erase (associatedPointsInfo[iList].points.begin() + position2Split, associatedPointsInfo[iList].points.end() );
+                                     splitFound = true;
+                                     
+                                     ROS_WARN("Segment splitted based on dist_for_object_split-criterion (v2). ");
+                                     segmentSplitted = true;
+                                       
+                                     for(unsigned int iPrint = 0; iPrint < associatedPointsInfo[iList].laserIDs.size(); iPrint++)
+                                     {       
+                                             if(associatedPointsInfo[iList].laserIDs[iPrint]  > sensor_ranges.size())
+                                             {
+                                                     ROS_ERROR("BAD INFORMATION 1!!");
+                                                     exit(0);
+                                             }
+                                     }   
+                                        
+                                     for(unsigned int iPrint = 0; iPrint <splittedInfo.laserIDs.size(); iPrint++)
+                                     {       
+                                             if(splittedInfo.laserIDs[iPrint]  > sensor_ranges.size())
+                                             {
+                                                     ROS_ERROR("BAD INFORMATION 2!!");
+                                                     exit(0);
+                                             }
+                                      }
+                             }
+                    }
+            }
+    }
+    return segmentSplitted;
+}
+
+std::vector<tracking::ScanSegment> determineSegments(std::vector<float> sensor_ranges, int maxGapSize, int minSegmentSize, 
+                                                float segmentdepthThreshold, geo::LaserRangeFinder lrf_model, 
+                                                double minClusterSize, double maxClusterSize, bool checkMinSizeCriteria)
+{
+        unsigned int num_beams = sensor_ranges.size();
+        std::vector<tracking::ScanSegment> segments;
+ 
+        // Find first valid value
+        tracking::ScanSegment current_segment;
+        for ( unsigned int i = 0; i < num_beams - 1; ++i )
+        {
+
+                if ( sensor_ranges[i] > 0 )
+                {
+                        current_segment.push_back(i);
+                        break;
+                }
+        }
+
+        if ( current_segment.empty() )
+        {
+                return segments;
+        }
+
+        int gap_size = 0;
+        std::vector<float> gapRanges;
+
+        for(unsigned int i = current_segment.front(); i < num_beams; ++i)
+        {
+                float rs = sensor_ranges[i];
+
+                if (    rs == 0 || 
+                        (std::abs(rs - sensor_ranges[current_segment.back()]) > segmentdepthThreshold ) ||  // if there is a minimum number of points not associated
+                        i == num_beams - 1)
+                {
+                        // Found a gap
+                        ++gap_size;
+                        gapRanges.push_back ( rs );
+
+                        if (gap_size >= maxGapSize || i == num_beams - 1)
+                        {
+                                i = current_segment.back() + 1;
+
+                                if (current_segment.size()  >= minSegmentSize || !checkMinSizeCriteria)
+                                {
+                                        // calculate bounding box
+                                        geo::Vec2 seg_min, seg_max;
+
+                                        for(unsigned int k = 0; k <  current_segment.size(); ++k)
+                                        {
+                                                geo::Vector3 p = lrf_model.rayDirections()[ current_segment[k]] * sensor_ranges[current_segment[k]];
+
+                                                if (k == 0)
+                                                {
+                                                        seg_min = geo::Vec2(p.x, p.y);
+                                                        seg_max = geo::Vec2(p.x, p.y);
+                                                }
+                                                else
+                                                {
+                                                        seg_min.x = std::min(p.x, seg_min.x);
+                                                        seg_min.y = std::min(p.y, seg_min.y);
+                                                        seg_max.x = std::max(p.x, seg_max.x);
+                                                        seg_max.y = std::max(p.y, seg_max.y);
+                                                }
+                                        }
+
+                                        geo::Vec2 bb = seg_max - seg_min;
+                                        if ( ( bb .x > minClusterSize || bb.y > minClusterSize || !checkMinSizeCriteria) && 
+                                                bb.x < maxClusterSize && bb.y < maxClusterSize )
+                                        {
+                                                segments.push_back ( current_segment );
+                                        } 
+                                }
+
+                                current_segment.clear();
+                                gapRanges.clear();
+
+                                // Find next good value
+                                while (i < num_beams &&  sensor_ranges[i] == 0)
+                                {
+                                        ++i; // check for confidence left
+                                }
+
+                                int nPointsToCheck = POINTS_TO_CHECK_CONFIDENCE;
+                                if ( i < nPointsToCheck )
+                                {
+                                nPointsToCheck = i;
+                                }
+
+                                current_segment.push_back ( i );
+                        }
+                }
+                else
+                {
+                        gap_size = 0;
+                        gapRanges.clear();
+                        current_segment.push_back ( i );
+                }
+        }
+        
+    return segments;
 }
 
 }

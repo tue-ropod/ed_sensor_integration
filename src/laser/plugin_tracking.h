@@ -2,6 +2,22 @@
 #define ED_SENSOR_INTEGRATION_LASER_PLUGIN_H_
 
 #include <ed/plugin.h>
+#include "feature_functions.h"
+#include "featureProperties_info.h"
+
+#include "plugin_support_functions.h"
+#include "visualization_functions.h"
+#include "generic_functions.h"
+
+// Tracking
+#include "problib/conversions.h"
+#include "wiredData.h"
+
+// Generic
+#include <iostream>
+#include <cstdlib>
+#include <ctime>
+#include <algorithm>
 
 // ROS
 #include <ros/subscriber.h>
@@ -10,21 +26,11 @@
 // TF
 #include <tf/transform_listener.h>
 
-#include <geolib/sensors/LaserRangeFinder.h>
-
 // Messages
 #include <queue>
 #include <sensor_msgs/LaserScan.h>
 #include <ed_sensor_integration/doorDetection.h>
-#include <visualization_msgs/MarkerArray.h>
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
-
-//#include <boost/circular_buffer/space_optimized.hpp>
-
-// Properties
-#include "feature_functions.h"
-//#include "ed_sensor_integration/properties/featureProperties_info.h"
-#include "featureProperties_info.h"
 
 #define ASSOCIATION_DISTANCE 0.5                        // [m] For the entities which already exist in the WM, determine the relevant properties in order to determine which entities _might_ associate to which clusters Association distance 
 #define MIN_ASSOCIATION_DISTANCE 0.3                    // [m] Maximum distance to reassociate consecutive segments
@@ -37,28 +43,14 @@
 #define MIN_DISTANCE_CORNER_DETECTION_LARGE   2*MIN_DISTANCE_CORNER_DETECTION       // [m]
 #define MAX_DISTANCE_POS_CORRECTION2 std::pow(0.3, 2.0) // [m]
 
-#define N_POINTS_MARGIN_FOR_BEING_CONSECUTIVE 3    // [-] points must be consecutive for splitting if there is a proven gap. This is the margin for points being considered as consecutive
 #define DEFAULT_MEASUREMENT_UNCERTAINTY 0.1 //[-] TODO TEMP, in order to check which dimensions are measured.
 
 #define DELAY_AFTER_INIT ros::Duration(1.0)             // [s]
-
-#include <iostream>
-#include <cstdlib>
-#include <ctime>
-#include <algorithm>
-
-//#include "../../../../dlib-19.16/dlib/optimization/max_cost_assignment.h" // TODO temp, improvement of lib-inclusion needed, see http://dlib.net/
-
-#include "wire_msgs/WorldEvidence.h" // TEMP for publishing WIRE-evidence 
-#include "wire_msgs/ObjectEvidence.h" // TEMP for publishing WIRE-evidence
-#include "problib/conversions.h" // TEMP for publishing WIRE-evidence
-#include "wiredData.h"
 
 #define INF 10000
 
 #define DEBUG false // TEMP
 #define DEBUG_SF false // TEMP
-
 
 // ----------------------------------------------------------------------------------------------------
 
@@ -88,20 +80,10 @@ private:
    
     ros::Publisher points_modelled_pub_; // ############################## TEMP ############################
    
-    ros::Publisher points_modelled_all_pub_; // ############################## TEMP ############################
-   
-    ros::Publisher points_measured_all_pub_; // ############################## TEMP ############################
-   
     ros::Publisher points_measured_pub_; // ############################## TEMP ############################
-   
-    ros::Publisher cornerPointModelled_pub_; // ############################## TEMP ############################
-   
-    ros::Publisher cornerPointMeasured_pub_; // ############################## TEMP ############################
 
     ros::Publisher associatedPoints_pub_; // ############################## TEMP ############################
 
-    ros::Publisher improvedRobotPos_pub_;
-    
     ros::Subscriber amclPose_sub_;
     
     ros::Subscriber initializedPose_sub_;
@@ -124,8 +106,6 @@ private:
 
     void update(const ed::WorldModel& world, const sensor_msgs::LaserScan::ConstPtr& scan, geo::Pose3D& sensor_pose, ed::UpdateRequest& req);
 
-
-
     // PARAMETERS
     int min_segment_size_pixels_;
     float world_association_distance_;
@@ -145,6 +125,5 @@ private:
     // 'Feature' property key
     ed::PropertyKey<tracking::FeatureProperties> featureProperties_; 
 };
-
 
 #endif

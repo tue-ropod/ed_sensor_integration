@@ -25,7 +25,7 @@
 #include "problib/conversions.h"
 
 // Property info
-#include "ed/featureProperties_info.h"
+#include <wire/featureProperties_info.h>
 
 namespace
 // {
@@ -608,13 +608,13 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
 
             it_laserEntities.push_back ( e_it );
 
-            ed::tracking::FeatureProperties featureProperties = e->property ( featureProperties_ );
+            tracking::FeatureProperties featureProperties = e->property ( featureProperties_ );
             EntityProperty currentProperty;
 
             // For the entities which already exist in the WM, determine the relevant properties in order to determine which entities _might_ associate to which clusters
             if ( featureProperties.getFeatureProbabilities().get_pCircle() > featureProperties.getFeatureProbabilities().get_pRectangle() )
             {
-                ed::tracking::Circle circle = featureProperties.getCircle();
+                tracking::Circle circle = featureProperties.getCircle();
                 currentProperty.entity_min.x = circle.get_x() - ( 0.5*ADD_ASSOCIATION_DISTANCE + circle.get_radius() );
                 currentProperty.entity_max.x = circle.get_x() + ( 0.5*ADD_ASSOCIATION_DISTANCE + circle.get_radius() );
                 currentProperty.entity_min.y = circle.get_y() - ( 0.5*ADD_ASSOCIATION_DISTANCE + circle.get_radius() );
@@ -622,7 +622,7 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
             }
             else
             {
-                ed::tracking::Rectangle rectangle = featureProperties.getRectangle();
+                tracking::Rectangle rectangle = featureProperties.getRectangle();
 
                 std::vector<geo::Vec2f> corners = rectangle.determineCorners ( ADD_ASSOCIATION_DISTANCE );
                 currentProperty.entity_min = corners[0];
@@ -718,17 +718,17 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
             for ( unsigned int jj = 0; jj < possibleClusterEntityAssociations.size(); ++jj )  // relevant entities only
             {
                 const ed::EntityConstPtr& e = *it_laserEntities[ possibleClusterEntityAssociations[jj] ];
-                ed::tracking::FeatureProperties featureProperties = e->property ( featureProperties_ );
+                tracking::FeatureProperties featureProperties = e->property ( featureProperties_ );
                 float dist;
 
                 if ( featureProperties.getFeatureProbabilities().get_pCircle() > featureProperties.getFeatureProbabilities().get_pRectangle() )  // entity is considered to be a circle
                 {
-                    ed::tracking::Circle circle = featureProperties.getCircle();                
+                    tracking::Circle circle = featureProperties.getCircle();                
                     dist = std::abs ( std::sqrt ( std::pow ( p.x - circle.get_x(), 2.0 ) + std::pow ( p.y - circle.get_y(), 2.0 ) ) - circle.get_radius() ); // Distance of a point to a circle, see https://www.varsitytutors.com/hotmath/hotmath_help/topics/shortest-distance-between-a-point-and-a-circle
                 }
                 else     // entity is considered to be a rectangle. Check if point is inside the rectangle
                 {
-                    ed::tracking::Rectangle rectangle = featureProperties.getRectangle();
+                    tracking::Rectangle rectangle = featureProperties.getRectangle();
 
 
                     std::vector<geo::Vec2f> corners = rectangle.determineCorners ( 0.0 );
@@ -857,7 +857,7 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
 
 // - - - - - - - - - - - - - - - - - -
     std::vector<EntityUpdate> clusters;
-    std::vector<ed::tracking::FeatureProperties> measuredProperties ( pointsAssociatedList.size() ); // The first sequence in this vector (with the length of laser entitities) are the properties corresponding to existing entities
+    std::vector<tracking::FeatureProperties> measuredProperties ( pointsAssociatedList.size() ); // The first sequence in this vector (with the length of laser entitities) are the properties corresponding to existing entities
 
     int initialSize = segments.size();
 
@@ -868,7 +868,7 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
 
         if ( points.size() < min_segment_size_pixels_ ) // Add an element to measured properties such that the element in the measuredProperties-vector still corresponds with the laser-entity-vector
         {
-            ed::tracking::FeatureProperties properties; // values initialized with nan now
+            tracking::FeatureProperties properties; // values initialized with nan now
             measuredProperties[iList] =  properties;
             continue;
         }
@@ -878,7 +878,7 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
         std::vector<ScanSegment> segmentsSplitted;
         std::vector< std::vector<geo::Vec2f> > pointsList; // Vector of points might be splitted as the area described might be a non-occluded area
 
-        bool test = ed::tracking::findPossibleCorners ( points, &cornerIndices );
+        bool test = tracking::findPossibleCorners ( points, &cornerIndices );
 
         if ( !test ) // if no corners detected, add the points to the points-vector
         {
@@ -987,7 +987,7 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
 
             std::vector<geo::Vec2f>::iterator it_start = points.begin();
             std::vector<geo::Vec2f>::iterator it_end = points.end();
-            bool testForCorner = ed::tracking::findPossibleCorner ( points, &cornerIds, &it_start, &it_end ); // TODO Prevent recomputations
+            bool testForCorner = tracking::findPossibleCorner ( points, &cornerIds, &it_start, &it_end ); // TODO Prevent recomputations
             unsigned int cornerIndex =  std::numeric_limits<unsigned int>::quiet_NaN(); // TODO hack
             if ( testForCorner )
             {
@@ -1000,21 +1000,21 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
 
             cluster.pose = geo::Pose3D::identity();
 
-            ed::tracking::Circle circle;
-            ed::tracking::Rectangle rectangle;
+            tracking::Circle circle;
+            tracking::Rectangle rectangle;
             std::vector<geo::Vec2f>::iterator it_low, it_high;
 
-            ed::tracking::FITTINGMETHOD method = ed::tracking::CIRCLE;
-            float error_circle2 = ed::tracking::fitObject ( points, method, &cornerIndex, &rectangle, &circle, &it_low, &it_high, sensor_pose );
+            tracking::FITTINGMETHOD method = tracking::CIRCLE;
+            float error_circle2 = tracking::fitObject ( points, method, &cornerIndex, &rectangle, &circle, &it_low, &it_high, sensor_pose );
 
-            method = ed::tracking::determineCase ( points, &cornerIndex, &it_low, &it_high, sensor_pose ); // chose to fit a single line or a rectangle (2 lines)
+            method = tracking::determineCase ( points, &cornerIndex, &it_low, &it_high, sensor_pose ); // chose to fit a single line or a rectangle (2 lines)
 
-            float error_rectangle2 = ed::tracking::fitObject ( points, method,  &cornerIndex, &rectangle, &circle, &it_low, &it_high,  sensor_pose );
+            float error_rectangle2 = tracking::fitObject ( points, method,  &cornerIndex, &rectangle, &circle, &it_low, &it_high,  sensor_pose );
 
-            ed::tracking::FeatureProbabilities prob;
+            tracking::FeatureProbabilities prob;
             prob.setMeasurementProbabilities ( error_rectangle2, error_circle2, 2*circle.get_radius(), MAX_CORRIDOR_WIDTH );
 
-            ed::tracking::FeatureProperties properties;
+            tracking::FeatureProperties properties;
             properties.setFeatureProbabilities ( prob );
             properties.setCircle ( circle );
             properties.setRectangle ( rectangle );
@@ -1054,7 +1054,7 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
 
     unsigned int marker_ID = 0; // To Do: After tracking, the right ID's should be created. The ID's are used to have multiple markers.
 
-    ed::tracking::FeatureProperties measuredProperty, entityProperties; // Measured properties and updated properties
+    tracking::FeatureProperties measuredProperty, entityProperties; // Measured properties and updated properties
     ed::UUID id;
 
     for ( unsigned int i_properties = 0; i_properties < measuredProperties.size(); i_properties++ )
@@ -1130,14 +1130,14 @@ void LaserPlugin::update ( const ed::WorldModel& world, const sensor_msgs::Laser
         if ( entityProperties.getFeatureProbabilities().get_pCircle() < entityProperties.getFeatureProbabilities().get_pRectangle() )
         {
             // determine corners
-            ed::tracking::Rectangle rectangle = entityProperties.getRectangle();
+            tracking::Rectangle rectangle = entityProperties.getRectangle();
             std::vector<geo::Vec2f> corners = entityProperties.getRectangle().determineCorners ( 0.0 );
             new_pose = rectangle.getPose();
         }
         else
         {
             // determine cilinder-properties
-            ed::tracking::Circle circle = entityProperties.getCircle();
+            tracking::Circle circle = entityProperties.getCircle();
             new_pose = circle.getPose();
         }
 

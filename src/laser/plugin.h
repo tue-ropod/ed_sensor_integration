@@ -21,6 +21,9 @@
 #include "ed/convex_hull.h"
 #include "ed/convex_hull_calc.h"
 
+//#include "featureProperties.h"
+#include <featureProperties.h>
+
 #define MAX_CORRIDOR_WIDTH 3 // [m]
 #define ADD_ASSOCIATION_DISTANCE 0.5 // [m]
 #define MIN_ASSOCIATION_DISTANCE 0.3 // [m] TODO reduce
@@ -67,10 +70,7 @@ private:
     void update(const ed::WorldModel& world, const sensor_msgs::LaserScan::ConstPtr& scan,
                 const geo::Pose3D& sensor_pose, ed::UpdateRequest& req);
 
-
-
     // PARAMETERS
-
     int min_segment_size_pixels_;
     float world_association_distance_;
     float segment_depth_threshold_;
@@ -84,9 +84,7 @@ private:
     std::map<ed::UUID,geo::Pose3D> pose_cache;
     
     // 'Feature' property key
-    ed::PropertyKey<ed::tracking::FeatureProperties> featureProperties_; // TODO double defined now for publishing-purposes in rviz
-
+    ed::PropertyKey<tracking::FeatureProperties> featureProperties_; // TODO double defined now for publishing-purposes in rviz
 };
-
 
 #endif

@@ -22,789 +22,6 @@
 #include <iterator>
 #include <boost/graph/graph_concepts.hpp>
 
-namespace
-{
-
-typedef std::vector<unsigned int> ScanSegment;
-
-bool sortBySegmentSize(const ScanSegment &lhs, const ScanSegment &rhs) { return lhs.size() > rhs.size(); }
-
-ros::Time tLatestPoseInit( 0.0 );
-
-struct PointsInfo
-{
-    std::vector<geo::Vec2f> points;
-    ScanSegment laserIDs;
-};
-
-struct EntityUpdate
-{
-    ed::ConvexHull chull;
-    geo::Pose3D pose;
-    std::string flag; // Temp for RoboCup 2015; todo: remove after
-};
-
-struct EntityProperty
-{
-    geo::Vec2f entity_min;
-    geo::Vec2f entity_max;
-};
-
-struct measuredPropertyInfo
-{
-       tracking::FeatureProperties featureProperty;
-       bool propertiesDescribed;
-       bool confidenceCircle;
-       bool confidenceRectangleWidth;// confidence of entire side
-       bool confidenceRectangleWidthLow; // confidence about cornerpoint
-       bool confidenceRectangleWidthHigh; // confidence about cornerpoint
-       bool confidenceRectangleDepth; 
-       bool confidenceRectangleDepthLow;
-       bool confidenceRectangleDepthHigh;
-       tracking::FITTINGMETHOD methodRectangle; //
-       float fittingErrorCircle;
-       float fittingErrorRectangle;
-       std::vector<geo::Vec2f> measuredCorners;
-};
-
-visualization_msgs::Marker getMarker ( tracking::FeatureProperties& featureProp, int ID) // TODO move to ed_rviz_plugins?
-// ############################## TEMP ############################
-{
-    visualization_msgs::Marker marker;
-    std_msgs::ColorRGBA color;
-
-        color.r = 0;
-        color.g = 255;
-        color.b = 0;
-        color.a = ( float ) 0.5;
-
-        if ( featureProp.getFeatureProbabilities().get_pCircle() > featureProp.getFeatureProbabilities().get_pRectangle() )
-        {
-            tracking::Circle circle = featureProp.getCircle();
-            circle.setMarker ( marker , ID, color );
-        }
-        else
-        {
-            tracking::Rectangle rectangle = featureProp.getRectangle();
-            rectangle.setMarker ( marker , ID, color );
-        }
-        
-         if(marker.pose.position.x != marker.pose.position.x || marker.pose.position.y != marker.pose.position.y || marker.pose.position.z != marker.pose.position.z ||
-             marker.pose.orientation.x !=  marker.pose.orientation.x || marker.pose.orientation.y !=  marker.pose.orientation.y || marker.pose.orientation.z !=  marker.pose.orientation.z ||
-             marker.pose.orientation.w !=  marker.pose.orientation.w || marker.scale.x != marker.scale.x || marker.scale.y != marker.scale.y || marker.scale.z != marker.scale.z )
-     {
-             
-                featureProp.printProperties();
-                ROS_WARN( "Publishing of object with nan" ); 
-                
-                exit (EXIT_FAILURE);
-        }
-        
-    return marker;
-}
-
-template <typename T>
-void append(std::vector<T>& a, const std::vector<T>& b)
-{
-    a.reserve(a.size() + b.size());
-    a.insert(a.end(), b.begin(), b.end());
-}
-
-template <typename T>
-void append(std::vector<T>& a, const std::vector<T>& b, int bStart, int bEnd)
-{
-    a.reserve(a.size() + bEnd - bStart );
-    a.insert(a.end(), b.begin() + bStart, b.begin() + bEnd);
-}
-
-float COLORS[27][3] = { { 1.0, 0.0, 0.0},// ############################## TEMP ############################
-                        { 0.0, 1.0, 0.0},
-                        { 0.0, 0.0, 1.0},
-                        { 1.0, 0.0, 1.0},
-                        { 0.0, 1.0, 1.0},
-                        { 1.0, 1.0, 1.0},
-                        { 1.0, 0.0, 0.0},
-                        { 0.0, 0.0, 0.0}
-                      };
-
-
-void pubPoints ( visualization_msgs::MarkerArray *markerArray, std::vector<geo::Vec2f> points, unsigned int *ID )
-// ############################## TEMP ############################
-{
-    visualization_msgs::Marker marker;
-    marker.header.frame_id = "/map";
-    marker.header.stamp = ros::Time::now();
-    marker.ns = "points";
-    marker.id = ( *ID ) ++;
-    marker.type = visualization_msgs::Marker::POINTS;
-    marker.action = visualization_msgs::Marker::ADD;
-
-    marker.pose.position.x = 0.0;
-    marker.pose.position.y = 0.0;
-    marker.pose.position.z = 0.3;
-    marker.pose.orientation = tf::createQuaternionMsgFromRollPitchYaw ( 0.0, 0.0, 0.0 );
-    marker.scale.x = 0.05;
-    marker.scale.y = 0.05;
-    marker.scale.z = 0.05;
-
-    int i_color = *ID % 8;
-    marker.color.r = COLORS[i_color][0];
-    marker.color.g = COLORS[i_color][1];
-    marker.color.b = COLORS[i_color][2];
-    marker.color.a = ( float ) 1.0;
-
-    marker.lifetime = ros::Duration ( MARKER_TIMEOUT_TIME );
-
-    for ( unsigned int ii = 0; ii < points.size(); ii++ )
-    {
-
-        geometry_msgs::Point p;
-        p.x = points[ii].x;
-        p.y = points[ii].y;
-        p.z = 0.0;
-        marker.points.push_back ( p );
-    }
-    
-    markerArray->markers.push_back ( marker );
-}
-
-void renderWorld(const geo::Pose3D& sensor_pose, std::vector<double>& model_ranges, const ed::WorldModel& world, geo::LaserRangeFinder lrf_model)
-{
-     geo::Pose3D sensor_pose_inv = sensor_pose.inverse();
-
-    
-    for(ed::WorldModel::const_iterator it = world.begin(); it != world.end(); ++it)
-    {
-        const ed::EntityConstPtr& e = *it;
-        
-        if (e->shape() && e->has_pose() && !(e->hasType("left_door") || e->hasType("door_left") || e->hasType("right_door") || e->hasType("door_right" ) || e->hasFlag("non-localizable")))
-        {
-            // Set render options
-            geo::LaserRangeFinder::RenderOptions opt;
-            geo::Mesh testMesh = e->shape()->getMesh();
-            geo::Pose3D poseTest = sensor_pose_inv ;
-            geo::Pose3D poseTest2 = e->pose();
-
-            opt.setMesh(e->shape()->getMesh(), sensor_pose_inv * e->pose());
-
-            geo::LaserRangeFinder::RenderResult res(model_ranges);
-            lrf_model.render(opt, res);
-        }        
-    }       
-}
- 
-// ----------------------------------------------------------------------------------------------------
-
-double getFittingError(const ed::Entity& e, const geo::LaserRangeFinder& lrf, const geo::Pose3D& rel_pose,
-                       const std::vector<float>& sensor_ranges, const std::vector<double>& model_ranges,
-                       int& num_model_points)
-{
-    std::vector<double> test_model_ranges = model_ranges;
-
-    // Render the entity with the given relative pose
-    geo::LaserRangeFinder::RenderOptions opt;
-    opt.setMesh(e.shape()->getMesh(), rel_pose);
-
-    geo::LaserRangeFinder::RenderResult res(test_model_ranges);
-    lrf.render(opt, res);
-
-    int n = 0;
-    num_model_points = 0;
-    double total_error = 0;
-    for(unsigned int i = 0; i < test_model_ranges.size(); ++i)
-    {
-        double ds = sensor_ranges[i];
-        double dm = test_model_ranges[i];
-
-        if (ds <= 0)
-            continue;
-
-        ++n;
-
-        if (dm <= 0)
-        {
-            total_error += 0.1;
-            continue;
-        }
-
-        double diff = std::abs(ds - dm);
-        if (diff < 0.1)
-            total_error += diff;
-        else
-        {
-            if (ds > dm)
-                total_error += 1;
-            else
-                total_error += 0.1;
-        }
-
-        ++num_model_points;
-    }
-
-    return total_error / (n+1); // to be sure to never divide by zero.
-}
-
-// ----------------------------------------------------------------------------------------------------
-
-geo::Pose3D getPoseFromCache(const ed::Entity& e, std::map<ed::UUID,geo::Pose3D>& pose_cache)
-{
-    const ed::UUID ID = e.id();
-    geo::Pose3D old_pose = e.pose();
-    if (pose_cache.find(ID) == pose_cache.end())
-    {
-        pose_cache[ID] = old_pose;
-    }
-    else
-    {
-        old_pose = pose_cache[ID];
-    }
-    return old_pose;
-}
-
-// ----------------------------------------------------------------------------------------------------
-
-geo::Pose3D fitEntity(const ed::Entity& e, const geo::Pose3D& sensor_pose, const geo::LaserRangeFinder& lrf,
-                      const std::vector<float>& sensor_ranges, const std::vector<double>& model_ranges,
-                      float x_window, float x_step, float y_window, float y_step, float yaw_min, float yaw_plus, float yaw_step, std::map<ed::UUID,geo::Pose3D>& pose_cache)
-{
-    const geo::Pose3D& old_pose = getPoseFromCache(e, pose_cache);
-
-    geo::Pose3D sensor_pose_inv = sensor_pose.inverse();
-
-
-    double min_error = 1e6;
-    geo::Pose3D best_pose = e.pose();
-
-
-    for(float dyaw = yaw_min; dyaw <= yaw_plus; dyaw += yaw_step)
-    {
-        geo::Mat3 rot;
-        rot.setRPY(0, 0, dyaw);
-        geo::Pose3D test_pose = old_pose;
-        test_pose.R = old_pose.R * rot;
-
-        for(float dx = -x_window; dx <= x_window; dx += x_step)
-        {
-            test_pose.t.x = old_pose.t.x + dx;
-            for(float dy = -y_window; dy <= y_window; dy += y_step)
-            {
-                test_pose.t.y = old_pose.t.y + dy;
-
-                int num_model_points;
-                double error = getFittingError(e, lrf, sensor_pose_inv * test_pose, sensor_ranges, model_ranges, num_model_points);
-
-//                ROS_ERROR_STREAM("yaw = " << dyaw << ", error = " << error << ", minerror= " << min_error << ", num_model_points = " << num_model_points);
-
-                if (error < min_error && num_model_points >= 3)
-                {
-                    best_pose = test_pose;
-                    min_error = error;
-                }
-            }
-        }
-    }
-    return best_pose;
-}
-
-bool splitSegmentsWhenGapDetected( std::vector< PointsInfo >& associatedPointsInfo, int min_gap_size_for_split,int min_segment_size_pixels, float dist_for_object_split, 
-                                   std::vector<float>& sensor_ranges, const sensor_msgs::LaserScan::ConstPtr& scan)
-{
-        bool segmentSplitted = false;
-        for ( unsigned int iList = 0; iList < associatedPointsInfo.size(); iList++ )
-        {           
-            std::vector<unsigned int> IDs = associatedPointsInfo[iList].laserIDs;
-      
-            if( IDs.size() == 0 )
-                    continue;
-            
-            for(unsigned int iIDs = 1; iIDs < IDs.size(); iIDs++)
-            {
-                    unsigned int idLow = iIDs - 1;
-                    unsigned int gapSize = IDs[iIDs] - IDs[iIDs - 1];
-                    
-                    if( gapSize >= min_gap_size_for_split )
-                    {
-                        // check ranges in gap
-                        // if there is a set of consecutive ranges (min_gap_size_for_split) which is significantly larger than ranges before gap and after gap, this implies that there is free space
-                        // instead of an object which blocks the view on the object. The entities are splitted and treated as 2 separate ones.
-                            
-                            unsigned int nLowElements, nHighElements;
-                            if (idLow < min_gap_size_for_split)
-                            {
-                                    if ((2 * idLow) > IDs.size())
-                                        nLowElements = IDs.size() - idLow;
-                                    else
-                                        nLowElements = idLow;
-                            }
-                            else
-                            {
-                                    if ((idLow + min_gap_size_for_split) > IDs.size())
-                                        nLowElements = IDs.size() - idLow;
-                                    else
-                                        nLowElements = min_gap_size_for_split;
-                            }                           
-                            
-                            if (iIDs > (IDs.size() - (unsigned int)  min_gap_size_for_split))
-                            {
-                                    nHighElements = IDs.size() - iIDs;
-                            }
-                            else
-                            {
-                                    nHighElements = min_gap_size_for_split;
-                            }
-                            
-                            float avgRangeLow = 0.0, avgRangeHigh = 0.0;
-                            for(unsigned int iAvgLow = 0; iAvgLow < nLowElements; iAvgLow++)
-                            {
-                                    float range = sensor_ranges[IDs[idLow + iAvgLow]];
-                                    if (range == 0.0 ) // ranges were set to zero if associated to world
-                                            range = scan->range_max;
-                                    
-                                    avgRangeLow += range;
-                            }
-                            avgRangeLow /= nLowElements;
-
-                            for(unsigned int iAvgHigh = 0; iAvgHigh < nHighElements; iAvgHigh++)
-                            {
-                                    // Some checks just in case
-                                    if( iIDs + iAvgHigh >= IDs.size() )
-                                    {
-                                            bool check = iIDs > (IDs.size() - min_gap_size_for_split);
-                                            std::cout << "Test1: " << IDs.size() - min_gap_size_for_split << std::endl;
-                                            std::cout << "Test2: " << (unsigned int) IDs.size() - (unsigned int) min_gap_size_for_split << std::endl;
-                                            ROS_WARN("Potential Problem in ED tracking plugin: iIDs + iAvgHigh >= IDs.size(). iIDs = %u  iAvgHigh = %u IDs.size() = %lu  nHighElements = %u  min_gap_size_for_split = %u, check = %i", iIDs, iAvgHigh, IDs.size(), nHighElements, min_gap_size_for_split, check );
-                                            nHighElements = iAvgHigh - 1; // safety measure!
-                                            continue;
-                                            
-                                    }
-                                    
-                                    // Potential Problem in ED tracking plugin: iIDs + iAvgHigh >= IDs.size(). iIDs = 1  iAvgHigh = 1 IDs.size() = 2  nHighElements = 5  min_gap_size_for_split = 5
-                                    //[ WARN] [1559656004.524065310][/ed]: Potential Problem in ED tracking plugin: IDs[iIDs + iAvgHigh] >= sensor_ranges.size(). iIDs = 1 iAvgHigh = 1 IDs.size() = 2 IDs[iIDs + iAvgHigh] = 1111917452 nHighElements = 5 min_gap_size_for_split = 5 sensor_ranges.size() = 726
-
-                                    if( IDs[iIDs + iAvgHigh] >= sensor_ranges.size() )
-                                    {
-                                            ROS_WARN("Potential Problem in ED tracking plugin: IDs[iIDs + iAvgHigh] >= sensor_ranges.size(). iIDs = %u iAvgHigh = %u IDs.size() = %lu IDs[iIDs + iAvgHigh] = %u nHighElements = %u min_gap_size_for_split = %u sensor_ranges.size() = %lu", iIDs, iAvgHigh, IDs.size(), IDs[iIDs + iAvgHigh], nHighElements, min_gap_size_for_split, sensor_ranges.size() );
-                                    }
-                                    
-                                    float range = sensor_ranges[IDs[iIDs + iAvgHigh]];
-                                    if (range == 0.0 ) // ranges were set to zero if associated to world
-                                            range = scan->range_max;
-                                    
-                                    avgRangeHigh += range;
-                            }
-                            
-                            if(nHighElements <= 0)
-                            {
-                                    avgRangeHigh = scan->range_max;
-                            } else {
-                                    avgRangeHigh /= nHighElements;
-                            }
-
-                            float maxReference = std::max(avgRangeLow, avgRangeHigh);
-                            unsigned int nLargerRanges = 0;
-
-                            for(unsigned int iGap = IDs[idLow]; iGap < IDs[iIDs]; iGap++ )
-                            {       
-                                   if(  sensor_ranges[iGap] > maxReference ||  sensor_ranges[iGap] == 0.0 ) // as points associated to the world are set to 0
-                                    {
-                                            nLargerRanges++;
-                                    }
-                                    else
-                                    {
-                                            nLargerRanges = 0;
-                                    }
-
-                                    if(nLargerRanges >= min_gap_size_for_split)
-                                    {
-                                            PointsInfo splittedInfo;
-
-                                            std::vector<geo::Vec2f> points = associatedPointsInfo[iList].points;
-                                            std::copy( associatedPointsInfo[iList].laserIDs.begin() + iIDs, associatedPointsInfo[iList].laserIDs.end(), std::back_inserter(splittedInfo.laserIDs) );
-                                            std::copy( associatedPointsInfo[iList].points.begin() + iIDs, associatedPointsInfo[iList].points.end(),  std::back_inserter(splittedInfo.points) );
-                                            associatedPointsInfo.push_back( splittedInfo );
-                                            associatedPointsInfo[iList].laserIDs.erase (associatedPointsInfo[iList].laserIDs.begin() + iIDs, associatedPointsInfo[iList].laserIDs.end() );
-                                            associatedPointsInfo[iList].points.erase (associatedPointsInfo[iList].points.begin() + iIDs, associatedPointsInfo[iList].points.end() );
-                                            
-                                            ROS_WARN("Segment splitted based on min_gap_size_for_split-criterion. ");
-                                            segmentSplitted = true;
-                                            
-                                            goto endOfLoop;
-                                    }
-                            }
-                    }
-            }
-            endOfLoop:;  
-    }
-    
-    for ( unsigned int iList = 0; iList < associatedPointsInfo.size(); iList++ )
-    {
-            // As each point is associated to an object, it might happen that 2 objects close to each other can be seen as one. This results in large distances between consecutive points.
-            // Here it is checked if this is the case. If so, objects are being splitted.
-            
-            ScanSegment IDs = associatedPointsInfo[iList].laserIDs;
-            std::vector< geo::Vec2f > segmentPoints = associatedPointsInfo[iList].points;
-            
-            unsigned int nPointsForAvg;
-            min_segment_size_pixels % 2 == 0 ? nPointsForAvg = min_segment_size_pixels / 2 : nPointsForAvg = (min_segment_size_pixels - 1) / 2;
-            
-            if( IDs.size() < 2*nPointsForAvg ) // 2 times, because we have to determine the average for the lower and upper part
-            {
-                    continue;
-            }
-            
-            geo::Vec2f pointLowSum, pointHighSum;
-            pointLowSum.x = 0.0;
-            pointLowSum.y = 0.0;
-            pointHighSum.x = 0.0;
-            pointHighSum.y = 0.0;
-            
-            for(unsigned int iAvgLow = 0; iAvgLow < nPointsForAvg; iAvgLow++)
-            {                    
-                    pointLowSum += segmentPoints[iAvgLow];
-            }
-            
-            geo::Vec2f avgPointLow = pointLowSum / nPointsForAvg;
-             
-            for(unsigned int iAvgHigh = nPointsForAvg; iAvgHigh < 2*nPointsForAvg; iAvgHigh++)
-            {
-                    pointHighSum += segmentPoints [iAvgHigh];
-            }
-
-            geo::Vec2f avgPointHigh = pointHighSum / nPointsForAvg;
-            
-            bool splitFound = false;
-            
-             if( std::fabs( IDs[(2*nPointsForAvg) - 1] - IDs[0]) <=  2*nPointsForAvg + N_POINTS_MARGIN_FOR_BEING_CONSECUTIVE &&
-                 std::fabs( IDs[(2*nPointsForAvg) - 1] - IDs[0]) >=  2*nPointsForAvg - N_POINTS_MARGIN_FOR_BEING_CONSECUTIVE ) // points must be consecutive
-             {                     
-                if( avgPointHigh.dist( avgPointLow ) >  dist_for_object_split )
-                {
-                        PointsInfo splittedInfo;       
-                        unsigned int position2Split = nPointsForAvg;//IDs[nPointsForAvg];
-                        std::vector<geo::Vec2f> points = associatedPointsInfo[iList].points;             
-                        std::copy( associatedPointsInfo[iList].laserIDs.begin() + position2Split, associatedPointsInfo[iList].laserIDs.end(), std::back_inserter(splittedInfo.laserIDs) );
-                        std::copy( associatedPointsInfo[iList].points.begin() + position2Split, associatedPointsInfo[iList].points.end(),  std::back_inserter(splittedInfo.points) );
-                        associatedPointsInfo.push_back( splittedInfo );
-                        
-                        associatedPointsInfo[iList].laserIDs.erase (associatedPointsInfo[iList].laserIDs.begin() + position2Split, associatedPointsInfo[iList].laserIDs.end() );
-                        associatedPointsInfo[iList].points.erase (associatedPointsInfo[iList].points.begin() + position2Split, associatedPointsInfo[iList].points.end() );
-                        segmentSplitted = true;
-                        splitFound = true;
-                        
-                        ROS_WARN("Segment splitted based on dist_for_object_split-criterion (v1). ");
-                }
-             }
-
-            for(unsigned int iIDs = 0; iIDs < (IDs.size() - 2*nPointsForAvg - 1) && !splitFound && IDs.size() >= ( 2*nPointsForAvg + 1); iIDs++) // -1 because the first segment is already determined as above
-            { 
-                    pointLowSum -= segmentPoints[iIDs];
-                    pointLowSum += segmentPoints[iIDs + nPointsForAvg];
-                    
-                    pointHighSum -= segmentPoints[iIDs + nPointsForAvg];
-                    pointHighSum += segmentPoints[iIDs + 2*nPointsForAvg];
-
-                    if( IDs[iIDs + 2*nPointsForAvg] - IDs[iIDs] ==  2*nPointsForAvg) // points must be consecutive
-                    {
-                            avgPointLow = pointLowSum / nPointsForAvg;
-                            avgPointHigh = pointHighSum / nPointsForAvg;
-                        
-                            if( avgPointHigh.dist( avgPointLow ) >  dist_for_object_split )
-                            {
-                                    PointsInfo splittedInfo;       
-                                    unsigned int position2Split = iIDs;//IDs[nPointsForAvg];
-                                    std::vector<geo::Vec2f> points = associatedPointsInfo[iList].points;     
-                
-                                    for(unsigned int iPrint = 0; iPrint < associatedPointsInfo[iList].laserIDs.size(); iPrint++)
-                                    {
-                                            if(associatedPointsInfo[iList].laserIDs[iPrint]  > sensor_ranges.size())
-                                            {
-                                                    ROS_ERROR("BAD INFORMATION 0!!");
-                                                    exit(0);
-                                             }
-                                     }
-                                        
-                                     std::copy( associatedPointsInfo[iList].laserIDs.begin() + position2Split, associatedPointsInfo[iList].laserIDs.end(), std::back_inserter(splittedInfo.laserIDs) );
-                                     std::copy( associatedPointsInfo[iList].points.begin() + position2Split, associatedPointsInfo[iList].points.end(),  std::back_inserter(splittedInfo.points) );
-                                     associatedPointsInfo.push_back( splittedInfo );
-
-                                     associatedPointsInfo[iList].laserIDs.erase (associatedPointsInfo[iList].laserIDs.begin() + position2Split, associatedPointsInfo[iList].laserIDs.end() );
-                                     associatedPointsInfo[iList].points.erase (associatedPointsInfo[iList].points.begin() + position2Split, associatedPointsInfo[iList].points.end() );
-                                     splitFound = true;
-                                     
-                                     ROS_WARN("Segment splitted based on dist_for_object_split-criterion (v2). ");
-                                     segmentSplitted = true;
-                                       
-                                     for(unsigned int iPrint = 0; iPrint < associatedPointsInfo[iList].laserIDs.size(); iPrint++)
-                                     {       
-                                             if(associatedPointsInfo[iList].laserIDs[iPrint]  > sensor_ranges.size())
-                                             {
-                                                     ROS_ERROR("BAD INFORMATION 1!!");
-                                                     exit(0);
-                                             }
-                                     }   
-                                        
-                                     for(unsigned int iPrint = 0; iPrint <splittedInfo.laserIDs.size(); iPrint++)
-                                     {       
-                                             if(splittedInfo.laserIDs[iPrint]  > sensor_ranges.size())
-                                             {
-                                                     ROS_ERROR("BAD INFORMATION 2!!");
-                                                     exit(0);
-                                             }
-                                      }
-                             }
-                    }
-            }
-    }
-    return segmentSplitted;
-}
-
-// ----------------------------------------------------------------------------------------------------
-
-bool pointIsPresent(double x_sensor, double y_sensor, const geo::LaserRangeFinder& lrf, const std::vector<float>& sensor_ranges)
-{
-    int i_beam = lrf.getAngleUpperIndex(x_sensor, y_sensor);
-    if (i_beam < 0 || i_beam >= sensor_ranges.size())
-        return true; // or actually, we don't know
-
-    float rs = sensor_ranges[i_beam];
-    return rs == 0 || geo::Vec2(x_sensor, y_sensor).length() > rs - 0.1;
-}
-
-// ----------------------------------------------------------------------------------------------------
-
-bool pointIsPresent(const geo::Vector3& p_sensor, const geo::LaserRangeFinder& lrf, const std::vector<float>& sensor_ranges)
-{
-    return pointIsPresent(p_sensor.x, p_sensor.y, lrf, sensor_ranges);
-}
-
-}
-
-// ----------------------------------------------------------------------------------------------------
-
-// Strongly inspired by https://www.geeksforgeeks.org/how-to-check-if-a-given-point-lies-inside-a-polygon/
-template<typename T>
-// Given three colinear points p, q, r, the function checks if
-// point q lies on line segment 'pr'
-bool onSegment( T& p, T& q, T& r)
-{
-    if (q.x <= std::max(p.x, r.x) && q.x >= std::min(p.x, r.x) &&
-            q.y <= std::max(p.y, r.y) && q.y >= std::min(p.y, r.y))
-        return true;
-    return false;
-}
- 
- template<typename T>
-// To find orientation of ordered triplet (p, q, r).
-// The function returns following values
-// 0 --> p, q and r are colinear
-// 1 --> Clockwise
-// 2 --> Counterclockwise
-int orientation( T& p, T& q, T& r)
-{
-    int val = (q.y - p.y) * (r.x - q.x) -
-              (q.x - p.x) * (r.y - q.y);
- 
-    if (val == 0) return 0;  // colinear
-    return (val > 0)? 1: 2; // clock or counterclock wise
-}
- 
- template<typename T>
-// The function that returns true if line segment 'p1q1'
-// and 'p2q2' intersect.
-bool doIntersect( T& p1, T& q1, T& p2, T& q2)
-{
-    // Find the four orientations needed for general and
-    // special cases
-    int o1 = orientation(p1, q1, p2);
-    int o2 = orientation(p1, q1, q2);
-    int o3 = orientation(p2, q2, p1);
-    int o4 = orientation(p2, q2, q1);
- 
-    // General case
-    if (o1 != o2 && o3 != o4)
-        return true;
- 
-    // Special Cases
-    // p1, q1 and p2 are colinear and p2 lies on segment p1q1
-    if (o1 == 0 && onSegment(p1, p2, q1)) return true;
- 
-    // p1, q1 and p2 are colinear and q2 lies on segment p1q1
-    if (o2 == 0 && onSegment(p1, q2, q1)) return true;
- 
-    // p2, q2 and p1 are colinear and p1 lies on segment p2q2
-    if (o3 == 0 && onSegment(p2, p1, q2)) return true;
- 
-     // p2, q2 and q1 are colinear and q1 lies on segment p2q2
-    if (o4 == 0 && onSegment(p2, q1, q2)) return true;
- 
-    return false; // Doesn't fall in any of the above cases
-}
- 
- template<typename T>
-// Returns true if the point p lies inside the polygon[] with n vertices
-bool isInside(std::vector<T> Points, T& p)
-{
-     int n = Points.size();   
-        
-    // There must be at least 3 vertices in polygon[]
-    if (n < 3)  return false;
-    
-    // Create a point for line segment from p to infinite
-    T extreme;
-    extreme.x = INF;
-    extreme.y = p.y;
- 
-    // Count intersections of the above line with sides of polygon
-    int count = 0, i = 0;
-    do
-    {
-        int next = (i+1)%n;
- 
-        // Check if the line segment from 'p' to 'extreme' intersects
-        // with the line segment from 'polygon[i]' to 'polygon[next]'
-        if (doIntersect(Points[i], Points[next], p, extreme))
-        {
-            // If the point 'p' is colinear with line segment 'i-next',
-            // then check if it lies on segment. If it lies, return true,
-            // otherwise false
-            if (orientation(Points[i], p, Points[next]) == 0)
-               return onSegment(Points[i], p, Points[next]);
-            count++;
-        }
-        i = next;
-    } while (i != 0);
-    // Return true if count is odd, false otherwise
-    return count&1;  // Same as (count%2 == 1)
-}
-
- std::vector<ScanSegment> determineSegments(std::vector<float> sensor_ranges, int maxGapSize, int minSegmentSize, 
-                                                float segmentdepthThreshold, geo::LaserRangeFinder lrf_model, 
-                                                double minClusterSize, double maxClusterSize, bool checkMinSizeCriteria)
-{
-        unsigned int num_beams = sensor_ranges.size();
-        std::vector<ScanSegment> segments;
- 
-        // Find first valid value
-        ScanSegment current_segment;
-        for ( unsigned int i = 0; i < num_beams - 1; ++i )
-        {
-
-                if ( sensor_ranges[i] > 0 )
-                {
-                        current_segment.push_back(i);
-                        break;
-                }
-        }
-    
-        if ( current_segment.empty() )
-        {
-                return segments;
-        }
-
-        int gap_size = 0;
-        std::vector<float> gapRanges;
-
-        for(unsigned int i = current_segment.front(); i < num_beams; ++i)
-        {
-                float rs = sensor_ranges[i];
-
-                if (    rs == 0 || 
-                        (std::abs(rs - sensor_ranges[current_segment.back()]) > segmentdepthThreshold ) ||  // if there is a minimum number of points not associated
-                        i == num_beams - 1)
-                {
-                        // Found a gap
-                        ++gap_size;
-                        gapRanges.push_back ( rs );
-
-                        if (gap_size >= maxGapSize || i == num_beams - 1)
-                        {
-                                i = current_segment.back() + 1;
-
-                                if (current_segment.size()  >= minSegmentSize || !checkMinSizeCriteria)
-                                {
-                                        // calculate bounding box
-                                        geo::Vec2 seg_min, seg_max;
-
-                                        for(unsigned int k = 0; k <  current_segment.size(); ++k)
-                                        {
-                                                geo::Vector3 p = lrf_model.rayDirections()[ current_segment[k]] * sensor_ranges[current_segment[k]];
-
-                                                if (k == 0)
-                                                {
-                                                        seg_min = geo::Vec2(p.x, p.y);
-                                                        seg_max = geo::Vec2(p.x, p.y);
-                                                }
-                                                else
-                                                {
-                                                        seg_min.x = std::min(p.x, seg_min.x);
-                                                        seg_min.y = std::min(p.y, seg_min.y);
-                                                        seg_max.x = std::max(p.x, seg_max.x);
-                                                        seg_max.y = std::max(p.y, seg_max.y);
-                                                }
-                                        }
-
-                                        geo::Vec2 bb = seg_max - seg_min;
-                                        if ( ( bb .x > minClusterSize || bb.y > minClusterSize || !checkMinSizeCriteria) && 
-                                                bb.x < maxClusterSize && bb.y < maxClusterSize )
-                                        {
-                                                segments.push_back ( current_segment );
-                                        } 
-                                }
-
-                                current_segment.clear();
-                                gapRanges.clear();
-
-                                // Find next good value
-                                while (i < num_beams &&  sensor_ranges[i] == 0)
-                                {
-                                        ++i; // check for confidence left
-                                }
-
-                                int nPointsToCheck = POINTS_TO_CHECK_CONFIDENCE;
-                                if ( i < nPointsToCheck )
-                                {
-                                nPointsToCheck = i;
-                                }
-
-                                current_segment.push_back ( i );
-                        }
-                }
-                else
-                {
-                        gap_size = 0;
-                        gapRanges.clear();
-                        current_segment.push_back ( i );
-                }
-        }
-        
-    return segments;
-}
-
-void addEvidenceWIRE(wire_msgs::WorldEvidence& world_evidence, tracking::FeatureProperties measuredProperty )
-// Converter from measured properties to WIRE-info
-{
-        wire_msgs::Property properties;
-        properties.attribute = "positionAndDimension";  
-        
-        std::shared_ptr<pbl::Gaussian> zRectangle = std::make_shared<pbl::Gaussian>(RECTANGLE_MEASURED_STATE_SIZE + RECTANGLE_MEASURED_DIM_STATE_SIZE);
-        zRectangle->setMean(measuredProperty.rectangle_.get_H()* measuredProperty.rectangle_.getState());
-        zRectangle->setCovariance(measuredProperty.rectangle_.get_H()* measuredProperty.rectangle_.getCovariance()*measuredProperty.rectangle_.get_H().t());
-        
-        std::shared_ptr<pbl::Gaussian> zCircle = std::make_shared<pbl::Gaussian>(CIRCLE_MEASURED_STATE_SIZE + CIRCLE_MEASURED_DIM_STATE_SIZE);
-        zCircle->setMean(measuredProperty.circle_.get_H()* measuredProperty.circle_.getState());
-        zCircle->setCovariance(measuredProperty.circle_.get_H()* measuredProperty.circle_.getCovariance()*measuredProperty.circle_.get_H().t());
-
-        pbl::Hybrid  hyb;
-        hyb.addPDF(*zRectangle,measuredProperty.getFeatureProbabilities().get_pRectangle());
-        hyb.addPDF(*zCircle, measuredProperty.getFeatureProbabilities().get_pCircle());
-        
-        pbl::PDFtoMsg(hyb, properties.pdf);
-        wire_msgs::ObjectEvidence obj_evidence;
-        obj_evidence.properties.push_back(properties);
-        
-        world_evidence.object_evidence.push_back(obj_evidence);
-}
-
 // ----------------------------------------------------------------------------------------------------
 
 LaserPluginTracking::LaserPluginTracking() : tf_listener_(0)
@@ -863,10 +80,6 @@ void LaserPluginTracking::initialize(ed::InitData& init)
     pose_updated_pub_ = nh.advertise<geometry_msgs::PoseStamped> ( "PoseTest", 3 ); // TEMP
     points_measured_pub_ = nh.advertise<visualization_msgs::Marker> ( "MeasuredPoints", 3 ); // TEMP;
     points_modelled_pub_ = nh.advertise<visualization_msgs::Marker> ( "ModelledPoints", 3 ); // TEMP;
-    points_modelled_all_pub_ = nh.advertise<visualization_msgs::Marker> ( "ModelledPointsAll", 3 ); // TEMP;
-    points_measured_all_pub_ = nh.advertise<visualization_msgs::Marker> ( "MeasuredPointsAll", 3 ); // TEMP;
-    cornerPointModelled_pub_ = nh.advertise<visualization_msgs::Marker> ( "cornerPointModelled", 3 ); // TEMP
-    cornerPointMeasured_pub_ = nh.advertise<visualization_msgs::Marker> ( "cornerPointMeasured", 3 ); // TEMP
     associatedPoints_pub_ = nh.advertise<sensor_msgs::LaserScan> ("ed/associatedPoints", 3); // TEMP
     
     tf_listener_ = new tf::TransformListener;
@@ -1056,9 +269,9 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
     }
 
     float segmentDepthThresholdSmall = segment_depth_threshold_;
-    std::vector<ScanSegment> staticSegments = determineSegments(modelRangesAssociatedRanges2StaticWorld, max_gap_size_, 
-                                                                min_segment_size_pixels_, segmentDepthThresholdSmall, 
-                                                                lrf_model_, min_cluster_size_, max_cluster_size_, true );
+    std::vector<tracking::ScanSegment> staticSegments = tracking::determineSegments(modelRangesAssociatedRanges2StaticWorld, max_gap_size_, 
+                                                                        min_segment_size_pixels_, segmentDepthThresholdSmall, 
+                                                                        lrf_model_, min_cluster_size_, max_cluster_size_, true );
 
     std::sort(staticSegments.begin(), staticSegments.end(), sortBySegmentSize);
 
@@ -1079,7 +292,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
      
     for(unsigned int iSegment = 0; iSegment < staticSegments.size(); iSegment++)
     {
-           ScanSegment staticSegment = staticSegments[iSegment];
+           tracking::ScanSegment staticSegment = staticSegments[iSegment];
 
            if( staticSegment.size() < min_segment_size_pixels_ )
            {
@@ -1136,61 +349,13 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                         counter++;
                 }
 
-                visualization_msgs::Marker pointsMeasured, pointsModelled;
+                visualization_msgs::Marker modelledPointsMarker, measuredPointsMarker;
+                modelledPointsMarker = visualizePoints(modelledPoints, "/map", "modelledPoints", scan->header.stamp, sensor_pose.getOrigin().getZ(), 1 );
+                measuredPointsMarker = visualizePoints(measuredPoints, "/map", "measuredPoints", scan->header.stamp, sensor_pose.getOrigin().getZ(), 2 );
 
-                pointsModelled.header.frame_id = "/map";
-                pointsModelled.header.stamp = scan->header.stamp;
-                pointsModelled.ns = "modelledPoints";
-                pointsModelled.id = 1;
-                pointsModelled.type = visualization_msgs::Marker::POINTS;
-                pointsModelled.action = visualization_msgs::Marker::ADD;
-                pointsModelled.scale.x = 0.1;
-                pointsModelled.scale.y = 0.1;
-                pointsModelled.scale.z = 0.1;
-                pointsModelled.color.r = 0.0;
-                pointsModelled.color.g = 0.0;
-                pointsModelled.color.b = 1.0;
-                pointsModelled.color.a = 1.0; 
-                pointsModelled.lifetime = ros::Duration( MARKER_TIMEOUT_TIME );
-                        
-                for(int iPoints = 0; iPoints < modelledPoints.size(); iPoints++)
-                {
-                        geometry_msgs::Point p;
-                        
-                        p.x = modelledPoints[iPoints].x;
-                        p.y = modelledPoints[iPoints].y;
-                        p.z = sensor_pose.getOrigin().getZ();
-                        
-                        pointsModelled.points.push_back(p);
-                }
-                points_modelled_pub_.publish( pointsModelled );
-                
-               pointsMeasured.header.frame_id = "/map";
-               pointsMeasured.header.stamp = scan->header.stamp;
-               pointsMeasured.ns = "measuredPoints";
-               pointsMeasured.id = 1;
-               pointsMeasured.type = visualization_msgs::Marker::POINTS;
-               pointsMeasured.action = visualization_msgs::Marker::ADD;
-               pointsMeasured.scale.x = 0.1;
-               pointsMeasured.scale.y = 0.1;
-               pointsMeasured.scale.z = 0.1;
-               pointsMeasured.color.r = 0.0;
-               pointsMeasured.color.g = 1.0;
-               pointsMeasured.color.b = 0.0;
-               pointsMeasured.color.a = 1.0; 
-               pointsMeasured.lifetime = ros::Duration( MARKER_TIMEOUT_TIME );
-                        
-                for(int iPoints = 0; iPoints < measuredPoints.size(); iPoints++)
-                {
-                        geometry_msgs::Point p;
-                        
-                        p.x = measuredPoints[iPoints].x;
-                        p.y = measuredPoints[iPoints].y;
-                        p.z = sensor_pose.getOrigin().getZ();
-                        pointsMeasured.points.push_back(p);
-                }
-                points_measured_pub_.publish( pointsMeasured );
-                
+                points_modelled_pub_.publish( modelledPointsMarker );
+                points_measured_pub_.publish( measuredPointsMarker );
+
                 Eigen::VectorXf lineFitParamsMeasured( 2 ), lineFitParamsModdelled( 2 );
                 std::vector<geo::Vec2f>::iterator it_start = measuredPoints.begin();
                 std::vector<geo::Vec2f>::iterator it_end = measuredPoints.end();
@@ -1212,29 +377,26 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                 }
                 else
                 {
-                        ROS_WARN("Big angle correction required. Localisation correct?");
+                        ROS_WARN("Big angle correction required. Localisation correct?"); // TODO this is actually a monitor of the assumptions. What to do if assumptions violated?!
                 }
-                
            }
            
            if( angleCorrectionFound )        
            {
                    break;
            }
-            
-           
     }
     
     geo::Pose3D sensor_poseCorrected;
     if( angleCorrectionFound )
     {
             yawSensor -= diffAngle;
-            tracking::wrap2Interval(&yawSensor, (double) 0.0, (double) 2*M_PI);
+            wrap2Interval(&yawSensor, (double) 0.0, (double) 2*M_PI);
             
             sensor_poseCorrected = sensor_pose;
             sensor_poseCorrected.setRPY(rollSensor, pitchSensor, yawSensor );
     }
-            
+
      // TEMP TO TEST
      geometry_msgs::PoseStamped updatedSensorPose;
      updatedSensorPose.header = scan->header;
@@ -1264,9 +426,9 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                 }
      }
     
-     std::vector<ScanSegment> segments = determineSegments(sensor_ranges, max_gap_size_, min_segment_size_pixels_, 
-                                                                segment_depth_threshold_, lrf_model_, min_cluster_size_, 
-                                                                max_cluster_size_, false );
+     std::vector<tracking::ScanSegment> segments = tracking::determineSegments(   sensor_ranges, max_gap_size_, min_segment_size_pixels_, 
+                                                                        segment_depth_threshold_, lrf_model_, min_cluster_size_, 
+                                                                        max_cluster_size_, false );
     
     // Try to associate remaining laser points to specific entities
     std::vector<ed::WorldModel::const_iterator> it_laserEntities;
@@ -1339,7 +501,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
         }
     }
     
-     std::vector< PointsInfo > associatedPointsInfo( it_laserEntities.size() );
+     std::vector< tracking::PointsInfo > associatedPointsInfo( it_laserEntities.size() );
      sensor_msgs::LaserScan test;
      test = *scan;
 
@@ -1351,7 +513,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
     for ( unsigned int iSegments = 0; iSegments < segments.size(); ++iSegments )
     {
         // First, determine the properties of each segment
-        ScanSegment& segment = segments[iSegments];
+        tracking::ScanSegment& segment = segments[iSegments];
         unsigned int segment_size = segment.size();
 
         std::vector<geo::Vec2f> points ( segment_size );
@@ -1405,132 +567,18 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
 
         // If a cluster could be associated to a (set of) entities, determine for each point to which entitiy it belongs based on a shortest distance criterion. 
         // If the distance is too large, initiate a new entity
-        PointsInfo pointsNotAssociated;
+        tracking::PointsInfo pointsNotAssociated;
         std::vector<float> distances ( points.size() );
         std::vector<unsigned int> IDs ( points.size() ); // IDs of the entity which is closest to that point
         
         for ( unsigned int i_points = 0; i_points < points.size(); ++i_points )  // Determine closest object and distance to this object. If distance too large, relate to new object
         {
-            geo::Vec2f p = points[i_points];
-            float shortestDistance = std::numeric_limits< float >::max();
-            unsigned int id_shortestEntity = std::numeric_limits< unsigned int >::max();
+//                IDs[i_points] = determineClosestObject(points[i_points], possibleSegmentEntityAssociations, distances[i_points],
+//                                                        scan->header.stamp.toSec());
 
-            for ( unsigned int jj = 0; jj < possibleSegmentEntityAssociations.size(); jj++ )  // relevant entities only
-            {
-                const ed::EntityConstPtr& e = *it_laserEntities[ possibleSegmentEntityAssociations[jj] ];
-
-//                 if( !e-> property ( featureProperties_) )
-//                 {
-//                         ROS_WARN(" ed_sensor_integration:  !e-> property ( featureProperties_)");
-//                         req.removeEntity ( e->id() );
-//                         continue;
-//                 }
-                
-                tracking::FeatureProperties featureProperties = e->property ( featureProperties_ );
-
-                float dist;
-                float dt = scan->header.stamp.toSec() - e->lastUpdateTimestamp();
-                
-//                 std::cout << std::setprecision(5) << "dt = " << dt << " scan->header.stamp.toSec() = " << scan->header.stamp.toSec() << " e->lastUpdateTimestamp() = " << e->lastUpdateTimestamp() << std::endl;
-                
-// 		if(featureProperties.getFeatureProbabilities().getDomainSize() != 2 )// TODO ugly!
-// 		{
-//                         ROS_WARN(" ed_sensor_integration: featureProperties.getFeatureProbabilities().getDomainSize() != 2, 2nd version");
-// 			req.removeEntity ( e->id() );
-//                         continue;
-// 		}	
-                
-//                 if(featureProperties.getFeatureProbabilities().get_pCircle() == -1.0 || featureProperties.getFeatureProbabilities().get_pRectangle() == -1.0 ) // TODO ugly!
-//                 {
-//                         ROS_WARN(" ed_sensor_integration: pCircle == -1.0 || pRectangle == -1.0");
-//                         
-//                         req.removeEntity ( e->id() );
-//                         continue;
-//                 }
-
-                if ( featureProperties.getFeatureProbabilities().get_pCircle() > featureProperties.getFeatureProbabilities().get_pRectangle() ) 
-                {
-                    tracking::Circle circle = featureProperties.getCircle();  
-                    circle.predictAndUpdatePos( dt ); // TODO Do this update once at initialisation
-                    dist = std::abs ( std::sqrt ( std::pow ( p.x - circle.get_x(), 2.0 ) + std::pow ( p.y - circle.get_y(), 2.0 ) ) - circle.get_radius() ); // Distance of a point to a circle, see https://www.varsitytutors.com/hotmath/hotmath_help/topics/shortest-distance-between-a-point-and-a-circle
-                }
-                else     // entity is considered to be a rectangle. Check if point is inside the rectangle
-                {
-                    tracking::Rectangle rectangle = featureProperties.getRectangle();
-                    rectangle.predictAndUpdatePos( dt );// TODO Do this update once at initialisation
-
-                    std::vector<geo::Vec2f> corners = rectangle.determineCorners ( 0.0 );
-
-                    geo::Vec2f vx = corners[1] - corners[0];
-                    geo::Vec2f vy = corners[3] - corners[0];
-
-                    geo::Vec2f pCorrected = p - corners[0];
-
-                    // Test if point is inside rectangle https://math.stackexchange.com/questions/190111/how-to-check-if-a-point-is-inside-a-rectangle
-                    geo::Vec2f OP = p - corners[0]; // Distance from origin to point which is tested
-                    geo::Vec2f OC1 = corners[1] - corners[0];
-                    geo::Vec2f OC3 = corners[3] - corners[0];
-
-                    float OP_OC1   = OP.dot ( OC1 ); // elementwise summation
-                    float OC1_OC1B = OC1.dot ( OC1 );
-                    float OP_OC3   = OP.dot ( OC3 );
-                    float OC3_OC3  = OC3.dot ( OC3 );
-
-                    float minDistance = std::numeric_limits< float >::infinity();
-                    
-                    if ( OP_OC1 > 0 && OC1_OC1B > OP_OC1 && OP_OC3 > 0 && OC3_OC3 > OP_OC3 )   // point is inside the rectangle
-                    {
-                        std::vector<geo::Vec2f> p1Check = corners;
-
-                        std::vector<geo::Vec2f> p2Check = corners; // place last element at begin
-                        p2Check.insert ( p2Check.begin(), p2Check.back() );
-                        p2Check.erase ( p2Check.end() );
-
-                        for ( unsigned int ii_dist = 0; ii_dist < p1Check.size(); ii_dist++ )
-                        {
-
-                            float x1 = p1Check[ii_dist].x;
-                            float x2 = p2Check[ii_dist].x;
-
-                            float y1 = p1Check[ii_dist].y;
-                            float y2 = p2Check[ii_dist].y;
-
-                            float distance = std::abs ( ( y2 - y1 ) *p.x - ( x2 - x1 ) *p.y + x2*y1 -y2*x1 ) /std::sqrt ( std::pow ( y2-y1, 2.0 ) + std::pow ( x2-x1, 2.0 ) );
-                            
-                            if ( distance < minDistance )
-                            {
-                                minDistance = distance;
-                            }
-                        }
-                    }
-                    else     // point is outside the rectangle, https://stackoverflow.com/questions/44824512/how-to-find-the-closest-point-on-a-right-rectangular-prism-3d-rectangle/44824522#44824522
-                    {
-                        float tx = pCorrected.dot ( vx ) / ( vx.dot ( vx ) );
-                        float ty = pCorrected.dot ( vy ) / ( vy.dot ( vy ) );
-
-                        tx = tx < 0 ? 0 : tx > 1 ? 1 : tx;
-                        ty = ty < 0 ? 0 : ty > 1 ? 1 : ty;
-
-                        geo::Vec2f closestPoint = tx*vx + ty*vy + corners[0];
-
-                        geo::Vec2f vector2Point = p - closestPoint;
-                        minDistance = std::sqrt ( vector2Point.dot ( vector2Point ) );
-                    }
-
-                    dist = minDistance;
-                }
-                
-                if ( dist < shortestDistance )
-                {
-                        shortestDistance = dist;
-                        id_shortestEntity = jj;
-                }
-            }
-
-//             std::cout << "shortestDistance for point " << points[i_points] << " = " << shortestDistance << " to entity = " << id_shortestEntity << std::endl;
-
-            distances[i_points] = shortestDistance;
-            IDs[i_points] = id_shortestEntity;
+                IDs[i_points] = determineClosestObject(points[i_points], &distances[i_points], scan->header.stamp.toSec(),
+                        possibleSegmentEntityAssociations, it_laserEntities, featureProperties_);
+                //(geo::Vec2f point, std::vector< int > possibleSegmentEntityAssociations, float *shortestDistance)
         }
 
         unsigned int IDtoCheck = IDs[0];
@@ -1614,7 +662,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                 else
                 {
                         previousSegmentAssociated = false;
-                        pointsNotAssociated = PointsInfo();
+                        pointsNotAssociated = tracking::PointsInfo();
 
                         for (unsigned int i_points = firstElement; i_points < iDistances; ++i_points)
                         {
@@ -2169,7 +1217,8 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
         
         if ( check )
         {
-                if( measuredProperty.circle_.get_x() != measuredProperty.circle_.get_x() || 
+                if( measuredProperty.isValid()
+ /*                       measuredProperty.circle_.get_x() != measuredProperty.circle_.get_x() || 
                         measuredProperty.circle_.get_y() != measuredProperty.circle_.get_y() || 
                         measuredProperty.circle_.get_xVel() != measuredProperty.circle_.get_xVel() ||
                         measuredProperty.circle_.get_yVel() != measuredProperty.circle_.get_yVel() ||
@@ -2182,6 +1231,7 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
                         measuredProperty.rectangle_.get_d() != measuredProperty.rectangle_.get_d() ||
                         measuredProperty.featureProbabilities_.get_pRectangle() != measuredProperty.featureProbabilities_.get_pRectangle() ||
                         measuredProperty.featureProbabilities_.get_pCircle() != measuredProperty.featureProbabilities_.get_pCircle() 
+                        */
                 )
                 {
                      ROS_FATAL  ( "ed_sensor_integration: problems!!!!!!!!!" );
@@ -2208,7 +1258,6 @@ void LaserPluginTracking::update(const ed::WorldModel& world, const sensor_msgs:
 }
 
 // ----------------------------------------------------------------------------------------------------
-
 
 void LaserPluginTracking::scanCallback(const sensor_msgs::LaserScan::ConstPtr& msg)
 {
